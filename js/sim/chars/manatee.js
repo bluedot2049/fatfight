@@ -39,6 +39,7 @@ const SU = [
 
 export default {
   id: 'manatee', name: '海牛', full: '灰色海牛', color: '#7fe6ff',
+  blurb: '遠處吐泡泡、尾巴對空', stat: [4, 5, 2],     // 選角畫面：一句話、力氣／距離／速度（1–5）
   w: 330, h: 1450, hc: 950,
   walkX: 16, walkZ: 11, run: 44, runZ: 9, jumpV: 150, jumpX: 18, jumpZ: 12, dashV: 102, dashX: 58,
   normals: N, specials: SP, supers: SU,

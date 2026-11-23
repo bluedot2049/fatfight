@@ -39,6 +39,7 @@ const SU = [
 
 export default {
   id: 'marmot', name: '胖鼠', full: '土撥鼠界最狂妄', color: '#ffd84a',
+  blurb: '近身亂鑽、翻滾衝撞', stat: [3, 2, 5],       // 選角畫面：一句話、力氣／距離／速度（1–5）
   w: 300, h: 1150, hc: 760,
   walkX: 20, walkZ: 13, run: 54, runZ: 11, jumpV: 156, jumpX: 22, jumpZ: 14, dashV: 105, dashX: 68,
   normals: N, specials: SP, supers: SU,

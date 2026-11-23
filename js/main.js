@@ -7,7 +7,9 @@ import { Hud } from './ui/hud.js';
 import { Keyboard } from './ui/keys.js';
 import { Menu, selectScreen, moveListHtml, keysHtml } from './ui/menu.js';
 import { KEYMAP, keyName } from './ui/keys.js';
-import { unlockAudio, sfxEvent, play } from './ui/sfx.js';
+import { unlockAudio, sfxEvent, sfxState, play, soundMode, setSoundMode, SOUND_NAMES } from './ui/sfx.js';
+import { music } from './ui/music.js';
+import { gt } from './ui/gt.js';
 import { newMatch, step } from './sim/match.js';
 import { CHARS, MOVES } from './sim/chars/index.js';
 import { LEFT, RIGHT, BD, BJ, BS } from './sim/const.js';
@@ -40,7 +42,16 @@ function setMovesOn(on) {
   try { localStorage.setItem(MOVES_KEY, on ? '1' : '0'); } catch {}
 }
 const DUMMY = ['站著', '蹲著', '防禦', '蹲防', '一直跳', '由 P2 操作'];
-view.onEvent = (e, S) => { if (G.mode === 'fight') { hud.event(e, S); sfxEvent(e); } };
+// 聲音偏左偏右：場上的 x（公釐）離鏡頭中心多遠
+const panOf = (x) => Math.max(-0.8, Math.min(0.8, ((x || 0) / 1000 - view.cam.x) / 6));
+view.onEvent = (e, S) => {
+  if (G.mode !== 'fight') return;
+  hud.event(e, S, view);
+  sfxEvent(e, e.x === undefined ? (e.s === undefined ? 0 : panOf(S.p[e.s]?.x)) : panOf(e.x));
+  // 音樂跟著比賽：KO 壓低、下一回合拉回來、打完留一點點
+  if (e.k === 'ko') music.level(0.3, 0.2); else if (e.k === 'round') music.level(1, 0.6); else if (e.k === 'over') music.level(0.25, 0.5);
+};
+const soundItem = () => ({ label: '聲音', value: () => SOUND_NAMES[soundMode()], on: () => setSoundMode(soundMode() + 1), cycle: (d) => setSoundMode(soundMode() + d) });
 addEventListener('pointerdown', unlockAudio);
 
 // ---------- 主迴圈 ----------
@@ -60,7 +71,7 @@ function loop(now) {
     if (n >= 6) acc = 0;
   }
   view.render(G.S, G.events, dt);
-  if (G.mode === 'fight') hud.update(G.S, dt);
+  if (G.mode === 'fight') { hud.update(G.S, dt); if (!G.paused) sfxState(G.S, panOf); }
   requestAnimationFrame(loop);
 }
 
@@ -93,6 +104,12 @@ function dummyBits() {
 }
 
 // ---------- 畫面流程 ----------
+// 選角背景擺的兩隻：站在畫面兩邊三分之一的地方，中間留給 VS（只是擺樣子，不是比賽）
+function showcase(c0, c1) {
+  const S = newMatch(c0, c1);
+  S.p[0].x = -1300; S.p[1].x = 1300;
+  return S;
+}
 function toTitle() {
   if (G.net) { G.net.close(); G.net = null; }
   G.rb = null; G.mode = 'title'; G.paused = false;
@@ -100,19 +117,24 @@ function toTitle() {
   hud.show(false); hud.net('');
   closeOverlay();
   document.body.classList.add('at-title');
-  view.camOffset = 1.4;
+  view.camOffset = 2.0;
+  G.S.p[0].x = -950; G.S.p[1].x = 950;      // 標題的兩隻站近一點，擠在右半邊（只是擺樣子，不是比賽）
+  music.menu(); music.muffle(false); music.level(1);
+  const tick = '海牛 VS 土撥鼠　／　超能力格鬥　／　胖鼠牛了　／　';
   menu.show({
     cls: 'title',
-    title: '<span class="logo"><i class="m">胖鼠</i><i class="r">牛了</i></span>',
-    sub: '海牛 vs 土撥鼠　超能力格鬥',
+    logo: `<h1 class="logo">${gt('胖鼠', { cls: 'a', sw: 0.1, k: 0.035 })}${gt('牛了', { cls: 'b', sw: 0.1, k: 0.035 })}</h1>`,
+    sub: '海牛 VS 土撥鼠<i></i>超能力格鬥',
     items: [
-      { label: '本機雙人', on: () => toSelect('local') },
-      { label: '練習', on: () => toSelect('train') },
-      { label: '線上對戰', on: onlineMenu },
-      { label: '招式表', on: () => showOverlay(moveListHtml()) },
-      { label: '按鍵', on: () => showOverlay(keysHtml()) },
+      { label: '本機雙人', desc: '同一台鍵盤兩個人', on: () => toSelect('local') },
+      { label: '練習', desc: '木樁、血會回', on: () => toSelect('train') },
+      { label: '線上對戰', desc: '房間碼找朋友', on: onlineMenu },
+      { label: '招式表', desc: '兩隻的必殺技', on: () => showOverlay(moveListHtml()) },
+      { label: '按鍵', desc: 'P1、P2 的鍵位', on: () => showOverlay(keysHtml()) },
+      soundItem(),
     ],
-    foot: `方向鍵移動　${['A', 'J', 'D'].map((k, i) => keyName(KEYMAP[0][k][0]) + ' ' + ['攻', '跳', '防'][i]).join('　')}　Enter 確定`,
+    foot: `<span><kbd>↑</kbd><kbd>↓</kbd>選</span><span><kbd>${keyName(KEYMAP[0].A[0])}</kbd>確定</span><span><kbd>${keyName(KEYMAP[0].J[0])}</kbd>返回</span>`,
+    extra: `<div class="ticker"><span>${tick.repeat(12)}</span></div><div class="ver">α 0.2</div>`,
   });
 }
 
@@ -120,9 +142,13 @@ function toSelect(kind, onlineSide = 0) {
   G.kind = kind; G.mode = 'select';
   view.camOffset = 0;
   document.body.classList.remove('at-title');
+  music.menu(); music.muffle(false); music.level(1);
+  hud.show(false);
   const scr = selectScreen({
     mode: kind, side: onlineSide,
     back: toTitle,
+    // 游標移到誰，背景就換成那兩隻站著
+    onHover: (c0, c1) => { if (G.mode === 'select' && (G.S.p[0].ch !== c0 || G.S.p[1].ch !== c1)) G.S = showcase(c0, c1); },
     onPick: kind === 'online' ? (ch, ok) => G.net?.ctl({ t: 'pick', ch, ok }) : null,
     done: (c0, c1) => {
       if (kind === 'online') { if (G.side === 0) startOnline(c0, c1); }
@@ -131,7 +157,10 @@ function toSelect(kind, onlineSide = 0) {
   });
   scr.refresh = () => menu.render();
   G.select = scr;
+  G.paused = false;
+  G.S = showcase(G.S.p[0].ch, G.S.p[1].ch);
   menu.show(scr);
+  scr.hover();
 }
 
 function startFight(c0, c1) {
@@ -142,27 +171,30 @@ function startFight(c0, c1) {
   G.mode = 'fight'; G.paused = false; acc = 0; G.overShown = false;
   hud.show(true); hud.setNames(G.S); hud.setMoves(G.S, 0); hud.showMoves(movesOn);
   document.body.classList.remove('at-title');
+  music.muffle(false); music.level(1); music.battle();
 }
 
 // ---------- 暫停、結果 ----------
 function pauseMenu() {
   if (G.kind === 'online') { showOverlay(moveListHtml(G.S.p[G.side].ch) + `<p class="foot">線上對戰不會暫停。　<span data-act="leave">離開對戰</span></p>`); return; }
   G.paused = true;
+  music.muffle(true); play('pause');
+  const resume = () => { G.paused = false; music.muffle(false); menu.hide(); };
   const items = [
-    { label: '繼續', on: () => { G.paused = false; menu.hide(); } },
+    { label: '繼續', on: resume },
     { label: '招式表', on: () => showOverlay(moveListHtml()) },
     { label: '左下招式表', value: () => (movesOn ? '顯示' : '不顯示'), on: () => setMovesOn(!movesOn), cycle: () => setMovesOn(!movesOn) },
   ];
   if (G.kind === 'train') items.push({ label: '對手', value: () => DUMMY[G.dummy], on: () => { G.dummy = (G.dummy + 1) % DUMMY.length; }, cycle: (d) => { G.dummy = (G.dummy + d + DUMMY.length) % DUMMY.length; } });
   items.push({ label: '判定框', value: () => (view.debug ? '顯示' : '不顯示'), on: () => { view.debug = !view.debug; }, cycle: () => { view.debug = !view.debug; } });
-  items.push({ label: '換角色', on: () => toSelect(G.kind) }, { label: '回標題', on: toTitle });
-  menu.show({ title: '暫停', items, back: () => { G.paused = false; menu.hide(); } });
+  items.push(soundItem(), { label: '換角色', on: () => toSelect(G.kind) }, { label: '回標題', on: toTitle });
+  menu.show({ title: '暫停', items, back: resume });
 }
 
 function showResult() {
   if (G.kind === 'online') {
     menu.show({
-      title: '比賽結束',
+      title: '比賽結束', cls: 'result',
       items: [{ label: '再來一場', on: () => { G.again = true; G.net.ctl({ t: 'again' }); maybeRematch(); menu.cur.sub = '等對方…'; } },
         { label: '換角色', on: () => { G.net.ctl({ t: 'reselect' }); toSelect('online', G.side); } },
         { label: '離開', on: toTitle }],
@@ -171,7 +203,7 @@ function showResult() {
     return;
   }
   menu.show({
-    title: '比賽結束',
+    title: '比賽結束', cls: 'result',
     items: [{ label: '再來一場', on: () => startFight(...G.chars) }, { label: '換角色', on: () => toSelect(G.kind) }, { label: '回標題', on: toTitle }],
     back: () => {},
   });
@@ -281,6 +313,7 @@ function beginOnline(ch, delay) {
   G.S = G.rb.S;
   G.mode = 'fight'; G.paused = false; acc = 0; G.overShown = false;
   hud.show(true); hud.setNames(G.S); hud.setMoves(G.S, G.side); hud.showMoves(movesOn);
+  music.muffle(false); music.level(1); music.battle();
 }
 function netStatus() {
   const rb = G.rb;
@@ -292,7 +325,7 @@ function netStatus() {
 }
 
 // ---------- 開始 ----------
-if (qs.has('debug')) window.__g = { G, view, hud, keys, menu, step, newMatch, CHARS };
+if (qs.has('debug')) window.__g = { G, view, hud, keys, menu, step, newMatch, CHARS, music, play };
 // ?fight=manatee,marmot 直接進本機對戰（截圖、測試用）；&train 練習
 if (qs.has('fight')) {
   const [a, b] = (qs.get('fight') || 'manatee,marmot').split(',');
@@ -300,4 +333,3 @@ if (qs.has('fight')) {
   startFight(CHARS[a] ? a : 'manatee', CHARS[b] ? b : 'marmot');
 } else toTitle();
 requestAnimationFrame(loop);
-play('move');
