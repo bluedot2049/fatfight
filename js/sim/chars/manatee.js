@@ -15,7 +15,7 @@ const N = {
     hits: [hit([12, 15], [150, 400, 880, 1150], 'H', { dmg: 70, kd: 1, dvx: 34, dvy: 60, bdef: 55 })] }),
   runA: mv('runA', '衝鋒頭槌', 34, { pose: 'cC', vx: [[0, 40], [14, 10], [20, 0]],
     hits: [hit([6, 14], [100, 300, 800, 1200], 'H', { dmg: 65, kd: 1, dvx: 24, dvy: 55 })] }),
-  jA: mv('jA', '空中大拍', 30, { pose: 'jC', air: 1, hits: [hit([5, 14], [80, 150, 640, 750], 'L', { dmg: 50, fall: 45 })] }),
+  jA: mv('jA', '空中大拍', 20, { pose: 'jC', air: 1, hits: [hit([5, 14], [80, 150, 640, 750], 'L', { dmg: 50, fall: 45 })] }),
   dashA: mv('dashA', '泰山壓頂', 30, { pose: 'jD', air: 1, hits: [hit([5, 16], [100, -80, 700, 500], 'H', { dmg: 70, kd: 1 })] }),
 };
 
@@ -27,14 +27,14 @@ const SP = [
     m: mv('wave', '翻滾浪', 46, { kind: 'sp', mp: 150, hurt: [-300, 0, 300, 900], vx: [[0, 0], [6, 52], [28, 0]], zm: 10, stick: 1,
       hits: [hit([8, 13], [0, 0, 540, 1000], 'S', { dmg: 40, fall: 20, hs: 18 }), hit([18, 24], [0, 0, 540, 1000], 'S', { dmg: 50, kd: 1, dvx: 24, dvy: 70 })] }) },
   { id: 'tail', name: '尾巴一甩', d: 'u', btn: 'A', note: '對空，起手打不到',
-    m: mv('tail', '尾巴一甩', 30, { kind: 'sp', mp: 150, inv: [1, 8], jump: [4, 10, 100], land: 16,
+    m: mv('tail', '尾巴一甩', 30, { kind: 'sp', mp: 150, inv: [1, 8], jump: [4, 10, 100], land: 4, landW: 11,
       hits: [hit([4, 14], [0, 400, 580, 1650], 'S', { dmg: 100, kd: 1, dvx: 16, dvy: 95 })] }) },
 ];
 
 const BEAM = [150, 250, 2900, 1350];
 const SU = [
   { id: 'surge', name: '深海霸氣', d: 'u', btn: 'J', note: '整排浪打過去，前後也很寬',
-    m: mv('surge', '深海霸氣', 86, { kind: 'su', mp: 400, flash: 1, inv: [0, 16], hits: multi(16, 8, 6, BEAM, 40, 90, { zr: 420 }) }) },
+    m: mv('surge', '深海霸氣', 86, { kind: 'su', mp: 400, flash: 1, inv: [0, 16], hits: multi(16, 8, 6, BEAM, 40, 90, { zr: 650 }) }) },
 ];
 
 export default {

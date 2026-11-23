@@ -92,7 +92,12 @@ export function poseOf(f, clock) {
       break;
     }
     case 'run': { const s = Math.sin(f.x / 90); p = over(BASE.run, { by: 0.06 * Math.abs(s), lN: 1.0 * s, lF: -1.0 * s }); break; }
-    case 'crouch': p = over(BASE.crouch, { by: -0.04 + 0.008 * cyc(0.9) }); break;
+    case 'crouch': {
+      if (!f.vx && !f.vz) { p = over(BASE.crouch, { by: -0.04 + 0.008 * cyc(0.9) }); break; }
+      const s = Math.sin((f.x + f.z) / 70);                        // 蹲著走：小碎步、身體左右晃
+      p = over(BASE.crouch, { by: -0.04 + 0.015 * Math.abs(s), lN: 0.35 * s, lF: -0.35 * s, spin: 0.06 * s });
+      break;
+    }
     case 'brake': p = BASE.brake; break;
     case 'guard': case 'block': p = f.cr ? BASE.cblock : BASE.block; break;
     case 'pre': p = BASE.pre; break;

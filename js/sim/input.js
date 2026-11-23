@@ -27,8 +27,9 @@ export const holding = (H, bit) => !!(H.prev & bit);
 export const dirX = (H) => ((H.prev & RIGHT) ? 1 : 0) - ((H.prev & LEFT) ? 1 : 0);
 export const dirZ = (H) => ((H.prev & DOWN) ? 1 : 0) - ((H.prev & UP) ? 1 : 0);
 
-// 最近 buf 幀內按下過這顆鍵、而且還沒拿去用過：回傳是第幾格紀錄（找不到 -1）
-export function pressed(H, bit, buf = 4) {
+// 最近 buf 幀內按下過這顆鍵、而且還沒拿去用過：回傳是第幾格紀錄（找不到 -1）。
+// 預設 8 幀（約 0.13 秒）：收招、落地前先按好的鍵，能動的那一幀就出（原本 4 幀，太早按會被吃掉）
+export function pressed(H, bit, buf = 8) {
   for (let i = H.k.length - 1; i >= 0; i--) {
     if (H.n - H.t[i] >= buf) break;
     if (H.k[i] === bit && H.t[i] > H.used[slot(bit)]) return i;

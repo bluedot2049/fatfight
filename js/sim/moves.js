@@ -6,29 +6,31 @@
 //   total 全長；kind 'n' 普通技 'sp' 必殺 'su' 超必殺 'sys' 系統；air 空中招（落地就結束）；hurt 自訂受擊框 [x0,y0,x1,y1]（x 往前為正、y 從腳底算）
 //   hits  [{ on:[起,迄], box, zr 前後打得到多遠, dmg, fall 倒值（累積到 40 頭暈、60 倒地）, bdef 打在防禦上累積多少（60 破防）,
 //           hs 受擊硬直, stop 頓格, dvx dvy 倒地時往後、往上飛多快, kd 一定打倒 }]
-//   vx    [[從第幾幀, 往前速度], …]；stick 1＝打到人之後不再往前（角色會互相穿過，衝刺連打要停在對方面前）；zm 出招中按上下還能前後移動多快；jump [第幾幀起跳, 往前速度, 往上速度]＋land 落地硬直
+//   vx    [[從第幾幀, 往前速度], …]；stick 1＝打到人之後不再往前（角色會互相穿過，衝刺連打要停在對方面前）；zm 出招中按上下還能前後移動多快；jump [第幾幀起跳, 往前速度, 往上速度]＋land 打中時落地硬直、landW 揮空或被擋的落地硬直
 //   inv   [起,迄] 打不到；under [起,迄] 鑽到地底（什麼都打不到）
 //   proj  { at 第幾幀射出, x 從身前多遠, y 高度, vx, w, h, dmg, fall, life }
 //   cr    蹲著出的招（受擊框變矮）；next 打到人後按著蹲再按攻接哪一招
 //   mp    要多少魔力；flash 超必殺的定格；cancel 1＝打到人之後可以接必殺
 //   pose  畫面用哪個姿勢（poses.js 的 ATK 表，跟 KOF 版共用同一套角色和姿勢）
 
-// 節奏（使用者 2026-11-24：場地加大、招式跟著快、整體節奏快一點）：每一招定義完都過一次 tune，
-// 幀數乘 3/4、地上位移每幀 ×3、前後偏移 ×3、往上速度 ×1.25（重力也加大）、打飛的左右速度和飛行道具 ×2。角色表照舊寫原本的數字。
-export const TEMPO = [3, 4];
+// 節奏（使用者 2026-11-24：場地加大、招式跟著快；同一天又說整體慢 20%）：每一招定義完都過一次 tune，
+// 幀數乘 15/16（原本 3/4 再拉長 5/4）、地上位移每幀 ×2.4、前後偏移 ×2.4、往上速度不變（重力跟著調，高度不變）、打飛的左右速度和飛行道具 ×1.6。
+// 距離都跟原本一樣，只是走得慢。角色表照舊寫原本的數字。
+export const TEMPO = [15, 16];
 export const T = (t) => ((t * TEMPO[0] + (TEMPO[1] >> 1)) / TEMPO[1]) | 0;
-export const UPV = (v) => (v * 5) >> 2;
-const MOVE_V = 3, ZM = 3, LAUNCH_X = 2, PROJ_V = 2, JUMP_X = 2;
+const sc = (n, d) => (v) => ((v * n) / d) | 0;
+const MOVE_V = sc(12, 5), ZM = sc(12, 5), LAUNCH_X = sc(8, 5), PROJ_V = sc(8, 5), JUMP_X = sc(8, 5);
 const R = (r) => r && [T(r[0]), Math.max(T(r[0]), T(r[1]))];
 function tune(m) {
   m.total = T(m.total);
-  m.hits = m.hits.map((h) => ({ ...h, on: R(h.on), hs: T(h.hs), dvx: h.dvx * LAUNCH_X, dvy: UPV(h.dvy) }));
-  if (m.vx) m.vx = m.vx.map(([t, v]) => [T(t), v * MOVE_V]);
-  if (m.jump) m.jump = [T(m.jump[0]), m.jump[1] * JUMP_X, UPV(m.jump[2])];
+  m.hits = m.hits.map((h) => ({ ...h, on: R(h.on), hs: T(h.hs), dvx: LAUNCH_X(h.dvx) }));
+  if (m.vx) m.vx = m.vx.map(([t, v]) => [T(t), MOVE_V(v)]);
+  if (m.jump) m.jump = [T(m.jump[0]), JUMP_X(m.jump[1]), m.jump[2]];
   if (m.land) m.land = T(m.land);
+  if (m.landW) m.landW = T(m.landW);
   m.inv = R(m.inv); m.under = R(m.under);
-  if (m.zm) m.zm *= ZM;
-  if (m.proj) m.proj = { ...m.proj, at: T(m.proj.at), life: T(m.proj.life), vx: m.proj.vx * PROJ_V };
+  if (m.zm) m.zm = ZM(m.zm);
+  if (m.proj) m.proj = { ...m.proj, at: T(m.proj.at), life: T(m.proj.life), vx: PROJ_V(m.proj.vx) };
   return m;
 }
 
@@ -63,8 +65,8 @@ export const SYS = {
 
 // 招式表畫面用：系統操作（防、攻、跳和方向在 menu.js 換成按鍵）
 export const SYS_LIST = [
-  ['→→', '跑（按反方向停）'], ['攻 攻', '連打，對方頭暈時變重拳'], ['跳', '跳（帶方向跳得遠）'], ['跑＋攻', '跑步攻擊'], ['跑＋跳', '衝跳'],
+  ['→→', '跑（按反方向停）'], ['攻 攻', '連打，對方頭暈時變重拳'], ['跳', '跳（帶方向跳得遠，空中可以稍微改方向）'], ['跑＋攻', '跑步攻擊'], ['跑＋跳', '衝跳'],
   ['衝跳＋攻', '衝跳攻擊'], ['攻跳 同按', '吹飛（打飛很遠）'], ['跳防 同按', '翻滾（往按著的方向）'], ['跑＋防', '翻滾'],
-  ['防', '防禦（按住；被打太多下會破防）'], ['蹲', '蹲下（按住；比較矮，有些招會揮空）'], ['蹲＋攻', '下段攻擊，打到再按接掃腿'], ['蹲＋防', '蹲防'],
+  ['防', '防禦（按住；被打太多下會破防）'], ['蹲', '蹲下（按住；比較矮，有些招會揮空；可以慢慢走）'], ['蹲＋攻', '下段攻擊，打到再按接掃腿'], ['蹲＋防', '蹲防'],
   ['走進頭暈的人', '抓住'], ['抓住時 攻', '抓著打'], ['抓住時 →＋攻', '丟出去'],
 ];

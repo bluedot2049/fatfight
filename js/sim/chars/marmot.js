@@ -14,17 +14,17 @@ const N = {
     hits: [hit([11, 14], [120, 300, 820, 1000], 'H', { dmg: 68, kd: 1, dvx: 34, dvy: 60, bdef: 55 })] }),
   runA: mv('runA', '衝刺門牙', 32, { pose: 'cC', vx: [[0, 48], [14, 10], [20, 0]],
     hits: [hit([5, 13], [100, 250, 760, 1050], 'H', { dmg: 60, kd: 1, dvx: 26, dvy: 55 })] }),
-  jA: mv('jA', '空中大爪', 28, { pose: 'jC', air: 1, hits: [hit([4, 12], [60, 100, 580, 650], 'L', { dmg: 46, fall: 45 })] }),
+  jA: mv('jA', '空中大爪', 18, { pose: 'jC', air: 1, hits: [hit([4, 12], [60, 100, 580, 650], 'L', { dmg: 46, fall: 45 })] }),
   dashA: mv('dashA', '胖鼠坐', 28, { pose: 'jD', air: 1, hits: [hit([5, 14], [80, -120, 660, 420], 'H', { dmg: 66, kd: 1 })] }),
 };
 
 const SP = [
   { id: 'tooth', name: '門牙衝天', d: 'u', btn: 'A', note: '對空，起手打不到',
-    m: mv('tooth', '門牙衝天', 30, { kind: 'sp', mp: 150, inv: [1, 8], jump: [3, 16, 130], land: 18,
+    m: mv('tooth', '門牙衝天', 30, { kind: 'sp', mp: 150, inv: [1, 8], jump: [3, 16, 130], land: 4, landW: 11,
       hits: [hit([3, 16], [0, 300, 500, 1600], 'S', { dmg: 110, kd: 1, dvx: 14, dvy: 105 })] }) },
   { id: 'burrow', name: '鑽地三圈', d: 'd', btn: 'A', note: '鑽進地底往前，按上下轉彎，再飛上來；在地底什麼都打不到',
     m: mv('burrow', '鑽地三圈', 44, { kind: 'sp', mp: 180, under: [6, 40], vx: [[0, 0], [8, 36], [40, 0]], zm: 22,
-      jump: [40, 14, 120], land: 18, hits: [hit([40, 52], [-80, 0, 480, 1350], 'S', { dmg: 120, kd: 1, dvx: 14, dvy: 100 })] }) },
+      jump: [40, 14, 120], land: 4, landW: 11, hits: [hit([40, 52], [-80, 0, 480, 1350], 'S', { dmg: 120, kd: 1, dvx: 14, dvy: 100 })] }) },
   { id: 'ball', name: '胖鼠翻滾', d: 'f', btn: 'J', note: '縮成一顆滾過去，按上下可以偏',
     m: mv('ball', '胖鼠翻滾', 48, { kind: 'sp', mp: 150, hurt: [-280, 0, 280, 720], vx: [[0, 0], [8, 70], [32, 18], [38, 0]], zm: 12,
       hits: [hit([8, 32], [0, 0, 540, 720], 'S', { dmg: 90, kd: 1, dvx: 24, dvy: 75 })] }) },

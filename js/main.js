@@ -31,6 +31,14 @@ const G = {
   rb: null, net: null, side: 0, overT: 0,
   events: [],
 };
+// 左下角招式表開不開（記在這台瀏覽器；讀不到就當沒開）
+const MOVES_KEY = 'fatfight.moves';
+let movesOn = false;
+try { movesOn = localStorage.getItem(MOVES_KEY) === '1'; } catch {}
+function setMovesOn(on) {
+  movesOn = on; hud.showMoves(on);
+  try { localStorage.setItem(MOVES_KEY, on ? '1' : '0'); } catch {}
+}
 const DUMMY = ['站著', '蹲著', '防禦', '蹲防', '一直跳', '由 P2 操作'];
 view.onEvent = (e, S) => { if (G.mode === 'fight') { hud.event(e, S); sfxEvent(e); } };
 addEventListener('pointerdown', unlockAudio);
@@ -132,7 +140,7 @@ function startFight(c0, c1) {
   G.chars = [c0, c1];
   G.S = newMatch(c0, c1, { train: G.kind === 'train' });
   G.mode = 'fight'; G.paused = false; acc = 0; G.overShown = false;
-  hud.show(true); hud.setNames(G.S);
+  hud.show(true); hud.setNames(G.S); hud.setMoves(G.S, 0); hud.showMoves(movesOn);
   document.body.classList.remove('at-title');
 }
 
@@ -143,6 +151,7 @@ function pauseMenu() {
   const items = [
     { label: '繼續', on: () => { G.paused = false; menu.hide(); } },
     { label: '招式表', on: () => showOverlay(moveListHtml()) },
+    { label: '左下招式表', value: () => (movesOn ? '顯示' : '不顯示'), on: () => setMovesOn(!movesOn), cycle: () => setMovesOn(!movesOn) },
   ];
   if (G.kind === 'train') items.push({ label: '對手', value: () => DUMMY[G.dummy], on: () => { G.dummy = (G.dummy + 1) % DUMMY.length; }, cycle: (d) => { G.dummy = (G.dummy + d + DUMMY.length) % DUMMY.length; } });
   items.push({ label: '判定框', value: () => (view.debug ? '顯示' : '不顯示'), on: () => { view.debug = !view.debug; }, cycle: () => { view.debug = !view.debug; } });
@@ -191,7 +200,7 @@ addEventListener('keydown', (e) => {
     else if (!fight) stop();
     return;
   }
-  if (e.code === 'F1') { showOverlay(moveListHtml()); stop(); return; }
+  if (e.code === 'F1') { if (fight) setMovesOn(!movesOn); else showOverlay(moveListHtml()); stop(); return; }
   if (e.code === 'F2') { view.debug = !view.debug; stop(); return; }
   if (e.code === 'Escape' && G.mode === 'fight' && !menu.open) { pauseMenu(); stop(); }
 }, true);
@@ -271,7 +280,7 @@ function beginOnline(ch, delay) {
   G.rb = new Rollback({ local: G.side, init: newMatch(ch[0], ch[1]), send: (m) => G.net?.fast(m), delay });
   G.S = G.rb.S;
   G.mode = 'fight'; G.paused = false; acc = 0; G.overShown = false;
-  hud.show(true); hud.setNames(G.S);
+  hud.show(true); hud.setNames(G.S); hud.setMoves(G.S, G.side); hud.showMoves(movesOn);
 }
 function netStatus() {
   const rb = G.rb;

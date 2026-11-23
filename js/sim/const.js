@@ -8,14 +8,19 @@ export const Z_NEAR = 1500;         // 地板最靠鏡頭那邊（z 往鏡頭為
 export const Z_FAR = -1500;         // 地板最裡面
 export const START_X = 2000;        // 開場兩人各離中心多遠
 export const MAX_SEP = 9000;        // 兩個玩家左右最遠拉開多少（鏡頭框得住）
-export const GRAV = 11;             // 每幀往下加的速度（節奏加快後變大，跳的高度差不多、落地快）
+export const GRAV = 7;              // 每幀往下加的速度（整體慢 20% 後：往上速度 ×4/5、重力 ×16/25，跳的高度不變）
 export const HP = 1000;
 export const MP = 1000;             // 魔力上限
 export const MP_REGEN = 3;          // 每幾幀回 1 點魔力（血少回得快，見 fighter.js）
 export const WIN_ROUNDS = 2;        // 三戰兩勝
-// 走、跑、跳的左右前後速度一律乘這個（使用者 2026-11-24：整體移動速度提升 300%＝4 倍）。招式自己的位移（衝撞、翻滾）不乘
-export const SPEED = 4;
-export const Z_REACH = 220;         // 普通技前後打得到的範圍（招式沒寫 zr 就用這個）
+// 走、跑、跳的左右前後速度一律過這個（使用者 2026-11-24：先 4 倍，同一天又說整體慢 20%＝3.2 倍）。招式自己的位移（衝撞、翻滾）在 moves.js 的 tune 另算
+export const SPEED = (v) => ((v * 16) / 5) | 0;
+// 整體慢 20%：每幀的速度 ×4/5（角色表的起跳速度在這裡換算）
+export const SLOW = (v) => ((v * 4) / 5) | 0;
+export const AIR_STEER = 1;         // 空中按方向，每幀往那邊加多少速度（稍微改方向；LF2 原本不能改）
+export const Z_REACH = 380;         // 普通技前後打得到的範圍（招式沒寫 zr 就用這個；原本 220 近身常揮空）
+export const PUSH_Z = 260;          // 不同隊的兩人前後差這麼近、高度有疊到，身體就互推，不會穿過去
+export const PUSH_IN = 80;          // 身體可以疊進去多少（衝刺連打貼身疊 60、抓人疊 80）
 
 // 被打累積的「倒值」：到 DIZZY 頭暈（可以抓、下一拳變重拳），到 KNOCK 倒地
 export const DIZZY = 40, KNOCK = 60;

@@ -60,10 +60,10 @@ function applyHit(S, a, d, h, kind, fromX, isProj) {
       setAct(d, 'block'); d.stun = (h.hs >> 1) + 2;
       S.ev.push({ k: 'block', s: a.i, x: ex, y: ey, z: ez, big: h.dmg >= 60 ? 1 : 0 });
     }
-    d.slide = (h.dvx ?? 24) * 3; d.sdir = dir;           // dvx 是打飛速度（節奏換算後 ×2），推開距離照一半算
+    d.slide = ((h.dvx ?? 19) * 15) >> 2; d.sdir = dir;   // dvx 是打飛速度（節奏換算後 ×1.6），推開距離照它換回原本的量
     d.stop = 3;
     if (!isProj) { a.stop = 3; a.con = a.con || 2; }
-    if (d.hp <= 0) { d.hp = 0; launch(d, dir, 32, 62); }
+    if (d.hp <= 0) { d.hp = 0; launch(d, dir, 26, 50); }
     return;
   }
   if (d.hold >= 0) release(S, d);                        // 被抓的或在抓人的被打，手就鬆了
@@ -83,7 +83,7 @@ function applyHit(S, a, d, h, kind, fromX, isProj) {
     S.ev.push({ k: 'dizzy', s: d.i });
   } else {
     setAct(d, 'hit'); d.stun = h.hs;
-    d.slide = (h.dvx ?? 24) * 4; d.sdir = dir;
+    d.slide = (h.dvx ?? 19) * 5; d.sdir = dir;
   }
   d.stop = h.stop;
   if (!isProj) { a.stop = h.stop; a.con = 1; }
@@ -135,7 +135,7 @@ export function resolveHits(S) {
       if (d.team === q.team || !hittable(d) || Math.abs(d.z - q.z) > Z_REACH) continue;
       if (!hurtBoxes(d).some((b) => overlap(qb, box(d, b)))) continue;
       q.life = 0;
-      const h = { dmg: q.dmg, fall: q.fall, bdef: 40, hs: 15, stop: 5, dvx: 32, dvy: 69, kd: 0, y: q.y };
+      const h = { dmg: q.dmg, fall: q.fall, bdef: 40, hs: 19, stop: 5, dvx: 26, dvy: 55, kd: 0, y: q.y };
       applyHit(S, S.p[q.o], d, h, 'sp', q.x - q.vx, true);
       break;
     }
