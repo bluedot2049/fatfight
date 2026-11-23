@@ -9,6 +9,7 @@ import { play } from './sfx.js';
 
 const ARROW = { 1: '↙', 2: '↓', 3: '↘', 4: '←', 5: '・', 6: '→', 7: '↖', 8: '↑', 9: '↗' };
 const k0 = (a) => keyName(KEYMAP[0][a][0]);
+const k1 = (a) => keyName(KEYMAP[1][a][0]);
 // '236' + 'P' → ↓↘→ ＋拳（J／U）
 export function cmdHtml(cmd, btn) {
   const arrows = [...cmd].map((c) => ARROW[c] || c).join('');
@@ -81,7 +82,7 @@ export function selectScreen({ mode, side = 0, done, back, onPick }) {
         <div class="art"></div><h3>${c.full}</h3><p>${c.id === 'manatee' ? '遠處吐泡泡、尾巴對空' : '近身亂鑽、翻滾衝撞'}</p>
         ${[0, 1].map((p) => (ROSTER[st.cur[p]] === c ? `<span class="tag p${p} ${st.ok[p] ? 'ok' : ''}">${mode === 'train' && p === 1 ? '對手' : 'P' + (p + 1)}${st.ok[p] ? '・好了' : ''}</span>` : '')).join('')}
       </div>`).join('')}</div>
-      <p class="foot">${mode === 'local' ? `P1 ${k0('left')} ${k0('right')} 選、${k0('A')} 確定　P2 ← → 選、數字鍵 1 確定` : mode === 'train' ? (st.step ? '選練習對手' : '選自己的角色') + `　${k0('left')} ${k0('right')} 選、${k0('A')} 確定` : `${k0('left')} ${k0('right')} 選、${k0('A')} 確定　（${st.ok[1 - side] ? '對方好了' : '等對方選…'}）`}
+      <p class="foot">${mode === 'local' ? `P1 ${k0('left')} ${k0('right')} 選、${k0('A')} 確定　P2 ${k1('left')} ${k1('right')} 選、${k1('A')} 確定` : mode === 'train' ? (st.step ? '選練習對手' : '選自己的角色') + `　${k0('left')} ${k0('right')} 選、${k0('A')} 確定` : `${k0('left')} ${k0('right')} 選、${k0('A')} 確定　（${st.ok[1 - side] ? '對方好了' : '等對方選…'}）`}
       　<span data-back>返回</span></p></div>`,
     pick(p, ch, confirm) {
       const i = ROSTER.findIndex((c) => c.id === ch);
@@ -131,8 +132,9 @@ export function moveListHtml(only) {
 }
 
 export function keysHtml() {
-  const row = (p, a, label) => `<tr><td>${label}</td><td>${KEYMAP[p][a].map(keyName).join(' ／ ')}</td></tr>`;
-  const t = (p) => `<table>${[['up', '上（跳）'], ['down', '下（蹲）'], ['left', '左'], ['right', '右'], ['A', 'A 輕拳'], ['B', 'B 輕腳'], ['C', 'C 重拳'], ['D', 'D 重腳'], ['AB', 'A＋B 翻滾'], ['BC', 'B＋C 爆氣'], ['CD', 'C＋D 吹飛']].map(([a, l]) => row(p, a, l)).join('')}</table>`;
-  return `<div class="keyhelp"><section><h3>P1／線上</h3>${t(0)}</section><section><h3>P2（同一台鍵盤）</h3>${t(1)}</section>
+  const kn = (p, a) => KEYMAP[p][a].map(keyName).join(' ／ ');
+  const row = (p, keys, label) => `<tr><td>${label}</td><td>${keys.split('+').map((a) => kn(p, a)).join(' ＋ ')}</td></tr>`;
+  const t = (p) => `<table>${[['up', '上（跳）'], ['down', '下（蹲）'], ['left', '左'], ['right', '右'], ['A', 'A 輕拳'], ['B', 'B 輕腳'], ['C', 'C 重拳'], ['D', 'D 重腳'], ['A+B', '翻滾'], ['B+C', 'MAX 爆氣'], ['C+D', '吹飛']].map(([a, l]) => row(p, a, l)).join('')}</table>`;
+  return `<div class="keyhelp"><section><h3>P1／線上</h3>${t(0)}</section><section><h3>P2（同一台鍵盤，要有數字鍵盤）</h3>${t(1)}</section>
     <p class="foot">拉後＝防禦，拉左下／右下＝蹲防。Esc 暫停，F1 招式表，F2 顯示判定框。<br>同一台鍵盤兩個人玩時，有些鍵盤同時按太多鍵會吃鍵，這是硬體限制。</p></div>`;
 }

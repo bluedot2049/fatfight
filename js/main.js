@@ -107,7 +107,7 @@ function toTitle() {
       { label: '招式表', on: () => showOverlay(moveListHtml()) },
       { label: '按鍵', on: () => showOverlay(keysHtml()) },
     ],
-    foot: `${'WASD 移動　J K U I 攻擊　Enter 確定'}`,
+    foot: '方向鍵移動　Z X C V 攻擊　Enter 確定',
   });
 }
 
@@ -173,7 +173,7 @@ function showResult() {
 
 // ---------- 招式表、按鍵說明（蓋在上面的一層） ----------
 function showOverlay(html) {
-  overlay.innerHTML = `<div class="sheet">${html}<p class="close">Esc／K 關閉</p></div>`;
+  overlay.innerHTML = `<div class="sheet">${html}<p class="close">Esc／X 關閉</p></div>`;
   overlay.hidden = false;
 }
 function closeOverlay() { overlay.hidden = true; overlay.innerHTML = ''; }
@@ -189,7 +189,7 @@ addEventListener('keydown', (e) => {
   const fight = G.mode === 'fight' && !G.paused;
   const stop = () => { e.stopPropagation(); e.preventDefault(); };
   if (!overlay.hidden) {
-    const closers = fight ? ['Escape', 'F1'] : ['Escape', 'F1', 'KeyK', 'KeyJ', 'Enter', 'Backspace'];
+    const closers = fight ? ['Escape', 'F1'] : ['Escape', 'F1', 'KeyX', 'KeyZ', 'Enter', 'Backspace'];
     if (closers.includes(e.code)) { closeOverlay(); stop(); }
     else if (!fight) stop();
     return;

@@ -4,18 +4,18 @@
 
 import { UP, DOWN, LEFT, RIGHT, BA, BB, BC, BD } from '../sim/const.js';
 
-// 下排輕、上排重：J 輕拳 K 輕腳、U 重拳 I 重腳（KOF 的 A B／C D 排法）。H L O 是同時按兩顆的快捷鍵
+// 使用者 2026-11-23 定的：P1 方向鍵＋Z X C V（A 輕拳 B 輕腳 C 重拳 D 重腳，一排照 KOF 的 A B C D）；
+// P2 數字鍵盤 5 2 1 3 當上下左右＋M , . /
 export const KEYMAP = [
-  { up: ['KeyW'], down: ['KeyS'], left: ['KeyA'], right: ['KeyD'], A: ['KeyJ'], B: ['KeyK'], C: ['KeyU'], D: ['KeyI'], AB: ['KeyH'], BC: ['KeyO'], CD: ['KeyL'] },
-  { up: ['ArrowUp'], down: ['ArrowDown'], left: ['ArrowLeft'], right: ['ArrowRight'],
-    A: ['Numpad1', 'Delete'], B: ['Numpad2', 'End'], C: ['Numpad4', 'Insert'], D: ['Numpad5', 'Home'], AB: ['Numpad0'], BC: ['Numpad6', 'PageUp'], CD: ['Numpad3', 'PageDown'] },
+  { up: ['ArrowUp'], down: ['ArrowDown'], left: ['ArrowLeft'], right: ['ArrowRight'], A: ['KeyZ'], B: ['KeyX'], C: ['KeyC'], D: ['KeyV'] },
+  { up: ['Numpad5'], down: ['Numpad2'], left: ['Numpad1'], right: ['Numpad3'], A: ['KeyM'], B: ['Comma'], C: ['Period'], D: ['Slash'] },
 ];
-const BIT = { up: UP, down: DOWN, left: LEFT, right: RIGHT, A: BA, B: BB, C: BC, D: BD, AB: BA | BB, BC: BB | BC, CD: BC | BD };
+const BIT = { up: UP, down: DOWN, left: LEFT, right: RIGHT, A: BA, B: BB, C: BC, D: BD };
 
-// 畫面上寫鍵用：KeyJ → J、Numpad1 → 數字鍵 1
+// 畫面上寫鍵用：KeyZ → Z、Numpad5 → 數字鍵 5、Comma → ,
+const PUNCT = { Comma: ',', Period: '.', Slash: '/', ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→' };
 export function keyName(code) {
-  return code.replace(/^Key/, '').replace(/^Digit/, '').replace(/^Numpad/, '數字鍵 ').replace(/^Arrow/, '')
-    .replace('Up', '↑').replace('Down', '↓').replace('Left', '←').replace('Right', '→');
+  return PUNCT[code] || code.replace(/^Key/, '').replace(/^Digit/, '').replace(/^Numpad/, '數字鍵 ');
 }
 
 export class Keyboard {
