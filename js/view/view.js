@@ -164,9 +164,9 @@ export class View {
     const xs = live.map((p) => p.x * U), zs = live.map((p) => p.z * U);
     const x0 = Math.min(...xs), x1 = Math.max(...xs);
     let cx = (x0 + x1) / 2;
-    let cz = Math.max(-0.3, Math.min(0.3, (Math.min(...zs) + Math.max(...zs)) / 2 * 0.4));
+    let cz = Math.max(-0.5, Math.min(0.5, (Math.min(...zs) + Math.max(...zs)) / 2 * 0.4));
     let d = 7.6 + Math.max(0, x1 - x0 - 2.6) * 0.75;
-    d = Math.min(d, 11);
+    d = Math.min(d, 12.6);                 // 兩個玩家最遠 9 公尺（MAX_SEP），這個距離框得住
     if (S.freeze > 0 && S.fwho >= 0) {
       const p = S.p[S.fwho];
       cx = cx * 0.4 + p.x * U * 0.6; cz = p.z * U; d -= 1.6;
@@ -182,7 +182,7 @@ export class View {
     const ox = this.cam.x - this.off;
     // 俯角約 26 度：高度和距離照比例一起拉
     const D = this.cam.d;
-    this.camera.position.set(ox + sx, 0.55 + D * 0.5 + sy, this.cam.z + Z_NEAR * U * 0.3 + D);
+    this.camera.position.set(ox + sx, 0.55 + D * 0.5 + sy, this.cam.z + 0.3 + D);
     this.camera.lookAt(ox + sx, 0.55 + sy, this.cam.z - 0.15);
   }
 

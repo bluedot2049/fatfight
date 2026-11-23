@@ -10,7 +10,7 @@ import { KEYMAP, keyName } from './ui/keys.js';
 import { unlockAudio, sfxEvent, play } from './ui/sfx.js';
 import { newMatch, step } from './sim/match.js';
 import { CHARS, MOVES } from './sim/chars/index.js';
-import { LEFT, RIGHT, BD, BJ } from './sim/const.js';
+import { LEFT, RIGHT, BD, BJ, BS } from './sim/const.js';
 import { Rollback } from './net/rollback.js';
 import { connect, newCode, cleanCode } from './net/peer.js';
 
@@ -27,11 +27,11 @@ const G = {
   S: newMatch('manatee', 'marmot'),
   chars: ['manatee', 'marmot'],
   paused: false,
-  dummy: 0,               // 練習對手：0 站著 1 防禦 2 一直跳 3 P2 操作
+  dummy: 0,               // 練習對手：0 站著 1 蹲著 2 防禦 3 蹲防 4 一直跳 5 P2 操作
   rb: null, net: null, side: 0, overT: 0,
   events: [],
 };
-const DUMMY = ['站著', '防禦', '一直跳', '由 P2 操作'];
+const DUMMY = ['站著', '蹲著', '防禦', '蹲防', '一直跳', '由 P2 操作'];
 view.onEvent = (e, S) => { if (G.mode === 'fight') { hud.event(e, S); sfxEvent(e); } };
 addEventListener('pointerdown', unlockAudio);
 
@@ -76,9 +76,10 @@ function dummyBits() {
   const [me, d] = G.S.p;
   const toward = me.x < d.x ? LEFT : RIGHT;
   switch (G.dummy) {
-    case 1: return d.face === (toward === RIGHT ? 1 : -1) ? BD : (G.S.f & 1 ? toward : 0);
-    case 2: return d.act === 'air' || d.act === 'pre' ? 0 : (G.S.f & 1 ? BJ : 0);
-    case 3: return keys.bits(1);
+    case 1: return BS;
+    case 2: case 3: return (G.dummy === 3 ? BS : 0) | (d.face === (toward === RIGHT ? 1 : -1) ? BD : (G.S.f & 1 ? toward : 0));
+    case 4: return d.act === 'air' || d.act === 'pre' ? 0 : (G.S.f & 1 ? BJ : 0);
+    case 5: return keys.bits(1);
     default: return 0;
   }
 }

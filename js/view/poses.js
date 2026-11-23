@@ -92,8 +92,9 @@ export function poseOf(f, clock) {
       break;
     }
     case 'run': { const s = Math.sin(f.x / 90); p = over(BASE.run, { by: 0.06 * Math.abs(s), lN: 1.0 * s, lF: -1.0 * s }); break; }
+    case 'crouch': p = over(BASE.crouch, { by: -0.04 + 0.008 * cyc(0.9) }); break;
     case 'brake': p = BASE.brake; break;
-    case 'guard': case 'block': p = BASE.block; break;
+    case 'guard': case 'block': p = f.cr ? BASE.cblock : BASE.block; break;
     case 'pre': p = BASE.pre; break;
     case 'air': p = f.dash ? over(BASE.run, { lN: 0.9, lF: -0.6, lean: 0.5 }) : f.vy > 0 ? BASE.up : BASE.down; break;
     case 'dizzy': { const s = Math.sin(clock * 6 + f.i); p = over(BASE.dizzy, { spin: 0.35 * s, head: 0.2 + 0.15 * Math.cos(clock * 6), lean: -0.15 + 0.1 * s }); break; }
@@ -117,13 +118,13 @@ function attackPose(f, m, t, clock) {
   const id = m.pose || m.id;
   // 系統招和幾個整段在滾、在鑽的必殺技另外算
   if (id === 'roll' || id === 'rollB' || id === 'gcRoll') {
-    const k = Math.min(1, t / 20);
+    const k = Math.min(1, t / (m.total * 0.65));
     return over(BASE.crouch, { tumble: (id === 'rollB' ? -1 : 1) * k * Math.PI * 2, sq: -0.3 });
   }
   if (id === 'backstep') return BASE.backstep;
   if (id === 'throw') {                              // 丟：抓著轉半圈甩出去
-    const k = Math.min(1, t / 10);
-    return t <= 10 ? over(BASE.throw, { spin: -0.6 * k, lean: -0.15 }) : mix(over(BASE.throw, { spin: 1.2, lean: 0.4, aN: 2.0, aF: 1.8 }), BASE.idle, Math.min(1, (t - 14) / 14));
+    const k = Math.min(1, t / 8);
+    return t <= 8 ? over(BASE.throw, { spin: -0.6 * k, lean: -0.15 }) : mix(over(BASE.throw, { spin: 1.2, lean: 0.4, aN: 2.0, aF: 1.8 }), BASE.idle, Math.min(1, (t - 11) / 11));
   }
   if (id === 'wave' || id === 'ball') {
     const end = m.vx[m.vx.length - 1][0];
@@ -138,15 +139,16 @@ function attackPose(f, m, t, clock) {
     const k = t - at;
     return { aN: 2.8, aF: 2.6, sq: 0.15, spin: Math.max(0, 3 * Math.PI * 2 * (1 - k / 14)), head: -0.3 };
   }
-  if (id === 'frenzy') {
-    if (t < 6) return over(BASE.run, {});
-    if (t < 26) return BASE.run;
+  if (id === 'frenzy') {                             // 衝過去（照 vx 停下那幀）→ 亂打 → 最後一下往上打（照最後一下的幀數；兩版節奏不同也對得上）
+    const dash = m.vx[m.vx.length - 1][0], fin = m.hits[m.hits.length - 1].on[0] - 2;
+    if (t < dash) return BASE.run;
     const s = Math.sin(t * 1.3);
-    if (t < 62) return { aN: 1.2 + 0.8 * s, aF: 1.2 - 0.8 * s, lean: 0.3, spin: 0.3 * s };
+    if (t < fin) return { aN: 1.2 + 0.8 * s, aF: 1.2 - 0.8 * s, lean: 0.3, spin: 0.3 * s };
     return { aN: 2.8, aF: 2.6, lN: 1.2, sq: 0.15, head: -0.3 };
   }
+
   const P = ATK[f.ch][id] || { w: {}, s: {} };
-  const base = m.air ? (f.vy > 0 ? BASE.up : BASE.down) : BASE.idle;
+  const base = m.air ? (f.vy > 0 ? BASE.up : BASE.down) : m.cr ? BASE.crouch : BASE.idle;
   if (!m.hits.length) {                               // 吐泡泡這種沒有打擊框的：照射出那一幀
     const a0 = m.proj ? m.proj.at : (m.total / 3) | 0;
     if (t < a0) return mix(base, over(base, P.w), ease(t / a0));

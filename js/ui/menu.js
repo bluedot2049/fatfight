@@ -9,9 +9,9 @@ import { play } from './sfx.js';
 
 const k0 = (a) => keyName(KEYMAP[0][a][0]);
 const k1 = (a) => keyName(KEYMAP[1][a][0]);
-const BTN = { A: '攻', J: '跳', D: '防' };
-// 文字裡的攻、跳、防後面加上 P1 的鍵（攻<small>Z</small>）
-const withKeys = (t) => t.replace(/[攻跳防]/g, (c) => { const k = Object.keys(BTN).find((x) => BTN[x] === c); return `${c}<small>${k0(k)}</small>`; });
+const BTN = { A: '攻', J: '跳', D: '防', S: '蹲' };
+// 文字裡的攻、跳、防、蹲後面加上 P1 的鍵（攻<small>Z</small>）
+const withKeys = (t) => t.replace(/[攻跳防蹲]/g, (c) => { const k = Object.keys(BTN).find((x) => BTN[x] === c); return `${c}<small>${k0(k)}</small>`; });
 // 必殺指令：防 → ↑ → 攻
 export function cmdHtml(d, btn) {
   const arrow = d === 'u' ? '↑' : d === 'd' ? '↓' : '→';
@@ -134,7 +134,7 @@ export function moveListHtml(only) {
 
 export function keysHtml() {
   const kn = (p, a) => KEYMAP[p][a].map(keyName).join(' ／ ');
-  const t = (p) => `<table>${[['up', '上（往裡走）'], ['down', '下（往外走）'], ['left', '左'], ['right', '右'], ['A', '攻擊'], ['J', '跳'], ['D', '防禦']].map(([a, l]) => `<tr><td>${l}</td><td>${kn(p, a)}</td></tr>`).join('')}</table>`;
+  const t = (p) => `<table>${[['up', '上（往裡走）'], ['down', '下（往外走）'], ['left', '左'], ['right', '右'], ['A', '攻擊'], ['J', '跳'], ['D', '防禦'], ['S', '蹲']].map(([a, l]) => `<tr><td>${l}</td><td>${kn(p, a)}</td></tr>`).join('')}</table>`;
   return `<div class="keyhelp"><section><h3>P1／線上</h3>${t(0)}</section><section><h3>P2（同一台鍵盤，要有數字鍵盤）</h3>${t(1)}</section>
-    <p class="foot">左右連按兩下跑步。必殺技＝防、方向、攻或跳照順序按。Esc 暫停，F1 招式表，F2 顯示判定框。<br>同一台鍵盤兩個人玩時，有些鍵盤同時按太多鍵會吃鍵，這是硬體限制。</p></div>`;
+    <p class="foot">左右連按兩下跑步。必殺技＝防、方向、攻或跳照順序按。攻跳同按吹飛、跳防同按翻滾。Esc 暫停，F1 招式表，F2 顯示判定框。<br>同一台鍵盤兩個人玩時，有些鍵盤同時按太多鍵會吃鍵，這是硬體限制。</p></div>`;
 }
