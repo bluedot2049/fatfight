@@ -140,8 +140,9 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--ink); 
 @keyframes open { 0% { scale: 0 1; } }
 #hud .announce.a-round .t, #hud .announce.a-win .t { animation: rise .45s ease-out both; }
 @keyframes rise { 0% { opacity: 0; translate: 0 16px; } 40% { opacity: 0; } }
-#hud .announce .ring { position: absolute; left: 50%; top: -230px; width: 460px; height: 460px; margin-left: -230px; color: var(--goldc); opacity: .7; animation: ring .9s ease-out both; }
-#hud .announce.a-ko .ring { color: #d8323a; }
+#hud .announce .ring { position: absolute; left: 50%; top: -300px; width: 600px; height: 600px; margin-left: -300px; opacity: .75; mix-blend-mode: screen; animation: ring .9s ease-out both; }
+#hud .announce .ring .burst { --burst: #f3e3bd; }
+#hud .announce.a-ko .ring .burst { --burst: #ff3b3b; }
 @keyframes ring { 0% { scale: .3; opacity: 0; } 30% { opacity: .85; } 100% { scale: 1.1; opacity: .5; } }
 #hud .announce.a-go .t { font-size: 150px; letter-spacing: .1em; animation: popIn .25s ease-out both; }
 #hud .announce.a-ko .t { font: 900 190px/1 var(--cinzel); letter-spacing: .04em; animation: popIn .3s ease-out both; }
@@ -150,9 +151,17 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--ink); 
 /* 超必殺定格：畫面變暗＋中間一個魔法陣轉 */
 #hud .dim { position: absolute; inset: 0; background: radial-gradient(ellipse at center, rgba(8, 5, 6, .15) 25%, rgba(8, 5, 6, .85)); opacity: 0; transition: opacity .15s; }
 #hud .dim.on { opacity: 1; }
-#hud .circle { position: absolute; left: 50%; top: 52%; width: 74vmin; height: 74vmin; margin: -37vmin 0 0 -37vmin; color: var(--goldc); opacity: 0; scale: .6; transition: opacity .2s, scale .35s ease-out; }
-#hud .circle.on { opacity: .55; scale: 1; }
-#hud .circle .mcircle { animation-duration: 8s; }
+#hud .circle { --burst: #fff; position: absolute; left: 50%; top: 52%; width: 110vmin; height: 110vmin; margin: -55vmin 0 0 -55vmin; opacity: 0; scale: .5; transition: opacity .15s, scale .3s ease-out; mix-blend-mode: screen; pointer-events: none; }
+#hud .circle.on { opacity: .8; scale: 1; }
+/* 光芒：一圈細光從中間射出、白芯、往外淡掉，慢慢轉（超能力爆氣，不是法陣） */
+.burst { --burst: #fff; display: block; width: 100%; height: 100%; border-radius: 50%;
+  background:
+    radial-gradient(circle, #fff 0 4%, color-mix(in srgb, var(--burst) 70%, #fff) 9%, color-mix(in srgb, var(--burst) 35%, transparent) 22%, transparent 48%),
+    repeating-conic-gradient(from 0deg, transparent 0 4.2deg, color-mix(in srgb, var(--burst) 55%, transparent) 5deg, transparent 6deg 9.5deg, rgba(255,255,255,.5) 10deg, transparent 10.6deg 15deg);
+  -webkit-mask: radial-gradient(circle, #000 8%, rgba(0,0,0,.6) 30%, transparent 68%); mask: radial-gradient(circle, #000 8%, rgba(0,0,0,.6) 30%, transparent 68%);
+  animation: turn 6s linear infinite, burstpulse .12s steps(2) infinite; }
+#hud .circle .burst { --burst: inherit; }
+@keyframes burstpulse { 50% { filter: brightness(1.25); } }
 #hud .flash { position: absolute; inset: 0; background: #fff6dc; opacity: 0; }
 #hud .flash.on { animation: flash .35s ease-out; }
 @keyframes flash { 0% { opacity: var(--a, .4); } }

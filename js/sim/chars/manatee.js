@@ -23,19 +23,19 @@ const N = {
 
 // 必殺：防＋方向＋攻／跳。d 'f' 左右（按哪邊往哪邊）、'u' 上、'd' 下
 const SP = [
-  { id: 'bubble', name: '深海泡', d: 'f', btn: 'A', note: '吐泡泡',
+  { id: 'bubble', name: '深海泡', yomi: 'shinkai ho-', d: 'f', btn: 'A', note: '吐泡泡',
     m: mv('bubble', '深海泡', 40, { kind: 'sp', mp: 120, proj: { at: 14, x: 420, y: 880, vx: 60, w: 170, h: 170, dmg: 70, fall: 70, life: 120 } }) },
-  { id: 'wave', name: '翻滾浪', d: 'f', btn: 'J', note: '滾過去撞兩下，按上下可以偏',
+  { id: 'wave', name: '翻滾浪', yomi: 'honkon ro-', d: 'f', btn: 'J', note: '滾過去撞兩下，按上下可以偏',
     m: mv('wave', '翻滾浪', 46, { kind: 'sp', mp: 150, hurt: [-300, 0, 300, 900], vx: [[0, 0], [6, 52], [28, 0]], zm: 10, stick: 1,
       hits: [hit([8, 13], [0, 0, 540, 1000], 'S', { dmg: 40, fall: 20, hs: 18 }), hit([18, 24], [0, 0, 540, 1000], 'S', { dmg: 50, kd: 1, dvx: 24, dvy: 70 })] }) },
-  { id: 'tail', name: '尾巴一甩', d: 'u', btn: 'A', note: '對空，起手打不到',
+  { id: 'tail', name: '尾巴一甩', yomi: 'biha issui', d: 'u', btn: 'A', note: '對空，起手打不到',
     m: mv('tail', '尾巴一甩', 30, { kind: 'sp', mp: 150, inv: [1, 8], jump: [4, 10, 100], land: 4, landW: 11,
       hits: [hit([4, 14], [0, 400, 580, 1650], 'S', { dmg: 100, kd: 1, dvx: 16, dvy: 95 })] }) },
 ];
 
 const BEAM = [150, 250, 2900, 1350];
 const SU = [
-  { id: 'surge', name: '深海霸氣', d: 'u', btn: 'J', note: '整排浪打過去，前後也很寬',
+  { id: 'surge', name: '深海霸氣', yomi: 'shinkai haki', d: 'u', btn: 'J', note: '整排浪打過去，前後也很寬',
     m: mv('surge', '深海霸氣', 86, { kind: 'su', mp: 400, flash: 1, inv: [0, 16], hits: multi(16, 8, 6, BEAM, 40, 90, { zr: 650 }) }) },
 ];
 
@@ -43,6 +43,7 @@ export default {
   id: 'manatee', name: '海牛', full: '灰色海牛', color: '#7fe6ff',
   blurb: '遠處吐泡泡、尾巴對空', stat: [4, 5, 2],
   pal: ['#5cc8e0', '#123a5c'], card: { attr: '水', type: '深海之獸', lv: 5, art: 'sea' },   // 介面：寶石色（亮、暗）；卡片的屬性、種族、等級星、畫框底色     // 選角畫面：一句話、力氣／距離／速度（1–5）
+  voice: { f0: 92, size: 0.9, mora: 0.12 },   // 念招式名稱的聲音（js/ui/voice.js）：音高、體型、一拍幾秒；招式的 yomi 是念法
   w: 330, h: 1450, hc: 950,
   walkX: 16, walkZ: 11, run: 44, runZ: 9, jumpV: 150, jumpX: 18, jumpZ: 12, dashV: 102, dashX: 58,
   normals: N, specials: SP, supers: SU,

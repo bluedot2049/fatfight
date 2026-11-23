@@ -7,7 +7,7 @@ import { HP, MP } from '../sim/const.js';
 import { CHARS, MOVES } from '../sim/chars/index.js';
 import { cmdHtml, withKeys } from './menu.js';
 import { gt, gtSet } from './gt.js';
-import { setPal, magicCircle, seal, ROMAN, studs } from './arcane.js';
+import { setPal, seal, ROMAN, studs } from './arcane.js';
 import { portraitURL } from '../view/portrait.js';
 
 const $ = (s, el = document) => el.querySelector(s);
@@ -27,7 +27,7 @@ export class Hud {
       </div>`;
     root.innerHTML = `
       <div class="dim"></div>
-      <div class="circle">${magicCircle({ seed: 'super', runes: 20, star: 6 })}</div>
+      <div class="circle"><i class="burst"></i></div>
       <div class="fit">
         ${side(0)}${side(1)}
         <div class="round"><small>ROUND</small><b></b></div>
@@ -146,16 +146,21 @@ export class Hud {
     const rd = S.opt.train ? '∞' : ROMAN[S.round - 1] || String(S.round);
     if (rd !== this.rd) { this.rd = rd; $('.round small', this.root).textContent = S.opt.train ? 'TRAIN' : 'ROUND'; gtSet($('.round b', this.root), rd, 0.05, 0.05); }
     const fz = S.freeze > 0;
-    if (fz !== this.fz) { this.fz = fz; $('.dim', this.root).classList.toggle('on', fz); $('.circle', this.root).classList.toggle('on', fz); }
+    if (fz !== this.fz) {
+      this.fz = fz;
+      const c = $('.circle', this.root);
+      if (fz) c.style.setProperty('--burst', CHARS[S.p[S.fwho]?.ch]?.pal?.[0] || '#ffffff');   // 光芒用放招那隻的顏色
+      $('.dim', this.root).classList.toggle('on', fz); c.classList.toggle('on', fz);
+    }
     if (this.mvOn && this.mvRows) { const mp = S.p[this.mvIdx]?.mp ?? 0; for (const [r, c] of this.mvRows) r.classList.toggle('low', mp < c); }
     if (this.annT > 0) { this.annT -= dt; if (this.annT <= 0) $('.announce', this.root).classList.remove('on'); }
   }
 
-  // 字卡。kind：round 緞帶、go 金字＋光圈、ko 血紅的字＋光圈、win 緞帶（不收）
+  // 字卡。kind：round 緞帶、go 金字＋光芒、ko 血紅的字＋光芒、win 緞帶（不收）
   announce(text, sec = 1.4, kind = 'round', sub = '') {
     const a = $('.announce', this.root);
     let html;
-    if (kind === 'go' || kind === 'ko') html = `<div class="ring">${magicCircle({ seed: kind, runes: 16, star: kind === 'ko' ? 5 : 6 })}</div>` + gt(text, { cls: `t ${kind === 'ko' ? 'blood' : ''}`, sw: 0.05, k: 0.06, tag: 'b' });
+    if (kind === 'go' || kind === 'ko') html = '<div class="ring"><i class="burst"></i></div>' + gt(text, { cls: `t ${kind === 'ko' ? 'blood' : ''}`, sw: 0.05, k: 0.06, tag: 'b' });
     else html = '<div class="ribbon"></div>' + gt(text, { cls: 't', sw: 0.05, k: 0.06, tag: 'b' });
     a.innerHTML = html + (sub ? `<small class="sub">${sub}</small>` : '');
     a.className = 'announce';

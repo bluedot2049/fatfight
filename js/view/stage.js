@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { STAGE_HALF, Z_NEAR, Z_FAR } from '../sim/const.js';
 
 export const BG = '#100b09';
-const GEMS = ['#5cc8e0', '#f2a93b'];     // 兩隊的旗和魔法陣顏色（海牛藍、胖鼠琥珀）
+const GEMS = ['#5cc8e0', '#f2a93b'];     // 兩隊的旗顏色（海牛藍、胖鼠琥珀）
 
 // 可重現的亂數（貼圖每次畫的一樣）
 function rng(seed) { let s = seed; return () => { s = (s * 16807) % 2147483647; return s / 2147483647; }; }
@@ -272,17 +272,9 @@ export class Stage {
     const rim = new THREE.DirectionalLight('#8f9cff', 0.8);
     rim.position.set(2, 3, -6);
     scene.add(rim);
-    this.gold = new THREE.Color('#9c7d48');
-    this.gems = GEMS.map((c) => new THREE.Color(c));
-    this.tmp = new THREE.Color();
   }
-  // power：兩邊的氣勢 0–1（超必殺、必殺時高）。地上的魔法陣跟著亮，顏色往氣勢比較高的那隊偏
+  // power：兩邊的氣勢 0–1（超必殺、必殺時高）。地上的刻紋只是場地裝飾，不跟著亮（使用者 2026-11-24：戰鬥特效不要法陣）
   update(dt, clock, power) {
-    const p = Math.max(power[0], power[1]), side = power[1] > power[0] ? 1 : 0;
-    const m = this.sigil.material;
-    m.opacity += ((0.15 + p * 0.6) - m.opacity) * 0.12;
-    this.tmp.copy(this.gold).lerp(this.gems[side], Math.min(1, p * 1.4));
-    m.color.lerp(this.tmp, 0.15);
     this.sigil.rotation.z = clock * 0.03;
     for (const t of this.torches) {
       const k = 0.85 + 0.1 * Math.sin(clock * 11 + t.ph) + 0.06 * Math.sin(clock * 23 + t.ph * 2);

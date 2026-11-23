@@ -54,7 +54,7 @@ const panOf = (x) => Math.max(-0.8, Math.min(0.8, ((x || 0) / 1000 - view.cam.x)
 view.onEvent = (e, S) => {
   if (G.mode !== 'fight') return;
   hud.event(e, S, view);
-  sfxEvent(e, e.x === undefined ? (e.s === undefined ? 0 : panOf(S.p[e.s]?.x)) : panOf(e.x));
+  sfxEvent(e, e.x === undefined ? (e.s === undefined ? 0 : panOf(S.p[e.s]?.x)) : panOf(e.x), S);
   // 音樂跟著比賽：KO 壓低、下一回合拉回來、打完留一點點
   if (e.k === 'ko') music.level(0.3, 0.2); else if (e.k === 'round') music.level(1, 0.6); else if (e.k === 'over') music.level(0.25, 0.5);
 };

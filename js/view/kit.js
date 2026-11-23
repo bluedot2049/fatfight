@@ -33,7 +33,6 @@ const outlineMat = new THREE.ShaderMaterial({
   fragmentShader: `uniform vec3 ink; void main() { gl_FragColor = vec4(ink, 1.0); }`,
   side: THREE.BackSide,
 });
-export const OUTLINE = outlineMat;
 
 const SPHERE = new THREE.SphereGeometry(1, 20, 14);
 const CAPS = new THREE.CapsuleGeometry(0.5, 1, 6, 12);
