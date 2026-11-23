@@ -75,44 +75,44 @@ export class FX {
   add(obj, life, upd) { this.scene.add(obj); this.list.push({ obj, life, t: 0, upd }); }
 
   // 打中：白光一閃＋一圈色環。big：重攻擊、超必殺
-  spark(x, y, big, color) {
+  spark(x, y, big, color, z = 0) {
     const s = sprite(TEX.star, '#ffffff');
-    s.position.set(x, y, 0.4);
+    s.position.set(x, y, z + 0.4);
     s.material.rotation = Math.random() * 6.28;
     const S0 = big ? 1.3 : 0.75;
     this.add(s, big ? 0.22 : 0.15, (o, k) => { o.scale.setScalar(S0 * (0.6 + k * 0.8)); o.material.opacity = 1 - k; });
     const r = sprite(TEX.ring, color);
-    r.position.set(x, y, 0.35);
+    r.position.set(x, y, z + 0.35);
     this.add(r, 0.25, (o, k) => { o.scale.setScalar((big ? 1.6 : 0.9) * (0.3 + k)); o.material.opacity = (1 - k) * 0.9; });
-    if (big) for (let i = 0; i < 6; i++) this.speck(x, y, color, 3.5);
+    if (big) for (let i = 0; i < 6; i++) this.speck(x, y, color, 3.5, z);
   }
-  block(x, y) {
+  block(x, y, z = 0) {
     const s = sprite(TEX.star, '#bfe9ff');
-    s.position.set(x, y, 0.4);
+    s.position.set(x, y, z + 0.4);
     this.add(s, 0.12, (o, k) => { o.scale.setScalar(0.5 + k * 0.3); o.material.opacity = 1 - k; });
-    for (let i = 0; i < 4; i++) this.speck(x, y, '#d8f4ff', 2.5);
+    for (let i = 0; i < 4; i++) this.speck(x, y, '#d8f4ff', 2.5, z);
   }
   // 小亮點往外噴（影片裡氣焰旁邊的水花點）
-  speck(x, y, color, sp = 1.2) {
+  speck(x, y, color, sp = 1.2, z = 0) {
     const s = sprite(TEX.soft, color);
-    s.position.set(x, y, 0.3);
+    s.position.set(x, y, z + 0.3);
     const a = Math.random() * 6.28, v = sp * (0.4 + Math.random() * 0.6), sz = 0.05 + Math.random() * 0.06;
     const vx = Math.cos(a) * v, vy = Math.sin(a) * v;
     this.add(s, 0.35 + Math.random() * 0.3, (o, k, dt) => { o.position.x += vx * dt; o.position.y += vy * dt; o.scale.setScalar(sz * (1 - k)); o.material.opacity = 1 - k; });
   }
-  dust(x, y = 0, n = 4, color) {
+  dust(x, y = 0, n = 4, color, z = 0) {
     for (let i = 0; i < n; i++) {
       const m = new THREE.Mesh(this.dustGeo, color ? new THREE.MeshBasicMaterial({ color, transparent: true, depthWrite: false }) : this.dustMat.clone());
-      m.position.set(x + (Math.random() - 0.5) * 0.4, y + 0.05, (Math.random() - 0.5) * 0.4);
+      m.position.set(x + (Math.random() - 0.5) * 0.4, y + 0.05, z + (Math.random() - 0.5) * 0.4);
       const vx = (Math.random() - 0.5) * 1.2, vy = 0.3 + Math.random() * 0.5, sz = 0.06 + Math.random() * 0.08;
       this.add(m, 0.5, (o, k, dt) => { o.position.x += vx * dt; o.position.y += vy * dt; o.scale.setScalar(sz * (0.6 + k)); o.material.opacity = 0.8 * (1 - k); });
     }
   }
-  burst(x, y, color, size = 3) {
+  burst(x, y, color, size = 3, z = 0) {
     const s = sprite(TEX.aura, color);
-    s.position.set(x, y, -0.2);
+    s.position.set(x, y, z - 0.2);
     this.add(s, 0.5, (o, k) => { o.scale.setScalar(size * (0.4 + k * 0.9)); o.material.opacity = (1 - k) * 0.9; o.material.rotation += 0.05; });
-    for (let i = 0; i < 14; i++) this.speck(x, y, color, 4);
+    for (let i = 0; i < 14; i++) this.speck(x, y, color, 4, z);
   }
 
   update(dt) {
@@ -130,7 +130,7 @@ export class FX {
   }
 }
 
-// 每隻角色背後一團氣焰：平常淡淡的，MAX 和超必殺整團亮起來
+// 每隻角色背後一團氣焰：平常淡淡的，出必殺、超必殺整團亮起來，頭暈時微微閃
 export class Aura {
   constructor(scene, color) {
     this.s = sprite(TEX.aura || (TEX.aura = brushTex(true)), color, 0);
@@ -138,10 +138,10 @@ export class Aura {
     scene.add(this.s);
     this.level = 0; this.cur = 0; this.color = color;
   }
-  update(x, y, h, want, clock) {
+  update(x, y, h, want, clock, z = 0) {
     this.cur += (want - this.cur) * 0.15;
     const k = this.cur;
-    this.s.position.set(x, y + h * 0.5, -0.35);
+    this.s.position.set(x, y + h * 0.5, z - 0.35);
     this.s.scale.setScalar(h * (1.5 + k * 0.9) * (1 + 0.04 * Math.sin(clock * 9)));
     this.s.material.opacity = 0.1 + k * 0.75;
     this.s.material.rotation = clock * 0.6;

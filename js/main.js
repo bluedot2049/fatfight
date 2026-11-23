@@ -6,10 +6,11 @@ import { View } from './view/view.js';
 import { Hud } from './ui/hud.js';
 import { Keyboard } from './ui/keys.js';
 import { Menu, selectScreen, moveListHtml, keysHtml } from './ui/menu.js';
+import { KEYMAP, keyName } from './ui/keys.js';
 import { unlockAudio, sfxEvent, play } from './ui/sfx.js';
 import { newMatch, step } from './sim/match.js';
 import { CHARS, MOVES } from './sim/chars/index.js';
-import { LEFT, RIGHT, DOWN, UP } from './sim/const.js';
+import { LEFT, RIGHT, BD, BJ } from './sim/const.js';
 import { Rollback } from './net/rollback.js';
 import { connect, newCode, cleanCode } from './net/peer.js';
 
@@ -26,11 +27,11 @@ const G = {
   S: newMatch('manatee', 'marmot'),
   chars: ['manatee', 'marmot'],
   paused: false,
-  dummy: 0,               // 練習對手：0 站著 1 蹲著 2 全防 3 一直跳 4 P2 操作
+  dummy: 0,               // 練習對手：0 站著 1 防禦 2 一直跳 3 P2 操作
   rb: null, net: null, side: 0, overT: 0,
   events: [],
 };
-const DUMMY = ['站著', '蹲著', '全部防禦', '一直跳', '由 P2 操作'];
+const DUMMY = ['站著', '防禦', '一直跳', '由 P2 操作'];
 view.onEvent = (e, S) => { if (G.mode === 'fight') { hud.event(e, S); sfxEvent(e); } };
 addEventListener('pointerdown', unlockAudio);
 
@@ -38,12 +39,12 @@ addEventListener('pointerdown', unlockAudio);
 let last = performance.now(), acc = 0;
 const STEP = 1 / 60;
 function loop(now) {
-  const dt = Math.min(0.1, (now - last) / 1000);
+  const dt = Math.max(0, Math.min(0.1, (now - last) / 1000));   // 第一幀的 rAF 時間可能比 last 早，負的會讓鏡頭緩動爆掉
   last = now;
   G.events = [];
   if (G.mode === 'title' || G.mode === 'select') {
     acc += dt;
-    while (acc >= STEP) { acc -= STEP; step(G.S, 0, 0); if (G.S.ph === 'fight') G.S.timer = 3600; }
+    while (acc >= STEP) { acc -= STEP; step(G.S, 0, 0); }
   } else if (G.mode === 'fight' && !G.paused) {
     acc += dt;
     let n = 0;
@@ -70,19 +71,14 @@ function tick() {
   if (G.S.ph === 'over' && G.S.pt >= 150 && !G.overShown) { G.overShown = true; showResult(); }
 }
 
-// 練習對手的按鍵（只在本機用，可以看狀態）
+// 練習對手的按鍵（只在本機用，可以看狀態）：防禦時先轉向 P1 再按住防
 function dummyBits() {
   const [me, d] = G.S.p;
-  const away = me.x > d.x ? LEFT : RIGHT;
+  const toward = me.x < d.x ? LEFT : RIGHT;
   switch (G.dummy) {
-    case 1: return DOWN;
-    case 2: {
-      const m = me.act === 'atk' ? MOVES[me.ch][me.mv] : null;
-      const low = m && m.hits.some((h) => h.lvl === 'l');
-      return away | (low || (d.cr && !(m && m.hits.some((h) => h.lvl === 'h'))) ? DOWN : 0);
-    }
-    case 3: return d.act === 'air' || d.act === 'pre' ? 0 : UP;
-    case 4: return keys.bits(1);
+    case 1: return d.face === (toward === RIGHT ? 1 : -1) ? BD : (G.S.f & 1 ? toward : 0);
+    case 2: return d.act === 'air' || d.act === 'pre' ? 0 : (G.S.f & 1 ? BJ : 0);
+    case 3: return keys.bits(1);
     default: return 0;
   }
 }
@@ -107,7 +103,7 @@ function toTitle() {
       { label: '招式表', on: () => showOverlay(moveListHtml()) },
       { label: '按鍵', on: () => showOverlay(keysHtml()) },
     ],
-    foot: '方向鍵移動　Z X C V 攻擊　Enter 確定',
+    foot: `方向鍵移動　${['A', 'J', 'D'].map((k, i) => keyName(KEYMAP[0][k][0]) + ' ' + ['攻', '跳', '防'][i]).join('　')}　Enter 確定`,
   });
 }
 

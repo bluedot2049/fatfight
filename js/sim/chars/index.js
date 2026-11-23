@@ -14,6 +14,6 @@ export const MOVES = {};
 for (const c of ROSTER) {
   const t = { ...SYS };
   for (const m of Object.values(c.normals)) t[m.id] = m;
-  for (const s of [...c.specials, ...c.supers]) for (const k of ['L', 'H', 'MAX']) if (s[k]) t[s[k].id] = s[k];
+  for (const s of [...c.specials, ...c.supers]) t[s.m.id] = s.m;
   MOVES[c.id] = t;
 }
