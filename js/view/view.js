@@ -55,9 +55,10 @@ export class View {
       const shadow = new THREE.Mesh(new THREE.CircleGeometry(1, 24), new THREE.MeshBasicMaterial({ color: '#070a04', transparent: true, opacity: 0.55, depthWrite: false }));
       shadow.rotation.x = -Math.PI / 2;
       this.scene.add(shadow);
-      const beam = beamMesh(CHARS[p.ch].color);
+      const beam = beamMesh(CHARS[p.ch].pal?.[0] || CHARS[p.ch].color);
       beam.visible = false;
       this.scene.add(beam);
+      this.renderer.initTexture(beam.material.map);
       const stars = [0, 1, 2].map((i) => starSprite(i === 1 ? '#ffffff' : '#ffe98a'));
       this.scene.add(...stars);
       return { ch: p.ch, model, shadow, beam, stars, pose: { ...ZERO }, flash: 0, px: p.x };
@@ -90,41 +91,43 @@ export class View {
   }
 
   event(S, e) {
-    const col = (s) => CHARS[S.p[s]?.ch]?.color || '#ffffff';
+    const col = (s) => CHARS[S.p[s]?.ch]?.pal?.[0] || CHARS[S.p[s]?.ch]?.color || '#ffffff';   // 寶石色
+    const GOLD = '#f3e3bd';      // 偏白的淡金（太黃會像塑膠）
     const z = (e.z || 0) * U;
     switch (e.k) {
       case 'hit': {
         const x = e.x * U, y = e.y * U, c = col(e.s), su = e.kind === 'su';
         this.fx.spark(x, y, e.big, c, z);
-        this.fx.slash(x, y, c, e.big, z);
-        this.fx.glow(x, y, c, e.big ? 2.4 : 1.1, z);
-        if (e.big) { this.fx.shards(x, y, c, su ? 14 : 9, 5, z); this.fx.groundRing(x, z, c, su ? 3.6 : 2.6); this.punch = Math.max(this.punch, su ? 0.9 : 0.55); }
-        else if ((e.combo || 0) >= 3) this.fx.shards(x, y, c, 3, 3, z);
+        this.fx.slash(x, y, GOLD, e.big, z);
+        this.fx.glow(x, y, c, e.big ? 2.2 : 1.0, z);
+        if (e.big) { this.fx.shards(x, y, GOLD, su ? 14 : 9, 5, z); this.fx.sigil(x, z, c, su ? 3.8 : 2.6, su ? 0.8 : 0.6); this.fx.runes(x, y, GOLD, su ? 8 : 4, z); this.punch = Math.max(this.punch, su ? 0.9 : 0.55); }
+        else if ((e.combo || 0) >= 3) { this.fx.shards(x, y, GOLD, 3, 3, z); this.fx.runes(x, y, GOLD, 1, z); }
         this.shake = Math.max(this.shake, e.big ? (su ? 0.13 : 0.09) : 0.03);
         break;
       }
       case 'block':
         this.fx.block(e.x * U, e.y * U, z);
-        if (e.big) { this.fx.slash(e.x * U, e.y * U, '#d8f4ff', 0, z); this.shake = Math.max(this.shake, 0.03); }
+        if (e.big) { this.fx.slash(e.x * U, e.y * U, '#fff1c8', 0, z); this.shake = Math.max(this.shake, 0.03); }
         break;
       case 'break': {
         const x = e.x * U, y = e.y * U;
-        this.fx.spark(x, y, 1, '#d8f4ff', z); this.fx.slash(x, y, '#d8f4ff', 1, z); this.fx.shards(x, y, '#d8f4ff', 18, 6, z); this.fx.groundRing(x, z, '#d8f4ff', 2.4);
+        this.fx.spark(x, y, 1, '#fff1c8', z); this.fx.slash(x, y, '#fff1c8', 1, z); this.fx.shards(x, y, GOLD, 18, 6, z); this.fx.sigil(x, z, '#f2d68a', 2.4, 0.5, -3); this.fx.runes(x, y, GOLD, 5, z);
         this.shake = Math.max(this.shake, 0.08);
         break;
       }
-      case 'clash': this.fx.spark(e.x * U, e.y * U, 1, '#ffffff', z); this.fx.slash(e.x * U, e.y * U, '#ffffff', 1, z); this.fx.pop(e.x * U, e.y * U, '#7fe6ff', z); break;
+      case 'clash': this.fx.spark(e.x * U, e.y * U, 1, '#ffffff', z); this.fx.slash(e.x * U, e.y * U, GOLD, 1, z); this.fx.pop(e.x * U, e.y * U, '#5cc8e0', z); this.fx.runes(e.x * U, e.y * U, GOLD, 4, z); break;
       case 'super': {
         const p = S.p[e.s], x = p.x * U, pz = p.z * U, c = col(e.s);
         this.fx.pillar(x, pz, c, 5);
-        this.fx.groundRing(x, pz, c, 5, 0.6); this.fx.groundRing(x, pz, '#ffffff', 3, 0.45);
+        this.fx.sigil(x, pz, GOLD, 5.5, 1.1, 1.5); this.fx.sigil(x, pz, c, 3.4, 0.9, -2.5);
         this.fighters[e.s].flash = 1;
         this.shake = 0.07;
         break;
       }
       case 'sp': {
         const p = S.p[e.s];
-        this.fx.groundRing(p.x * U, p.z * U, col(e.s), 1.6, 0.3);
+        this.fx.sigil(p.x * U, p.z * U, col(e.s), 1.9, 0.45, 2);
+        this.fx.runes(p.x * U, CHARS[p.ch].h * U * 0.6, GOLD, 2, p.z * U);
         this.fighters[e.s].flash = Math.max(this.fighters[e.s].flash, 0.35);
         break;
       }
@@ -136,13 +139,13 @@ export class View {
       case 'grab': { const p = S.p[e.s]; this.fx.spark((p.x + p.face * 300) * U, CHARS[p.ch].h * U * 0.6, 0, '#ffffff', p.z * U); break; }
       case 'dizzy': { const p = S.p[e.s]; this.fx.shards(p.x * U, CHARS[p.ch].h * U, '#ffe98a', 8, 2.5, p.z * U); break; }
       case 'land':
-        if (e.hard) { this.fx.dust(e.x * U, 0, 9, null, z); this.fx.groundRing(e.x * U, z, '#c9d6ae', 1.8, 0.35); this.shake = Math.max(this.shake, 0.05); }
+        if (e.hard) { this.fx.dust(e.x * U, 0, 9, null, z); this.fx.groundRing(e.x * U, z, '#b8a88e', 1.8, 0.35); this.shake = Math.max(this.shake, 0.05); }
         else this.fx.dust(e.x * U, 0, 3, null, z);
         break;
       case 'jump': this.fx.dust(e.x * U, 0, 3, null, z); break;
       case 'ko': {
         const lost = S.p.filter((p) => p.hp <= 0);
-        for (const p of lost) { this.fx.groundRing(p.x * U, p.z * U, '#ffffff', 6, 0.8); this.fx.shards(p.x * U, p.y * U + 0.8, '#ffffff', 20, 7, p.z * U); this.fx.glow(p.x * U, p.y * U + 0.8, '#ffffff', 5, p.z * U, 0.5); }
+        for (const p of lost) { this.fx.sigil(p.x * U, p.z * U, '#d8323a', 6.5, 1.4, 1); this.fx.shards(p.x * U, p.y * U + 0.8, GOLD, 20, 7, p.z * U); this.fx.runes(p.x * U, p.y * U + 0.6, GOLD, 14, p.z * U, 1.6); this.fx.glow(p.x * U, p.y * U + 0.8, '#fff1c8', 5, p.z * U, 0.5); }
         this.shake = 0.18; this.punch = 1.1;
         break;
       }
@@ -204,10 +207,11 @@ export class View {
       m.position.set(q.x * U, q.y * U, q.z * U);
       const w = 1 + 0.08 * Math.sin(this.clock * 14 + q.id);
       m.scale.set(w * q.w / 170, (2 - w) * q.h / 170, 1);
-      if (Math.random() < 0.5) this.fx.speck(q.x * U - Math.sign(q.vx) * 0.15, q.y * U + (Math.random() - 0.5) * 0.2, Math.random() < 0.3 ? '#ffffff' : '#7fe6ff', 0.6, q.z * U, -1.5);
-      if (q.t % 5 === 0) this.fx.trail(q.x * U - Math.sign(q.vx) * 0.35, q.y * U, '#7fe6ff', 0.9, q.z * U, 0.1);
+      if (Math.random() < 0.5) this.fx.speck(q.x * U - Math.sign(q.vx) * 0.15, q.y * U + (Math.random() - 0.5) * 0.2, Math.random() < 0.3 ? '#fff1c8' : '#5cc8e0', 0.6, q.z * U, -1.5);
+      if (q.t % 5 === 0) this.fx.trail(q.x * U - Math.sign(q.vx) * 0.35, q.y * U, '#5cc8e0', 0.9, q.z * U, 0.1);
+      if (q.t % 9 === 0) this.fx.runes(q.x * U, q.y * U, '#bfeaff', 1, q.z * U, 0.2);
     }
-    for (const [id, m] of this.projs) if (!live.has(id)) { this.scene.remove(m); this.projs.delete(id); this.fx.pop(m.position.x, m.position.y, '#7fe6ff', m.position.z); }
+    for (const [id, m] of this.projs) if (!live.has(id)) { this.scene.remove(m); this.projs.delete(id); this.fx.pop(m.position.x, m.position.y, '#5cc8e0', m.position.z); }
   }
 
   // 鏡頭從斜上方往下看地板，跟著場上的人左右移；人散得開就拉遠
@@ -237,6 +241,29 @@ export class View {
     const D = this.cam.d - this.punch;
     this.camera.position.set(ox + sx, 0.55 + D * 0.5 + sy, this.cam.z + 0.3 + D);
     this.camera.lookAt(ox + sx, 0.55 + sy, this.cam.z - 0.15);
+  }
+
+  // 開場先把每種特效、泡泡、浪、星星都畫一次到一張小圖上：著色器和貼圖先準備好，第一次出招才不會頓一下
+  warm() {
+    const fx = this.fx, x = this.cam.x, W = '#ffffff';
+    const keep = fx.list;
+    fx.list = [];
+    fx.spark(x, 1, 1, W); fx.slash(x, 1, W, 1); fx.glow(x, 1, W); fx.shards(x, 1, W, 2); fx.groundRing(x, 0, W); fx.pillar(x, 0, W);
+    fx.pop(x, 1, W); fx.trail(x, 1, W); fx.block(x, 1); fx.dust(x, 0, 1); fx.dust(x, 0, 1, W); fx.burst(x, 1, W); fx.sigil(x, 0, W); fx.runes(x, 1, W, 8);
+    const b = bubbleMesh();
+    b.position.set(x, 1, 0);
+    this.scene.add(b);
+    const was = this.fighters.map((f) => f.beam.visible);
+    for (const f of this.fighters) { f.beam.visible = true; for (const s of f.stars) s.visible = true; }
+    const rt = new THREE.WebGLRenderTarget(16, 16);
+    this.renderer.setRenderTarget(rt);
+    this.renderer.render(this.scene, this.camera);
+    this.renderer.setRenderTarget(null);
+    rt.dispose();
+    this.scene.remove(b);
+    this.fighters.forEach((f, i) => { f.beam.visible = was[i]; for (const s of f.stars) s.visible = false; });
+    fx.update(99);            // 剛剛放的全部收掉
+    fx.list = keep;
   }
 
   // 場上的一點在畫面上的位置（像素），HUD 要把字貼在打中的地方用

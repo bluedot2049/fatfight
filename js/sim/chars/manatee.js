@@ -4,12 +4,14 @@
 
 import { hit, mv, multi } from '../moves.js';
 
-// 普通技：A1 A2 輪流出，對方頭暈時變 A3；蹲攻 crA 打到接 crD；攻跳同按吹飛 CD；跑、衝跳、空中各一招
+// 普通技：A1 A2 輪流出，對方頭暈時變 A3；蹲攻 crA（踢）打到接 crB（短手）再接 crD（掃）；攻跳同按吹飛 CD；跑、衝跳、空中各一招
 const N = {
   A1: mv('A1', '鰭拍', 16, { pose: 'sA', cancel: 1, hits: [hit([4, 6], [80, 780, 580, 1200], 'L')] }),   // 打得高，胖鼠蹲下會揮空
   A2: mv('A2', '反手拍', 18, { pose: 'sC', cancel: 1, hits: [hit([5, 7], [80, 450, 620, 1100], 'L')] }),
   A3: mv('A3', '尾巴橫掃', 30, { pose: 'sD', cancel: 1, hits: [hit([8, 11], [100, 250, 860, 950], 'H', { dmg: 70, kd: 1, dvx: 20, dvy: 60 })] }),
-  crA: mv('crA', '蹲尾尖', 16, { pose: 'crB', cr: 1, cancel: 1, next: 'crD', hits: [hit([5, 7], [80, 0, 640, 300], 'L', { dmg: 34 })] }),
+  crA: mv('crA', '蹲尾尖', 16, { pose: 'crB', cr: 1, cancel: 1, next: 'crB', hits: [hit([5, 7], [80, 0, 640, 300], 'L', { dmg: 34 })] }),
+  // 蹲著的短手（姿勢表裡叫 crA；招式 id 照按的順序排所以是 crB）：手短，出手時往前蹭一點才接得上
+  crB: mv('crB', '蹲鰭拍', 14, { pose: 'crA', cr: 1, cancel: 1, next: 'crD', vx: [[0, 6], [4, 0]], hits: [hit([3, 5], [80, 250, 560, 700], 'L', { dmg: 30 })] }),
   crD: mv('crD', '貼地掃尾', 34, { pose: 'crD', cr: 1, hits: [hit([8, 11], [80, 0, 880, 260], 'H', { dmg: 60, kd: 1, dvx: 12, dvy: 45 })] }),
   CD: mv('CD', '霸氣一撞', 38, { pose: 'CD', vx: [[0, 0], [8, 14], [16, 0]],
     hits: [hit([12, 15], [150, 400, 880, 1150], 'H', { dmg: 70, kd: 1, dvx: 34, dvy: 60, bdef: 55 })] }),
@@ -39,7 +41,8 @@ const SU = [
 
 export default {
   id: 'manatee', name: '海牛', full: '灰色海牛', color: '#7fe6ff',
-  blurb: '遠處吐泡泡、尾巴對空', stat: [4, 5, 2],     // 選角畫面：一句話、力氣／距離／速度（1–5）
+  blurb: '遠處吐泡泡、尾巴對空', stat: [4, 5, 2],
+  pal: ['#5cc8e0', '#123a5c'], card: { attr: '水', type: '深海之獸', lv: 5, art: 'sea' },   // 介面：寶石色（亮、暗）；卡片的屬性、種族、等級星、畫框底色     // 選角畫面：一句話、力氣／距離／速度（1–5）
   w: 330, h: 1450, hc: 950,
   walkX: 16, walkZ: 11, run: 44, runZ: 9, jumpV: 150, jumpX: 18, jumpZ: 12, dashV: 102, dashX: 58,
   normals: N, specials: SP, supers: SU,

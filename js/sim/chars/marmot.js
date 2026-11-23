@@ -8,7 +8,9 @@ const N = {
   A1: mv('A1', '小爪', 14, { pose: 'sA', cancel: 1, hits: [hit([3, 5], [70, 450, 520, 950], 'L', { dmg: 36 })] }),
   A2: mv('A2', '大爪', 16, { pose: 'sC', cancel: 1, hits: [hit([4, 6], [70, 400, 560, 950], 'L', { dmg: 36 })] }),
   A3: mv('A3', '屁股撞', 28, { pose: 'sD', cancel: 1, hits: [hit([7, 10], [100, 200, 780, 850], 'H', { dmg: 66, kd: 1, dvx: 22, dvy: 60 })] }),
-  crA: mv('crA', '蹲踢', 15, { pose: 'crB', cr: 1, cancel: 1, next: 'crD', hits: [hit([4, 6], [60, 0, 580, 240], 'L', { dmg: 32 })] }),
+  crA: mv('crA', '蹲踢', 15, { pose: 'crB', cr: 1, cancel: 1, next: 'crB', hits: [hit([4, 6], [60, 0, 580, 240], 'L', { dmg: 32 })] }),
+  // 蹲著的短手（姿勢表裡叫 crA）：踢到之後按著蹲再按攻出這一下，再按才是掃
+  crB: mv('crB', '蹲爪', 13, { pose: 'crA', cr: 1, cancel: 1, next: 'crD', vx: [[0, 7], [4, 0]], hits: [hit([3, 5], [60, 200, 500, 620], 'L', { dmg: 28 })] }),
   crD: mv('crD', '刨地掃', 32, { pose: 'crD', cr: 1, hits: [hit([7, 10], [60, 0, 820, 240], 'H', { dmg: 58, kd: 1, dvx: 12, dvy: 45 })] }),
   CD: mv('CD', '狂妄頭撞', 36, { pose: 'CD', vx: [[0, 0], [8, 16], [15, 0]],
     hits: [hit([11, 14], [120, 300, 820, 1000], 'H', { dmg: 68, kd: 1, dvx: 34, dvy: 60, bdef: 55 })] }),
@@ -39,7 +41,8 @@ const SU = [
 
 export default {
   id: 'marmot', name: '胖鼠', full: '土撥鼠界最狂妄', color: '#ffd84a',
-  blurb: '近身亂鑽、翻滾衝撞', stat: [3, 2, 5],       // 選角畫面：一句話、力氣／距離／速度（1–5）
+  blurb: '近身亂鑽、翻滾衝撞', stat: [3, 2, 5],
+  pal: ['#f2a93b', '#5a2a0c'], card: { attr: '地', type: '狂妄之鼠', lv: 4, art: 'earth' },  // 介面：寶石色（亮、暗）；卡片的屬性、種族、等級星、畫框底色       // 選角畫面：一句話、力氣／距離／速度（1–5）
   w: 300, h: 1150, hc: 760,
   walkX: 20, walkZ: 13, run: 54, runZ: 11, jumpV: 156, jumpX: 22, jumpZ: 14, dashV: 105, dashX: 68,
   normals: N, specials: SP, supers: SU,

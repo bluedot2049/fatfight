@@ -10,6 +10,8 @@ import { KEYMAP, keyName } from './ui/keys.js';
 import { unlockAudio, sfxEvent, sfxState, play, soundMode, setSoundMode, SOUND_NAMES } from './ui/sfx.js';
 import { music } from './ui/music.js';
 import { gt } from './ui/gt.js';
+import { magicCircle } from './ui/arcane.js';
+import { CardStage } from './view/cardstage.js';
 import { newMatch, step } from './sim/match.js';
 import { CHARS, MOVES } from './sim/chars/index.js';
 import { LEFT, RIGHT, BD, BJ, BS } from './sim/const.js';
@@ -22,6 +24,11 @@ const hud = new Hud(document.getElementById('hud'));
 const keys = new Keyboard();
 const menu = new Menu(document.getElementById('menu'), keys);
 const overlay = document.getElementById('overlay');
+let cards3d = null;          // 選角閃卡上的 3D 角色（第一次進選角才建）
+// 選角照 1600×900 畫再整塊縮放
+const fit9 = () => document.documentElement.style.setProperty('--s9', Math.min(innerWidth / 1600, innerHeight / 900));
+fit9();
+addEventListener('resize', fit9);
 
 const G = {
   mode: 'title',          // title select fight
@@ -70,7 +77,9 @@ function loop(now) {
     while (acc >= STEP && n++ < 6) { acc -= STEP; tick(); }
     if (n >= 6) acc = 0;
   }
-  view.render(G.S, G.events, dt);
+  if (G.mode === 'select') cards3d?.render(dt);       // 選角整頁都是介面蓋住，場地不用畫
+  else view.render(G.S, G.events, dt);
+  if (!G.warm) { G.warm = true; view.warm(); hud.warm(); }     // 第一個畫面畫完就預先準備特效和字，之後第一次出招不會頓
   if (G.mode === 'fight') { hud.update(G.S, dt); if (!G.paused) sfxState(G.S, panOf); }
   requestAnimationFrame(loop);
 }
@@ -104,12 +113,6 @@ function dummyBits() {
 }
 
 // ---------- 畫面流程 ----------
-// 選角背景擺的兩隻：站在畫面兩邊三分之一的地方，中間留給 VS（只是擺樣子，不是比賽）
-function showcase(c0, c1) {
-  const S = newMatch(c0, c1);
-  S.p[0].x = -1300; S.p[1].x = 1300;
-  return S;
-}
 function toTitle() {
   if (G.net) { G.net.close(); G.net = null; }
   G.rb = null; G.mode = 'title'; G.paused = false;
@@ -120,11 +123,12 @@ function toTitle() {
   view.camOffset = 2.0;
   G.S.p[0].x = -950; G.S.p[1].x = 950;      // 標題的兩隻站近一點，擠在右半邊（只是擺樣子，不是比賽）
   music.menu(); music.muffle(false); music.level(1);
-  const tick = '海牛 VS 土撥鼠　／　超能力格鬥　／　胖鼠牛了　／　';
+  cards3d?.stop();
   menu.show({
     cls: 'title',
-    logo: `<h1 class="logo">${gt('胖鼠', { cls: 'a', sw: 0.1, k: 0.035 })}${gt('牛了', { cls: 'b', sw: 0.1, k: 0.035 })}</h1>`,
-    sub: '海牛 VS 土撥鼠<i></i>超能力格鬥',
+    logo: `<div class="tcircle">${magicCircle({ seed: 'title', runes: 22, star: 6 })}</div>
+      <h1 class="logo">${gt('胖鼠牛了', { sw: 0.04, k: 0.06 })}</h1>
+      <div class="tagline"><i></i>海牛　對　土撥鼠<i></i></div>`,
     items: [
       { label: '本機雙人', desc: '同一台鍵盤兩個人', on: () => toSelect('local') },
       { label: '練習', desc: '木樁、血會回', on: () => toSelect('train') },
@@ -134,7 +138,7 @@ function toTitle() {
       soundItem(),
     ],
     foot: `<span><kbd>↑</kbd><kbd>↓</kbd>選</span><span><kbd>${keyName(KEYMAP[0].A[0])}</kbd>確定</span><span><kbd>${keyName(KEYMAP[0].J[0])}</kbd>返回</span>`,
-    extra: `<div class="ticker"><span>${tick.repeat(12)}</span></div><div class="ver">α 0.2</div>`,
+    extra: `<div class="ver">α 0.2</div>`,
   });
 }
 
@@ -147,8 +151,6 @@ function toSelect(kind, onlineSide = 0) {
   const scr = selectScreen({
     mode: kind, side: onlineSide,
     back: toTitle,
-    // 游標移到誰，背景就換成那兩隻站著
-    onHover: (c0, c1) => { if (G.mode === 'select' && (G.S.p[0].ch !== c0 || G.S.p[1].ch !== c1)) G.S = showcase(c0, c1); },
     onPick: kind === 'online' ? (ch, ok) => G.net?.ctl({ t: 'pick', ch, ok }) : null,
     done: (c0, c1) => {
       if (kind === 'online') { if (G.side === 0) startOnline(c0, c1); }
@@ -158,13 +160,13 @@ function toSelect(kind, onlineSide = 0) {
   scr.refresh = () => menu.render();
   G.select = scr;
   G.paused = false;
-  G.S = showcase(G.S.p[0].ch, G.S.p[1].ch);
   menu.show(scr);
-  scr.hover();
+  if (!cards3d) cards3d = new CardStage();
+  cards3d.start();
 }
 
 function startFight(c0, c1) {
-  menu.hide(); closeOverlay();
+  menu.hide(); closeOverlay(); cards3d?.stop();
   view.camOffset = 0;
   G.chars = [c0, c1];
   G.S = newMatch(c0, c1, { train: G.kind === 'train' });
@@ -251,7 +253,7 @@ function onlineMenu() {
 }
 function joinPrompt() {
   menu.show({
-    html: () => `<div class="panel"><h2>加入房間</h2><p class="sub">輸入朋友給你的四個字</p>
+    html: () => `<div class="panel"><i class="shape"></i><h2>${gt('加入房間', { sw: 0.05, k: 0.06 })}</h2><p class="sub">輸入朋友給你的四個字</p>
       <input id="code" maxlength="4" autocomplete="off" spellcheck="false"><p class="foot">Enter 加入　Esc 返回</p></div>`,
     onKey: (nav, p, code) => { if (code === 'Escape') onlineMenu(); },
   });
@@ -268,7 +270,7 @@ async function goOnline(code, host) {
   const abort = new AbortController();
   let msg = '';
   const scr = {
-    html: () => `<div class="panel"><h2>${host ? '建立房間' : '加入房間'}</h2>
+    html: () => `<div class="panel"><i class="shape"></i><h2>${gt(host ? '建立房間' : '加入房間', { sw: 0.05, k: 0.06 })}</h2>
       ${host ? `<p class="code">${code}</p><p class="sub">把這四個字給朋友</p>` : ''}<p class="status">${msg}</p><p class="foot">Esc 取消</p></div>`,
     onKey: (nav, p, k) => { if (k === 'Escape') { abort.abort(); onlineMenu(); } },
   };
@@ -306,7 +308,7 @@ function startOnline(c0, c1) {
 }
 function beginOnline(ch, delay) {
   G.again = G.otherAgain = false;
-  menu.hide(); closeOverlay();
+  menu.hide(); closeOverlay(); cards3d?.stop();
   G.kind = 'online'; G.chars = ch;
   view.camOffset = 0;
   G.rb = new Rollback({ local: G.side, init: newMatch(ch[0], ch[1]), send: (m) => G.net?.fast(m), delay });
