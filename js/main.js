@@ -6,13 +6,17 @@ import { View } from './view/view.js';
 import { Hud } from './ui/hud.js';
 import { Keyboard } from './ui/keys.js';
 import { Menu, selectScreen, moveListHtml, keysHtml } from './ui/menu.js';
-import { KEYMAP, keyName } from './ui/keys.js';
+import { KEYMAP, keyName, device } from './ui/keys.js';
+import { Touch, fullscreen, canFull, isFull } from './ui/touch.js';
 import { unlockAudio, sfxEvent, sfxState, play, soundMode, setSoundMode, SOUND_NAMES } from './ui/sfx.js';
 import { music } from './ui/music.js';
 import { gt } from './ui/gt.js';
 import { magicCircle } from './ui/arcane.js';
 import { CardStage } from './view/cardstage.js';
-import { newMatch, step } from './sim/match.js';
+import { newMatch, step, setCpu } from './sim/match.js';
+import { newQuest } from './sim/quest.js';
+import { ORDER } from './sim/quests/index.js';
+import { LV_MAX } from './sim/ai.js';
 import { CHARS, MOVES } from './sim/chars/index.js';
 import { LEFT, RIGHT, BD, BJ, BS } from './sim/const.js';
 import { Rollback } from './net/rollback.js';
@@ -21,6 +25,7 @@ import { connect, newCode, cleanCode } from './net/peer.js';
 const qs = new URLSearchParams(location.search);
 const view = new View(document.getElementById('c'));
 const hud = new Hud(document.getElementById('hud'));
+hud.view = view;
 const keys = new Keyboard();
 const menu = new Menu(document.getElementById('menu'), keys);
 const overlay = document.getElementById('overlay');
@@ -32,14 +37,24 @@ addEventListener('resize', fit9);
 
 const G = {
   mode: 'title',          // title select fight
-  kind: 'local',          // local train online
+  kind: 'local',          // local train online cpu quest
   S: newMatch('manatee', 'marmot'),
   chars: ['manatee', 'marmot'],
   paused: false,
-  dummy: 0,               // 練習對手：0 站著 1 蹲著 2 防禦 3 蹲防 4 一直跳 5 P2 操作
+  dummy: 0,               // 練習對手：0 站著 1 蹲著 2 防禦 3 蹲防 4 一直跳 5 P2 操作 6 電腦
+  cpuLv: 1,               // 對電腦的難度：贏了往上一級（0–LV_MAX），回標題重來
   rb: null, net: null, side: 0, overT: 0,
   events: [],
 };
+// 手機觸控（橫拿）：搖桿和按鈕變成跟鍵盤一樣的輸入位元；按到鍵盤的遊戲鍵就換回鍵盤的介面
+const touch = new Touch({
+  pause: () => { if (G.mode === 'fight' && !G.paused && !menu.open && overlay.hidden) pauseMenu(); },
+  back: () => { if (!overlay.hidden) closeOverlay(); else menu.key('Escape'); },
+});
+keys.onPress((code) => { if (keys.codes.has(code)) touch.enable(false); });
+document.addEventListener('fullscreenchange', () => menu.render());
+// 自己操作的那隻（觸控要看牠是不是在走、在跑；只讀）
+const mine = () => (G.S.quest ? G.S.p.find((f) => f.pl === 0) : G.S.p[G.kind === 'online' ? G.side : 0]);
 // 左下角招式表開不開（記在這台瀏覽器；讀不到就當沒開）
 const MOVES_KEY = 'fatfight.moves';
 let movesOn = false;
@@ -48,7 +63,8 @@ function setMovesOn(on) {
   movesOn = on; hud.showMoves(on);
   try { localStorage.setItem(MOVES_KEY, on ? '1' : '0'); } catch {}
 }
-const DUMMY = ['站著', '蹲著', '防禦', '蹲防', '一直跳', '由 P2 操作'];
+const DUMMY = ['站著', '蹲著', '防禦', '蹲防', '一直跳', '由 P2 操作', '電腦'];
+const TRAIN_CPU = 3;        // 練習的電腦對手用幾級
 // 聲音偏左偏右：場上的 x（公釐）離鏡頭中心多遠
 const panOf = (x) => Math.max(-0.8, Math.min(0.8, ((x || 0) / 1000 - view.cam.x) / 6));
 view.onEvent = (e, S) => {
@@ -57,6 +73,13 @@ view.onEvent = (e, S) => {
   sfxEvent(e, e.x === undefined ? (e.s === undefined ? 0 : panOf(S.p[e.s]?.x)) : panOf(e.x), S);
   // 音樂跟著比賽：KO 壓低、下一回合拉回來、打完留一點點
   if (e.k === 'ko') music.level(0.3, 0.2); else if (e.k === 'round') music.level(1, 0.6); else if (e.k === 'over') music.level(0.25, 0.5);
+  // 闖關的事件先借現有的音效
+  if (e.k === 'stage') play('round');
+  else if (e.k === 'kill') { if (e.boss) { play('ko'); music.level(0.3, 0.2); } else play('shatter', {}, panOf(e.x)); }
+  else if (e.k === 'die') play('ko');
+  else if (e.k === 'clear') play('win');
+  else if (e.k === 'boss' || e.k === 'respawn' || e.k === 'cont') play('fight');
+  else if (e.k === 'contask') music.level(0.4, 0.4);
 };
 const soundItem = () => ({ label: '聲音', value: () => SOUND_NAMES[soundMode()], on: () => setSoundMode(soundMode() + 1), cycle: (d) => setSoundMode(soundMode() + d) });
 addEventListener('pointerdown', unlockAudio);
@@ -81,17 +104,24 @@ function loop(now) {
   else view.render(G.S, G.events, dt);
   if (!G.warm) { G.warm = true; view.warm(); hud.warm(); }     // 第一個畫面畫完就預先準備特效和字，之後第一次出招不會頓
   if (G.mode === 'fight') { hud.update(G.S, dt); if (!G.paused) sfxState(G.S, panOf); }
+  view.setLift(touch.on && G.mode === 'fight' ? 0.06 : 0);
+  touch.sync({
+    fight: G.mode === 'fight' && !G.paused && !menu.open && overlay.hidden,
+    back: !overlay.hidden || (menu.open && !!(menu.cur.back || menu.cur.onKey) && !/result|title/.test(menu.cur.cls || '')),
+    ch: G.mode === 'fight' ? mine()?.ch : '',
+  });
   requestAnimationFrame(loop);
 }
 
 function tick() {
   if (G.kind === 'online') {
-    G.rb.tick(keys.bits(0));
+    const fresh = G.rb.localTop < G.rb.frame + G.rb.delay;      // 這幀的輸入有沒有被收下（等對方的時候沒有，觸控排好的補鍵不能往前走）
+    G.rb.tick(keys.bits(0) | touch.bits(mine(), fresh));
     G.S = G.rb.S;
     G.events.push(...G.rb.events);
     netStatus();
   } else {
-    const b0 = keys.bits(0);
+    const b0 = keys.bits(0) | touch.bits(mine());
     const b1 = G.kind === 'train' ? dummyBits() : keys.bits(1);
     step(G.S, b0, b1);
     for (const e of G.S.ev) G.events.push({ ...e, f: G.S.f });
@@ -130,12 +160,15 @@ function toTitle() {
       <h1 class="logo">${gt('胖鼠牛了', { sw: 0.04, k: 0.06 })}</h1>
       <div class="tagline"><i></i>海牛　對　土撥鼠<i></i></div>`,
     items: [
-      { label: '本機雙人', desc: '同一台鍵盤兩個人', on: () => toSelect('local') },
+      ...(device.touch ? [] : [{ label: '本機雙人', desc: '同一台鍵盤兩個人', on: () => toSelect('local') }]),
+      { label: '闖關', desc: '一路打到頭目', on: () => toSelect('quest') },
+      { label: '對電腦', desc: '贏了電腦會變強', on: () => { G.cpuLv = 1; toSelect('cpu'); } },
       { label: '練習', desc: '木樁、血會回', on: () => toSelect('train') },
       { label: '線上對戰', desc: '房間碼找朋友', on: onlineMenu },
       { label: '招式表', desc: '兩隻的必殺技', on: () => showOverlay(moveListHtml()) },
-      { label: '按鍵', desc: 'P1、P2 的鍵位', on: () => showOverlay(keysHtml()) },
+      { label: device.touch ? '操作' : '按鍵', desc: 'P1、P2 的鍵位', on: () => showOverlay(keysHtml()) },
       soundItem(),
+      ...(device.touch && canFull() ? [{ label: '全螢幕', value: () => (isFull() ? '開' : '關'), on: () => fullscreen(!isFull()), cycle: () => fullscreen(!isFull()) }] : []),
     ],
     foot: `<span><kbd>↑</kbd><kbd>↓</kbd>選</span><span><kbd>${keyName(KEYMAP[0].A[0])}</kbd>確定</span><span><kbd>${keyName(KEYMAP[0].J[0])}</kbd>返回</span>`,
     extra: `<div class="ver">α 0.2</div>`,
@@ -154,6 +187,7 @@ function toSelect(kind, onlineSide = 0) {
     onPick: kind === 'online' ? (ch, ok) => G.net?.ctl({ t: 'pick', ch, ok }) : null,
     done: (c0, c1) => {
       if (kind === 'online') { if (G.side === 0) startOnline(c0, c1); }
+      else if (kind === 'quest') startQuest(c0);
       else startFight(c0, c1);
     },
   });
@@ -169,7 +203,20 @@ function startFight(c0, c1) {
   menu.hide(); closeOverlay(); cards3d?.stop();
   view.camOffset = 0;
   G.chars = [c0, c1];
-  G.S = newMatch(c0, c1, { train: G.kind === 'train' });
+  G.S = newMatch(c0, c1, { train: G.kind === 'train', cpu: G.kind === 'cpu' ? G.cpuLv : undefined });
+  if (G.kind === 'train' && G.dummy === 6) setCpu(G.S, 1, TRAIN_CPU);
+  G.mode = 'fight'; G.paused = false; acc = 0; G.overShown = false;
+  hud.show(true); hud.setNames(G.S); hud.setMoves(G.S, 0); hud.showMoves(movesOn);
+  document.body.classList.remove('at-title');
+  music.muffle(false); music.level(1); music.battle();
+}
+
+// 闖關：一個人（之後兩人合作），從第一關開始
+function startQuest(c0, id = ORDER[0]) {
+  menu.hide(); closeOverlay(); cards3d?.stop();
+  view.camOffset = 0;
+  G.kind = 'quest'; G.chars = [c0]; G.quest = id;
+  G.S = newQuest([c0], id, { seed: (Math.random() * 0x7fffffff) | 0 });
   G.mode = 'fight'; G.paused = false; acc = 0; G.overShown = false;
   hud.show(true); hud.setNames(G.S); hud.setMoves(G.S, 0); hud.showMoves(movesOn);
   document.body.classList.remove('at-title');
@@ -185,10 +232,16 @@ function pauseMenu() {
   const items = [
     { label: '繼續', on: resume },
     { label: '招式表', on: () => showOverlay(moveListHtml()) },
-    { label: '左下招式表', value: () => (movesOn ? '顯示' : '不顯示'), on: () => setMovesOn(!movesOn), cycle: () => setMovesOn(!movesOn) },
+    device.touch
+      ? { label: '搖桿', value: () => (touch.left ? '左邊' : '右邊'), on: () => touch.setSide(!touch.left), cycle: () => touch.setSide(!touch.left) }
+      : { label: '左下招式表', value: () => (movesOn ? '顯示' : '不顯示'), on: () => setMovesOn(!movesOn), cycle: () => setMovesOn(!movesOn) },
   ];
-  if (G.kind === 'train') items.push({ label: '對手', value: () => DUMMY[G.dummy], on: () => { G.dummy = (G.dummy + 1) % DUMMY.length; }, cycle: (d) => { G.dummy = (G.dummy + d + DUMMY.length) % DUMMY.length; } });
+  if (G.kind === 'train') {
+    const setDummy = (n) => { G.dummy = (n + DUMMY.length) % DUMMY.length; setCpu(G.S, 1, G.dummy === 6 ? TRAIN_CPU : -1); hud.setNames(G.S); };
+    items.push({ label: '對手', value: () => DUMMY[G.dummy], on: () => setDummy(G.dummy + 1), cycle: (d) => setDummy(G.dummy + d) });
+  }
   items.push({ label: '判定框', value: () => (view.debug ? '顯示' : '不顯示'), on: () => { view.debug = !view.debug; }, cycle: () => { view.debug = !view.debug; } });
+  if (G.kind === 'quest') items.push({ label: '從頭再打', on: () => startQuest(G.chars[0], G.quest) });
   items.push(soundItem(), { label: '換角色', on: () => toSelect(G.kind) }, { label: '回標題', on: toTitle });
   menu.show({ title: '暫停', items, back: resume });
 }
@@ -204,6 +257,25 @@ function showResult() {
     });
     return;
   }
+  if (G.kind === 'quest') {
+    const won = G.S.winner === 0, sc = G.S.score[0].toLocaleString('en-US');
+    menu.show({
+      title: won ? '過關' : '結束', sub: `分數 ${sc}${G.S.conts ? `　接關 ${G.S.conts} 次` : ''}${won ? '　下一關還在蓋' : ''}`, cls: 'result',
+      items: [{ label: '再打一次', on: () => startQuest(G.chars[0], G.quest) }, { label: '換角色', on: () => toSelect('quest') }, { label: '回標題', on: toTitle }],
+      back: () => {},
+    });
+    return;
+  }
+  if (G.kind === 'cpu') {
+    const won = G.S.winner === 0, top = G.cpuLv >= LV_MAX;
+    if (won && !top) G.cpuLv++;
+    menu.show({
+      title: won ? '勝利' : '落敗', sub: won ? (top ? '電腦已經最強' : '電腦變強了') : '', cls: 'result',
+      items: [{ label: won ? '下一場' : '再來一場', on: () => startFight(...G.chars) }, { label: '換角色', on: () => toSelect('cpu') }, { label: '回標題', on: toTitle }],
+      back: () => {},
+    });
+    return;
+  }
   menu.show({
     title: '比賽結束', cls: 'result',
     items: [{ label: '再來一場', on: () => startFight(...G.chars) }, { label: '換角色', on: () => toSelect(G.kind) }, { label: '回標題', on: toTitle }],
@@ -213,7 +285,7 @@ function showResult() {
 
 // ---------- 招式表、按鍵說明（蓋在上面的一層） ----------
 function showOverlay(html) {
-  overlay.innerHTML = `<div class="sheet">${html}<p class="close">Esc／X 關閉</p></div>`;
+  overlay.innerHTML = `<div class="sheet">${html}<p class="close">${device.touch ? '點這裡關閉' : 'Esc／X 關閉'}</p></div>`;
   overlay.hidden = false;
 }
 function closeOverlay() { overlay.hidden = true; overlay.innerHTML = ''; }
@@ -254,14 +326,15 @@ function onlineMenu() {
 function joinPrompt() {
   menu.show({
     html: () => `<div class="panel"><i class="shape"></i><h2>${gt('加入房間', { sw: 0.05, k: 0.06 })}</h2><p class="sub">輸入朋友給你的四個字</p>
-      <input id="code" maxlength="4" autocomplete="off" spellcheck="false"><p class="foot">Enter 加入　Esc 返回</p></div>`,
+      <input id="code" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false"><br><button class="mbtn" id="codego">加入</button><p class="foot">Enter 加入　Esc 返回</p></div>`,
     onKey: (nav, p, code) => { if (code === 'Escape') onlineMenu(); },
   });
   const inp = document.getElementById('code');
   inp.focus();
   inp.addEventListener('input', () => { inp.value = cleanCode(inp.value); });
+  document.getElementById('codego').addEventListener('click', () => { if (inp.value.length === 4) goOnline(inp.value, false); else inp.focus(); });
   inp.addEventListener('keydown', (e) => {
-    if (e.code === 'Enter' && inp.value.length === 4) goOnline(inp.value, false);
+    if ((e.code === 'Enter' || e.key === 'Enter') && inp.value.length === 4) goOnline(inp.value, false);
     if (e.code === 'Escape') onlineMenu();
   });
 }
@@ -327,11 +400,13 @@ function netStatus() {
 }
 
 // ---------- 開始 ----------
-if (qs.has('debug')) window.__g = { G, view, hud, keys, menu, step, newMatch, CHARS, music, play };
-// ?fight=manatee,marmot 直接進本機對戰（截圖、測試用）；&train 練習
-if (qs.has('fight')) {
+if (qs.has('debug')) window.__g = { G, view, hud, keys, menu, touch, step, newMatch, CHARS, music, play };
+// ?fight=manatee,marmot 直接進本機對戰（截圖、測試用）；&train 練習；&cpu=3 對電腦（幾級）；?quest=marmot 直接闖關
+if (qs.has('quest')) startQuest(CHARS[qs.get('quest')] && !CHARS[qs.get('quest')].npc ? qs.get('quest') : 'marmot');
+else if (qs.has('fight')) {
   const [a, b] = (qs.get('fight') || 'manatee,marmot').split(',');
-  G.kind = qs.has('train') ? 'train' : 'local';
+  G.kind = qs.has('train') ? 'train' : qs.has('cpu') ? 'cpu' : 'local';
+  if (qs.has('cpu')) G.cpuLv = Math.max(0, Math.min(LV_MAX, +qs.get('cpu') || 1));
   startFight(CHARS[a] ? a : 'manatee', CHARS[b] ? b : 'marmot');
 } else toTitle();
 requestAnimationFrame(loop);

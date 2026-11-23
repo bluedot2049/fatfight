@@ -13,6 +13,11 @@ const BIT = { up: UP, down: DOWN, left: LEFT, right: RIGHT, A: BA, J: BJ, D: BD,
 
 // 畫面上寫鍵用：KeyZ → Z、Numpad5 → 數字鍵 5、Comma → ,
 const PUNCT = { Comma: ',', Period: '.', Slash: '/', ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→' };
+// 現在是不是用觸控在玩（js/ui/touch.js 改）：是的話畫面上不寫鍵盤的鍵
+export const device = { touch: false };
+// 畫面上寫「按哪顆」：鍵盤寫 P1 的鍵，觸控寫按鈕上的字
+const ZH = { A: '攻', J: '跳', D: '防', S: '蹲' };
+export const btnName = (a) => (device.touch ? ZH[a] : keyName(KEYMAP[0][a][0]));
 export function keyName(code) {
   return PUNCT[code] || code.replace(/^Key/, '').replace(/^Digit/, '').replace(/^Numpad/, '數字鍵 ');
 }

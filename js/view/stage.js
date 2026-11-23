@@ -180,8 +180,11 @@ function flameTex() {
 
 export class Stage {
   constructor(scene) {
-    scene.background = new THREE.Color(BG);
-    scene.fog = new THREE.Fog(BG, 14, 34);
+    this.root = new THREE.Group();
+    scene.add(this.root);
+    const add = (...o) => this.root.add(...o);
+    this.bg = new THREE.Color(BG);
+    this.fog = new THREE.Fog(BG, 14, 34);
     const W = STAGE_HALF / 1000;
     const span = W * 2 + 24;
     // 石板地
@@ -191,22 +194,22 @@ export class Stage {
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(span, 16), new THREE.MeshBasicMaterial({ map: ft, color: '#b8aa98' }));
     floor.rotation.x = -Math.PI / 2;
     floor.position.set(0, 0, -2);
-    scene.add(floor);
+    add(floor);
     // 中間嵌的魔法陣（金，超必殺時亮）
     const ct = canvasTex(circleCanvas(7, 1024), false);
     this.sigil = new THREE.Mesh(new THREE.PlaneGeometry(8.5, 8.5), new THREE.MeshBasicMaterial({ map: ct, color: '#9c7d48', transparent: true, opacity: 0.15, depthWrite: false, blending: THREE.AdditiveBlending }));
     this.sigil.rotation.x = -Math.PI / 2;
     this.sigil.position.set(0, 0.004, 0);
-    scene.add(this.sigil);
+    add(this.sigil);
     // 前後兩條石邊（能走到哪）＋一條細金線
     const curb = new THREE.MeshBasicMaterial({ color: '#15100d', transparent: true, opacity: 0.75, depthWrite: false });
     const inlay = new THREE.MeshBasicMaterial({ color: '#8f7442', transparent: true, opacity: 0.45, depthWrite: false });
     for (const z of [Z_NEAR, Z_FAR]) {
       const zz = z / 1000 + (z > 0 ? 0.45 : -0.45);
       const a = new THREE.Mesh(new THREE.PlaneGeometry(span, 0.32), curb);
-      a.rotation.x = -Math.PI / 2; a.position.set(0, 0.002, zz); scene.add(a);
+      a.rotation.x = -Math.PI / 2; a.position.set(0, 0.002, zz); add(a);
       const b = new THREE.Mesh(new THREE.PlaneGeometry(span, 0.035), inlay);
-      b.rotation.x = -Math.PI / 2; b.position.set(0, 0.003, zz + (z > 0 ? -0.18 : 0.18)); scene.add(b);
+      b.rotation.x = -Math.PI / 2; b.position.set(0, 0.003, zz + (z > 0 ? -0.18 : 0.18)); add(b);
     }
     // 後面：矮石台＋拱門牆
     const wt = wallTex();
@@ -216,13 +219,13 @@ export class Stage {
     const WZ = Z_FAR / 1000 - 3.4;
     const wall = new THREE.Mesh(new THREE.PlaneGeometry(span, 4), new THREE.MeshBasicMaterial({ map: wt }));
     wall.position.set(0, 2, WZ);
-    scene.add(wall);
+    add(wall);
     const ledge = new THREE.Mesh(new THREE.BoxGeometry(span, 0.5, 0.6), new THREE.MeshBasicMaterial({ color: '#2a211b' }));
     ledge.position.set(0, 0.25, Z_FAR / 1000 - 1.25);
-    scene.add(ledge);
+    add(ledge);
     const lip = new THREE.Mesh(new THREE.PlaneGeometry(span, 0.6), new THREE.MeshBasicMaterial({ color: '#4a3d32' }));
     lip.rotation.x = -Math.PI / 2; lip.position.set(0, 0.501, Z_FAR / 1000 - 1.25);
-    scene.add(lip);
+    add(lip);
     // 拱門裡的旗（兩隊顏色輪流）、柱子上的火把
     const x0 = -span / 2 + (wt.offset.x % 1) * 8;
     this.banners = []; this.torches = [];
@@ -235,7 +238,7 @@ export class Stage {
         if (Math.abs(x) > span / 2 - 1) return;
         const m = new THREE.Mesh(new THREE.PlaneGeometry(0.75, 1.9), new THREE.MeshBasicMaterial({ map: bt[(k + j + 100) % 2], transparent: true }));
         m.position.set(x, 2.35, WZ + 0.05);
-        scene.add(m);
+        add(m);
         this.banners.push({ m, ph: x * 1.3 });
       });
       for (const px of [0, 4]) {
@@ -243,12 +246,12 @@ export class Stage {
         if (Math.abs(x) > span / 2 - 1) continue;
         const sconce = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.22, 0.16), new THREE.MeshBasicMaterial({ color: '#1a120d' }));
         sconce.position.set(x, 1.75, WZ + 0.12);
-        scene.add(sconce);
+        add(sconce);
         const f = new THREE.Sprite(new THREE.SpriteMaterial({ map: flame, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
         f.position.set(x, 2.05, WZ + 0.2);
         const h = new THREE.Sprite(new THREE.SpriteMaterial({ map: glow, color: '#ff9a40', transparent: true, opacity: 0.35, depthWrite: false, blending: THREE.AdditiveBlending }));
         h.position.set(x, 2.0, WZ + 0.15);
-        scene.add(f, h);
+        add(f, h);
         this.torches.push({ f, h, ph: x * 2.7 });
       }
     }
@@ -263,15 +266,20 @@ export class Stage {
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     this.embers = new THREE.Points(geo, new THREE.PointsMaterial({ color: '#ffb060', size: 0.05, transparent: true, opacity: 0.8, depthWrite: false, blending: THREE.AdditiveBlending }));
-    scene.add(this.embers);
+    add(this.embers);
     // 光：暖的天光和主光（火把那種顏色），背後一道冷的邊光把角色從暗的背景分出來
-    scene.add(new THREE.HemisphereLight('#ffe9cc', '#2a1d16', 1.6));
+    add(new THREE.HemisphereLight('#ffe9cc', '#2a1d16', 1.6));
     const key = new THREE.DirectionalLight('#ffe0b0', 2.0);
     key.position.set(-2, 5, 6);
-    scene.add(key);
+    add(key);
     const rim = new THREE.DirectionalLight('#8f9cff', 0.8);
     rim.position.set(2, 3, -6);
-    scene.add(rim);
+    add(rim);
+  }
+  // 換場地：只顯示這一個，背景色和霧換成它的
+  show(scene, on) {
+    this.root.visible = on;
+    if (on) { scene.background = this.bg; scene.fog = this.fog; }
   }
   // power：兩邊的氣勢 0–1（超必殺、必殺時高）。地上的刻紋只是場地裝飾，不跟著亮（使用者 2026-11-24：戰鬥特效不要法陣）
   update(dt, clock, power) {

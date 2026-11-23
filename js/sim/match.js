@@ -6,25 +6,39 @@ import { HP, MP, WIN_ROUNDS, START_X, MAX_SEP, STAGE_HALF, PUSH_Z, PUSH_IN } fro
 import { CHARS } from './chars/index.js';
 import { newFighter, think, advance, record, toFree, FREE, isUnder } from './fighter.js';
 import { resolveHits, moveProjectiles } from './combat.js';
+import { newAI, aiBits } from './ai.js';
+import { questStep } from './quest.js';
 
-// 對戰：兩個玩家各一隻，隊伍 0 和 1。opt：{ train: 練習模式（血會回、魔力無限）}
+// 對戰：兩隻，隊伍 0 和 1。opt：{ train: 練習模式（血會回、魔力無限）, cpu: 難度（有給的話 2P 換電腦）}
 export function newMatch(ch0, ch1, opt = {}) {
   const S = {
     f: 0, ph: 'intro', pt: 0, round: 1, wins: [0, 0], winner: -2, rw: -2,
     freeze: 0, fwho: -1, pid: 0,
+    lo: -STAGE_HALF, hi: STAGE_HALF,     // 場地左右邊界（闖關時跟著推進）
     p: [], pr: [], ev: [],
     opt: { train: opt.train ? 1 : 0 },
   };
   S.p.push(newFighter(ch0, 0, 0, -START_X, 1), newFighter(ch1, 1, 1, START_X, -1));
   S.p[0].pad = 0; S.p[1].pad = 1;
+  S.p[0].main = S.p[1].main = 1;
+  if (opt.cpu !== undefined) setCpu(S, 1, opt.cpu);
   return S;
+}
+
+// 第 i 隻換電腦（lv 難度）或換回玩家（lv < 0）。亂數種子照幀號和是誰，兩台電腦一樣
+export function setCpu(S, i, lv) {
+  const f = S.p[i];
+  if (lv < 0) { f.ai = null; f.pad = i; return; }
+  f.pad = -1;
+  f.ai = newAI(lv, 0x9e3779b9 ^ Math.imul(i + 1, 0x85ebca6b) ^ S.f);
 }
 
 function resetRound(S) {
   S.ph = 'intro'; S.pt = 0; S.pr = []; S.freeze = 0; S.rw = -2;
   for (const f of S.p) {
     const H = f.H, x = f.team ? START_X : -START_X;
-    Object.assign(f, newFighter(f.ch, f.i, f.team, x, f.team ? -1 : 1), { H, pad: f.pad });
+    const ai = f.ai ? newAI(f.ai.lv, f.ai.r) : null;           // 電腦：難度和亂數接著用，其他重來
+    Object.assign(f, newFighter(f.ch, f.i, f.team, x, f.team ? -1 : 1), { H, pad: f.pad, main: f.main, ai });
   }
 }
 
@@ -33,7 +47,8 @@ const alive = (S, team) => S.p.some((f) => f.team === team && f.hp > 0);
 export function step(S, b0, b1) {
   S.f++;
   S.ev = [];
-  for (const f of S.p) record(f.H, f.pad === 0 ? b0 : f.pad === 1 ? b1 : 0);
+  for (const f of S.p) record(f.H, f.pad === 0 ? b0 : f.pad === 1 ? b1 : f.ai ? aiBits(S, f) : 0);
+  if (S.quest) { questStep(S); return; }
 
   if (S.ph === 'intro') {
     S.pt++;
@@ -51,12 +66,7 @@ export function step(S, b0, b1) {
     if (S.pt >= 150) { endRound(S); return; }
   }
 
-  for (const f of S.p) think(S, f, ko || f.hp <= 0);
-  for (const f of S.p) advance(S, f);
-  pushApart(S);
-  keepTogether(S);
-  moveProjectiles(S);
-  resolveHits(S);
+  world(S, ko);
 
   if (S.opt.train) training(S);
   else if (!ko && (!alive(S, 0) || !alive(S, 1))) startKO(S);
@@ -65,10 +75,20 @@ export function step(S, b0, b1) {
   }
 }
 
+// 場上的人照輸入動一幀、互推、泡泡飛、判定（對戰和闖關共用）。ko：不聽輸入
+export function world(S, ko) {
+  for (const f of S.p) think(S, f, ko || f.hp <= 0);
+  for (const f of S.p) advance(S, f);
+  pushApart(S);
+  keepTogether(S);
+  moveProjectiles(S);
+  resolveHits(S);
+}
+
 // 身體互推：不同隊的兩個人前後差不多、高度疊到，就左右各推開一半，不會互相穿過去。
 // 倒地、被打飛、抓人和被抓、鑽地的不推；同隊可以穿過（人多的時候才不會卡住）。靠牆推不動的那個，另一個多退
 const NO_PUSH = new Set(['fall', 'down', 'getup', 'ko', 'grab', 'grabbed']);
-const xLim = (f) => STAGE_HALF - CHARS[f.ch].w;
+const xLo = (S, f) => S.lo + CHARS[f.ch].w, xHi = (S, f) => S.hi - CHARS[f.ch].w;
 function pushApart(S) {
   const P = S.p;
   for (let i = 0; i < P.length; i++) {
@@ -83,15 +103,15 @@ function pushApart(S) {
       const s = dx > 0 ? 1 : dx < 0 ? -1 : a.face;      // 疊在同一點：b 往 a 面前推
       const lo = s > 0 ? a : b, hi = s > 0 ? b : a;      // 推完 lo 在左、hi 在右
       lo.x -= ov >> 1; hi.x += ov - (ov >> 1);
-      if (lo.x < -xLim(lo)) { hi.x += -xLim(lo) - lo.x; lo.x = -xLim(lo); }
-      if (hi.x > xLim(hi)) { lo.x -= hi.x - xLim(hi); hi.x = xLim(hi); }
+      if (lo.x < xLo(S, lo)) { hi.x += xLo(S, lo) - lo.x; lo.x = xLo(S, lo); }
+      if (hi.x > xHi(S, hi)) { lo.x -= hi.x - xHi(S, hi); hi.x = xHi(S, hi); }
     }
   }
 }
 
-// 兩個玩家左右最遠 MAX_SEP，鏡頭才框得住：拉太開就兩邊各往中間拉一半
+// 主角們（玩家、對戰的電腦）左右最遠 MAX_SEP，鏡頭才框得住：拉太開就兩邊各往中間拉一半
 function keepTogether(S) {
-  const pads = S.p.filter((f) => f.pad >= 0);
+  const pads = S.p.filter((f) => f.main && f.hp > 0);
   if (pads.length < 2) return;
   let lo = pads[0], hi = pads[0];
   for (const f of pads) { if (f.x < lo.x) lo = f; if (f.x > hi.x) hi = f; }
@@ -99,9 +119,8 @@ function keepTogether(S) {
   if (ex <= 0) return;
   lo.x += (ex + 1) >> 1; hi.x -= ex >> 1;
   for (const f of [lo, hi]) {
-    const w = CHARS[f.ch].w;
-    if (f.x < -STAGE_HALF + w) f.x = -STAGE_HALF + w;
-    if (f.x > STAGE_HALF - w) f.x = STAGE_HALF - w;
+    if (f.x < xLo(S, f)) f.x = xLo(S, f);
+    if (f.x > xHi(S, f)) f.x = xHi(S, f);
   }
 }
 
@@ -130,9 +149,9 @@ function training(S) {
   for (const f of S.p) {
     f.mp = MP;
     if (f.hp <= 0) f.hp = 1;
-    if (FREE.has(f.act) && f.hp < HP) {
+    if (FREE.has(f.act) && f.hp < f.mhp) {
       f.calm++;
-      if (f.calm > 60) { f.hp = HP; f.calm = 0; }
+      if (f.calm > 60) { f.hp = f.mhp; f.calm = 0; }
     } else f.calm = 0;
     if (f.act === 'ko') toFree(f);
   }

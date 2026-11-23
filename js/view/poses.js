@@ -66,6 +66,21 @@ const ATK = {
     CD: { w: { lean: -0.3 }, s: { lean: 0.5, bend: 0.4, bz: 0.2 } },
     tooth: { w: { sq: -0.25 }, s: { aN: 2.8, aF: 2.5, head: -0.35, sq: 0.15 } },
   },
+  sealion: {
+    sA: { w: { aN: -0.4 }, s: { aN: 1.6, lean: 0.15, bend: 0.12 } },
+    sC: { w: { aF: -0.6, spin: -0.3, lean: -0.1 }, s: { aF: 1.8, lean: 0.25, spin: 0.45 } },
+    cC: { w: { bend: -0.35, head: -0.3 }, s: { lean: 0.35, bend: 0.5, head: 0.45 } },
+    crA: { w: {}, s: { aN: 1.35 } },
+    crB: { w: {}, s: { aN: 1.5, aF: 0.4, lean: 0.15 } },
+    crD: { w: { spin: -0.4 }, s: { spin: 2.6, lean: 0.35, tail: 0.6 } },
+    jC: { w: { aF: -0.5 }, s: { aF: 2.0, lean: 0.4 } },
+    jD: { w: { lean: -0.2 }, s: { lean: 1.0, sq: -0.15, aN: 1.3, aF: 1.3 } },
+    CD: { w: { lean: -0.3, bend: -0.3 }, s: { lean: 0.5, bend: 0.35, sq: -0.1, bz: 0.15 } },
+    ballshot: { w: { bend: -0.3, head: -0.5 }, s: { bend: 0.3, head: 0.4, lean: 0.12 } },
+    slide: { w: { lean: 0.3, sq: -0.15 }, s: { lean: 1.35, by: -0.32, aN: -0.6, aF: -0.6, head: -0.7, tail: 0.4 } },
+    clap: { w: { sq: -0.25 }, s: { aN: 2.9, aF: 2.9, aNz: -0.35, aFz: -0.35, head: -0.4, sq: 0.15 } },
+    press: { w: { aN: 2.6, aF: 2.6, head: -0.3, sq: 0.05 }, s: { lean: 1.15, sq: -0.15, aN: 1.6, aF: 1.6, tail: 0.5 } },
+  },
 };
 
 const KEYS = ['by', 'bz', 'lean', 'bend', 'sq', 'spin', 'tumble', 'head', 'aN', 'aF', 'aNz', 'aFz', 'lN', 'lF', 'tail', 'sink'];

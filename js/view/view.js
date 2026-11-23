@@ -7,8 +7,11 @@ import { BUILD } from './models.js';
 import { poseOf, applyPose, ZERO } from './poses.js';
 import { FX, starSprite, bubbleMesh, beamMesh } from './fx.js';
 import { Stage } from './stage.js';
+import { SeaStage } from './sea.js';
+import { kit, toon } from './kit.js';
 import { CHARS, MOVES } from '../sim/chars/index.js';
 import { STAGE_HALF, Z_NEAR } from '../sim/const.js';
+import { QUESTS } from '../sim/quests/index.js';
 import { hurtBoxes } from '../sim/combat.js';
 
 const U = 1 / 1000;
@@ -21,6 +24,9 @@ export class View {
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(28, 16 / 9, 0.1, 80);
     this.stage = new Stage(this.scene);
+    this.stage.show(this.scene, true);
+    this.scenes = { arena: this.stage };
+    this.sceneName = 'arena';
     this.fx = new FX(this.scene);
     this.fighters = [];
     this.projs = new Map();
@@ -44,34 +50,69 @@ export class View {
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
+    this.applyLift();
+  }
+  // 手機：下面兩個角落是搖桿和按鈕，整個畫面往上挪一點（frac＝畫面高的幾成）。挪的是投影，toScreen 跟著對
+  setLift(frac) { if (frac !== (this.lift || 0)) { this.lift = frac; this.applyLift(); } }
+  applyLift() {
+    const w = innerWidth, h = innerHeight;
+    if (this.lift) this.camera.setViewOffset(w, h, 0, h * this.lift, w, h); else if (this.camera.view) this.camera.clearViewOffset();
   }
 
-  // 換一場比賽（角色可能不同）就重建模型
-  setMatch(S) {
-    for (const f of this.fighters) { this.scene.remove(f.model.root, f.shadow, f.beam, ...f.stars); }
-    this.fighters = S.p.map((p) => {
-      const model = BUILD[p.ch]();
-      this.scene.add(model.root);
-      const shadow = new THREE.Mesh(new THREE.CircleGeometry(1, 24), new THREE.MeshBasicMaterial({ color: '#070a04', transparent: true, opacity: 0.55, depthWrite: false }));
-      shadow.rotation.x = -Math.PI / 2;
-      this.scene.add(shadow);
-      const beam = beamMesh(CHARS[p.ch].pal?.[0] || CHARS[p.ch].color);
-      beam.visible = false;
-      this.scene.add(beam);
-      this.renderer.initTexture(beam.material.map);
-      const stars = [0, 1, 2].map((i) => starSprite(i === 1 ? '#ffffff' : '#ffe98a'));
-      this.scene.add(...stars);
-      return { ch: p.ch, model, shadow, beam, stars, pose: { ...ZERO }, flash: 0, px: p.x };
+  // 場上每一格一個模型。闖關會一直有人進場、格子換人，所以一格一格對：角色（或是不是雜兵）不同才重建那一格；
+  // 格子比狀態多（換了一場）就全部重來
+  sync(S) {
+    if (this.fighters.length > S.p.length) {
+      for (const f of this.fighters) this.drop(f);
+      this.fighters = [];
+      for (const m of this.projs.values()) this.scene.remove(m);
+      this.projs.clear();
+      this.seen.clear();
+    }
+    S.p.forEach((p, i) => {
+      const key = p.ch + (p.mini ? '*' : '');
+      const v = this.fighters[i];
+      if (v && v.key === key) return;
+      if (v) this.drop(v);
+      this.fighters[i] = this.make(p, key);
     });
-    for (const m of this.projs.values()) this.scene.remove(m);
-    this.projs.clear();
-    this.seen.clear();
+  }
+  drop(f) { this.scene.remove(f.model.root, f.shadow, f.beam, ...f.stars); }
+  make(p, key) {
+    const model = BUILD[p.ch]();
+    if (p.mini) shade(model.root);
+    this.scene.add(model.root);
+    const shadow = new THREE.Mesh(new THREE.CircleGeometry(1, 24), new THREE.MeshBasicMaterial({ color: '#070a04', transparent: true, opacity: 0.55, depthWrite: false }));
+    shadow.rotation.x = -Math.PI / 2;
+    this.scene.add(shadow);
+    const beam = beamMesh(CHARS[p.ch].pal?.[0] || CHARS[p.ch].color);
+    beam.visible = false;
+    this.scene.add(beam);
+    this.renderer.initTexture(beam.material.map);
+    const stars = [0, 1, 2].map((i) => starSprite(i === 1 ? '#ffffff' : '#ffe98a'));
+    this.scene.add(...stars);
+    return { key, ch: p.ch, model, shadow, beam, stars, pose: { ...ZERO }, flash: 0, px: p.x };
+  }
+
+  // 對戰是競技場，闖關照關卡表的場景
+  useScene(S) {
+    const Q = S.quest ? QUESTS[S.quest] : null;
+    const name = Q ? Q.scene : 'arena';
+    if (name === this.sceneName) return;
+    if (!this.scenes[name]) {
+      const last = Q.secs[Q.secs.length - 1];
+      this.scenes[name] = new SeaStage(this.scene, Q.span, (last.lo + last.hi) >> 1);
+    }
+    for (const [k, st] of Object.entries(this.scenes)) st.show(this.scene, k === name);
+    this.stage = this.scenes[name];
+    this.sceneName = name;
   }
 
   // events：這次跑過的幀的事件，每個帶 f（第幾幀）。同一幀同一件事只放一次特效（回滾重算會再送一次）
   render(S, events, dt) {
     this.clock += dt;
-    if (!this.fighters.length || this.fighters.some((v, i) => v.ch !== S.p[i].ch)) this.setMatch(S);
+    this.useScene(S);
+    this.sync(S);
     for (const e of events) {
       const key = `${e.f}|${e.k}|${e.s}|${e.x}|${e.z}|${e.id}`;
       if (this.seen.has(key)) continue;
@@ -157,6 +198,19 @@ export class View {
         else this.fx.dust(e.x * U, 0, 3, null, z);
         break;
       case 'jump': this.fx.dust(e.x * U, 0, 3, null, z); break;
+      // 闖關：敵人倒下（頭目比照 KO）、玩家倒下、復活從天上一道光下來
+      case 'kill': case 'die': {
+        const x = e.x * U, y = 0.6, c = e.k === 'die' ? '#ff4a4a' : col(e.s);
+        if (e.boss) { this.fx.wave(x, z, '#ff4a4a', 7, 1.2); this.fx.rays(x, y, c, 6, z, 0.7); this.fx.flare(x, y, c, 10, z, 0.5); this.fx.bolts(x, y, c, 7, 2.4, z, 0.3); this.fx.shards(x, y, c, 20, 7, z); this.shake = 0.18; this.punch = 1.1; break; }
+        this.fx.wave(x, z, c, 3, 0.6); this.fx.shock(x, y, HOT, 2, z, 0.35); this.fx.motes(x, y, c, 8, z, 1.2); this.fx.shards(x, y, c, 8, 4, z);
+        this.shake = Math.max(this.shake, e.k === 'die' ? 0.12 : 0.05);
+        break;
+      }
+      case 'respawn': {
+        const p = S.p[e.s], c = col(e.s);
+        this.fx.pillar(p.x * U, p.z * U, c, 6); this.fx.wave(p.x * U, p.z * U, c, 3, 0.6);
+        break;
+      }
       case 'ko': {
         const lost = S.p.filter((p) => p.hp <= 0);
         for (const p of lost) {
@@ -181,6 +235,10 @@ export class View {
     applyPose(v.model, v.pose);
     v.model.root.position.set(p.x * U, p.y * U, p.z * U);
     v.model.root.scale.x = p.face;
+    // 闖關：退場的不畫；倒下快退場的、剛復活打不到的一閃一閃
+    const blink = (p.iv > 0 || (p.gone === 1 && p.pl < 0 && p.t > 55)) && ((this.clock * 16) | 0) % 2 === 0;
+    v.model.root.visible = p.gone !== 2 && !blink;
+    v.shadow.visible = p.gone !== 2;
     // 鑽地的時候埋進土裡，冒點土
     const m = p.act === 'atk' ? MOVES[p.ch][p.mv] : null;
     if (m && m.under && p.t >= m.under[0] && p.t <= m.under[1] && (S.f + p.i) % 3 === 0) this.fx.dust(p.x * U, 0, 1, '#4a3f26', p.z * U);
@@ -216,6 +274,8 @@ export class View {
     } else v.beam.visible = false;
     // 海牛吐舌頭：出必殺技時伸長一點
     if (v.model.tongue) v.model.tongue.scale.y = m && m.kind !== 'n' ? 1.5 : 1;
+    // 海獅鼻子上的球：頂出去之後到收招前不在鼻子上
+    if (v.model.ball) v.model.ball.visible = !(m && m.proj && p.t >= m.proj.at);
   }
 
   updateProjectiles(S) {
@@ -223,20 +283,28 @@ export class View {
     for (const q of S.pr) {
       live.add(q.id);
       let m = this.projs.get(q.id);
-      if (!m) { m = bubbleMesh(); this.projs.set(q.id, m); this.scene.add(m); }
+      const ball = S.p[q.o]?.ch === 'sealion';
+      if (!m) { m = ball ? ballMesh() : bubbleMesh(); m.userData.ball = ball; this.projs.set(q.id, m); this.scene.add(m); }
       m.position.set(q.x * U, q.y * U, q.z * U);
-      const w = 1 + 0.08 * Math.sin(this.clock * 14 + q.id);
-      m.scale.set(w * q.w / 170, (2 - w) * q.h / 170, 1);
-      if (Math.random() < 0.5) this.fx.speck(q.x * U - Math.sign(q.vx) * 0.15, q.y * U + (Math.random() - 0.5) * 0.2, Math.random() < 0.3 ? '#fff1c8' : '#5cc8e0', 0.6, q.z * U, -1.5);
-      if (q.t % 5 === 0) this.fx.trail(q.x * U - Math.sign(q.vx) * 0.35, q.y * U, '#5cc8e0', 0.9, q.z * U, 0.1);
-      if (q.t % 9 === 0) this.fx.bolts(q.x * U, q.y * U, '#bfeaff', 1, 0.4, q.z * U, 0.1);
+      const c = ball ? CHARS.sealion.pal[0] : '#5cc8e0';
+      if (ball) { m.scale.setScalar(q.w * U * 0.75); m.rotation.z -= Math.sign(q.vx) * 0.2; }
+      else {
+        const w = 1 + 0.08 * Math.sin(this.clock * 14 + q.id);
+        m.scale.set(w * q.w / 170, (2 - w) * q.h / 170, 1);
+      }
+      if (Math.random() < 0.5) this.fx.speck(q.x * U - Math.sign(q.vx) * 0.15, q.y * U + (Math.random() - 0.5) * 0.2, Math.random() < 0.3 ? '#fff1c8' : c, 0.6, q.z * U, -1.5);
+      if (q.t % 5 === 0) this.fx.trail(q.x * U - Math.sign(q.vx) * 0.35, q.y * U, c, 0.9, q.z * U, 0.1);
+      if (q.t % 9 === 0) this.fx.bolts(q.x * U, q.y * U, ball ? '#ffd2c4' : '#bfeaff', 1, 0.4, q.z * U, 0.1);
     }
-    for (const [id, m] of this.projs) if (!live.has(id)) { this.scene.remove(m); this.projs.delete(id); this.fx.pop(m.position.x, m.position.y, '#5cc8e0', m.position.z); }
+    for (const [id, m] of this.projs) if (!live.has(id)) { this.scene.remove(m); this.projs.delete(id); this.fx.pop(m.position.x, m.position.y, m.userData.ball ? '#ffd2c4' : '#5cc8e0', m.position.z); }
   }
 
   // 鏡頭從斜上方往下看地板，跟著場上的人左右移；人散得開就拉遠
   updateCamera(S, dt) {
-    const live = S.p.filter((p) => p.pad >= 0 || p.hp > 0);
+    // 闖關只跟玩家（敵人從畫面外走進來）；全倒了也照樣看著玩家倒下的地方
+    let live = S.quest ? S.p.filter((p) => p.pl >= 0 && p.gone !== 3) : S.p.filter((p) => p.pad >= 0 || p.hp > 0);
+    if (!live.length) live = S.p.filter((p) => p.pl >= 0 || p.pad >= 0);
+    if (!live.length) live = S.p;
     const xs = live.map((p) => p.x * U), zs = live.map((p) => p.z * U);
     const x0 = Math.min(...xs), x1 = Math.max(...xs);
     let cx = (x0 + x1) / 2;
@@ -249,8 +317,8 @@ export class View {
       cx = cx * 0.4 + p.x * U * 0.6; cz = p.z * U; d -= 1.6;
     }
     const half = d * Math.tan(this.camera.fov * Math.PI / 360) * this.camera.aspect;
-    const lim = Math.max(0, STAGE_HALF * U - half + 0.6);
-    cx = Math.max(-lim, Math.min(lim, cx));
+    const lo = (S.lo ?? -STAGE_HALF) * U + half - 0.6, hi = (S.hi ?? STAGE_HALF) * U - half + 0.6;
+    cx = lo > hi ? (lo + hi) / 2 : Math.max(lo, Math.min(hi, cx));
     const k = 1 - Math.pow(0.0005, dt);
     this.cam.x += (cx - this.cam.x) * k; this.cam.z += (cz - this.cam.z) * k; this.cam.d += (d - this.cam.d) * k;
     this.shake *= Math.pow(0.002, dt);
@@ -303,6 +371,7 @@ export class View {
       for (const [x, y] of pts) { pos.push(x, y, (f.z || 0) * U + 0.3); col.push(...c); }
     };
     for (const f of S.p) {
+      if (f.gone === 2) continue;
       for (const b of hurtBoxes(f)) rect(f, b, [0.3, 1, 0.4]);
       const m = f.act === 'atk' ? MOVES[f.ch][f.mv] : null;
       if (m) for (const h of m.hits) if (f.t >= h.on[0] && f.t <= h.on[1]) rect(f, h.box, [1, 0.25, 0.2]);
@@ -312,4 +381,22 @@ export class View {
     g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
   }
+}
+
+// 雜兵（闖關）：照角色的模型，顏色往深紫的影子壓六成，一眼看得出不是本尊
+const SHADE = new THREE.Color('#251d3d');
+function shade(root) {
+  root.traverse((o) => {
+    if (!o.isMesh || !o.material?.isMeshToonMaterial) return;
+    o.material = toon('#' + o.material.color.clone().lerp(SHADE, 0.62).getHexString());
+  });
+}
+
+// 海獅頂出去的紅白球（半徑 1，view 照判定框縮放）
+function ballMesh() {
+  const g = new THREE.Group();
+  const k = kit(g);
+  k.ball(1, '#d8453a', 0, 0, 0);
+  k.ball(1.01, '#f4eadc', 0, 0, 0, { sy: 0.32, line: false });
+  return g;
 }

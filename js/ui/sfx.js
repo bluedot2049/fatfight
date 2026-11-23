@@ -6,7 +6,8 @@
 import { MOVES, CHARS } from '../sim/chars/index.js';
 import { speak } from './voice.js';
 
-let ctx = null, master = null, sfxBus = null, musicBus = null, echoIn = null, verbIn = null, noiseBuf = null;
+let ctx = null, master = null, sfxBus = null, musicBus = null, echoIn = null, verbIn = null, hallIn = null, noiseBuf = null;
+const HALL = { gap: 0.3, fb: 0.5 };   // 大招回音：每一聲隔幾秒、每彈一次剩多少
 // 聲音設定：0 全開、1 只有音效、2 靜音（記在這台瀏覽器）
 const SOUND_KEY = 'fatfight.sound';
 export const SOUND_NAMES = ['全開', '只有音效', '靜音'];
@@ -28,8 +29,8 @@ function init() {
   echoIn = ctx.createGain(); echoIn.gain.value = 0.35;
   const dl = ctx.createDelay(0.5); dl.delayTime.value = 0.13;
   const fb = ctx.createGain(); fb.gain.value = 0.32;
-  const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1800;
-  echoIn.connect(dl); dl.connect(lp); lp.connect(fb); fb.connect(dl); lp.connect(sfxBus);
+  const elp = ctx.createBiquadFilter(); elp.type = 'lowpass'; elp.frequency.value = 1800;
+  echoIn.connect(dl); dl.connect(elp); elp.connect(fb); fb.connect(dl); elp.connect(sfxBus);
   noiseBuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
   const d = noiseBuf.getChannelData(0);
   for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
@@ -40,6 +41,17 @@ function init() {
   verbIn = ctx.createGain(); verbIn.gain.value = 0.5;
   const vlp = ctx.createBiquadFilter(); vlp.type = 'lowpass'; vlp.frequency.value = 3200;
   verbIn.connect(conv); conv.connect(vlp); vlp.connect(sfxBus);
+  // 大招的回音：左右來回彈、一聲一聲聽得出來（「深海霸氣——霸氣——氣」）。每彈一次變暗一點
+  hallIn = ctx.createGain(); hallIn.gain.value = 1;
+  const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 160;
+  const dL = ctx.createDelay(1), dR = ctx.createDelay(1); dL.delayTime.value = dR.delayTime.value = HALL.gap;
+  const fL = lp(2600), fR = lp(2600), gL = ctx.createGain(), gR = ctx.createGain(); gL.gain.value = gR.gain.value = HALL.fb;
+  hallIn.connect(hp); hp.connect(dL);
+  dL.connect(fL); fL.connect(gL); gL.connect(dR);
+  dR.connect(fR); fR.connect(gR); gR.connect(dL);
+  for (const [d, p] of [[dL, -0.65], [dR, 0.65]]) {
+    if (ctx.createStereoPanner) { const s = ctx.createStereoPanner(); s.pan.value = p; d.connect(s); s.connect(sfxBus); } else d.connect(sfxBus);
+  }
   applyMode();
   return true;
 }
@@ -66,13 +78,14 @@ export function meter() {
   return () => { an.getFloatTimeDomainData(buf); let p = 0; for (const v of buf) p = Math.max(p, Math.abs(v)); return p; };
 }
 
-// 這次發聲接到哪：pan 偏左偏右（-1–1），echo 送多少回音，verb 送多少殘響
+// 這次發聲接到哪：pan 偏左偏右（-1–1），echo 送多少回音，verb 送多少殘響，hall 送多少大招回音
 let dest = null;
-function route(pan = 0, echo = 0, verb = 0) {
+function route(pan = 0, echo = 0, verb = 0, hall = 0) {
   const g = ctx.createGain();
   if (ctx.createStereoPanner) { const p = ctx.createStereoPanner(); p.pan.value = Math.max(-0.85, Math.min(0.85, pan)); g.connect(p); p.connect(sfxBus); } else g.connect(sfxBus);
   if (echo > 0) { const e = ctx.createGain(); e.gain.value = echo; g.connect(e); e.connect(echoIn); }
   if (verb > 0) { const e = ctx.createGain(); e.gain.value = verb; g.connect(e); e.connect(verbIn); }
+  if (hall > 0) { const e = ctx.createGain(); e.gain.value = hall; g.connect(e); e.connect(hallIn); }
   dest = g;
 }
 // 中間插一個效果：via(crush(4), () => { 這裡發的聲音都會過它 })
@@ -170,6 +183,21 @@ function drill(t, dur, p = 1) {
 function swell(t, a, dur, fs, p, cut = 1200) {
   via(lp(cut, 1.5), () => { for (const f of fs) { tone(t, dur, f, f, p, 'sawtooth', a); tone(t, dur, f * 1.006, f * 1.006, p * 0.7, 'sawtooth', a); } });
 }
+// 超必殺發動那一下「鏘——」：很尖很亮的金屬響聲（照 KOF 畫面暗下來那一聲的感覺）。大家共用，角色自己的蓄力疊在後面
+function shing(t, p = 1) {
+  noise(t, 0.09, 7000, 0.7, 0.45 * p, 'highpass');                          // 最前面刷一下的亮
+  tone(t, 0.06, 1400, 4200, 0.16 * p, 'sine', 0.002);                       // 「咻」往上滑一下
+  tone(t, 0.12, 1046, 1046, 0.12 * p, 'square', 0.002);                     // 咬一口
+  // 金屬的泛音不整齊，聽起來才像金屬不像鈴鐺；每個音先低一點滑上去
+  for (const [f, g, d] of [[2093, 0.2, 0.9], [2794, 0.13, 0.75], [3951, 0.11, 0.6], [5274, 0.08, 0.5], [6645, 0.05, 0.4]]) {
+    const o = ctx.createOscillator(); o.type = 'sine';
+    o.frequency.setValueAtTime(f * 0.92, t); o.frequency.exponentialRampToValueAtTime(f, t + 0.05);
+    const o2 = ctx.createOscillator(); o2.type = 'sine'; o2.frequency.value = f * 1.004;   // 跟它差一點點，會閃
+    const e = ctx.createGain(); env(e, t, 0.003, g * p, d);
+    o.connect(e); o2.connect(e); e.connect(dest);
+    o.start(t); o2.start(t); o.stop(t + d + 0.1); o2.stop(t + d + 0.1);
+  }
+}
 
 // ---------- 每隻角色一套：sp 必殺出手、cue 招式中途、super 超必殺（前 0.5 秒是定格蓄力）、hit 必殺打中加的那一層 ----------
 // 沒列在這裡的角色用下面 SND 的通用版
@@ -266,6 +294,7 @@ const SND = {
   // 超必殺：角色有自己那套就用；沒有的話往上衝的蓄力、閃亮的幾個音，最後一聲轟
   super({ ch }) {
     const t = ctx.currentTime;
+    shing(t);
     if (KIT[ch]) return KIT[ch].super(t);
     tone(t, 0.6, 110, 880, 0.45, 'sawtooth'); tone(t, 0.6, 165, 1320, 0.2, 'square');
     noise(t, 0.55, 300, 0.6, 0.45, 'bandpass', 4200);
@@ -327,7 +356,9 @@ export function play(name, arg = {}, pan = 0) {
   if (name === 'beep' && typeof arg !== 'object') { name = arg ? 'ok' : 'move'; arg = {}; }
   const a = typeof arg === 'object' && arg ? arg : {};
   const small = name === 'hit' && !a.big, power = a.kind === 'sp' || a.kind === 'su';
-  route(pan, (ECHO[name] || 0) * (small ? 0 : 1), (VERB[name] || 0) * (small ? (power ? 0.4 : 0) : 1));
+  // 大招回音：超必殺的蓄力和轟、念超必殺的名字、超必殺最後一下
+  const hall = name === 'super' ? 0.55 : name === 'voice' && a.su ? 0.8 : name === 'hit' && a.big && a.kind === 'su' ? 0.5 : 0;
+  route(pan, (ECHO[name] || 0) * (small ? 0 : 1), (VERB[name] || 0) * (small ? (power ? 0.4 : 0) : 1), hall);
   SND[name](a);
 }
 
@@ -341,7 +372,7 @@ export function sfxEvent(e, pan = 0, S = null) {
     case 'dizzy': play('dizzy', e, pan); break;
     case 'sp': play('whoosh', { ...e, ch }, pan); play('voice', { ch, id: e.id, who: e.s }, pan * 0.6); break;
     case 'proj': play('bubble', e, pan); break;
-    case 'super': play('super', { ...e, ch }, pan * 0.5); play('voice', { ch, id: e.id, who: e.s, force: 1 }, pan * 0.4); break;
+    case 'super': play('super', { ...e, ch }, pan * 0.5); play('voice', { ch, id: e.id, who: e.s, force: 1, su: 1 }, pan * 0.4); break;
     case 'ko': play('ko'); break;
     case 'land': play('land', e, pan); break;
     case 'jump': play('jump', e, pan); break;

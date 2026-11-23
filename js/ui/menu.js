@@ -3,7 +3,7 @@
 // 選單：一般的上下選單（深色面板＋金框、選到的那行前面一顆菱形）、選角（魔法卡：金框、名字牌、等級星、3D 角色站在畫框前、沒選到的暗下去）、招式表、按鍵說明。
 // 鍵盤為主（方向＋攻確定、跳／Esc 返回），滑鼠也點得到。
 
-import { navOf, KEYMAP, keyName } from './keys.js';
+import { navOf, KEYMAP, keyName, device } from './keys.js';
 import { ROSTER, CHARS } from '../sim/chars/index.js';
 import { SYS_LIST } from '../sim/moves.js';
 import { play } from './sfx.js';
@@ -15,7 +15,7 @@ const k1 = (a) => keyName(KEYMAP[1][a][0]);
 export const kbd = (...ks) => ks.map((k) => `<kbd>${k}</kbd>`).join('');
 const BTN = { A: '攻', J: '跳', D: '防', S: '蹲' };
 // 文字裡的攻、跳、防、蹲後面加上 P1 的鍵（攻<small>Z</small>）
-export const withKeys = (t) => t.replace(/[攻跳防蹲]/g, (c) => { const k = Object.keys(BTN).find((x) => BTN[x] === c); return `${c}<small>${k0(k)}</small>`; });
+export const withKeys = (t) => device.touch ? t : t.replace(/[攻跳防蹲]/g, (c) => { const k = Object.keys(BTN).find((x) => BTN[x] === c); return `${c}<small>${k0(k)}</small>`; });
 // 必殺指令：防 → ↑ → 攻
 export function cmdHtml(d, btn) {
   const arrow = d === 'u' ? '↑' : d === 'd' ? '↓' : '→';
@@ -98,7 +98,7 @@ export class Menu {
 
 const STAT = ['力氣', '距離', '速度'];
 const STAT1 = ['力', '距', '速'];
-const MODE = { local: '本機雙人', train: '練習', online: '線上對戰' };
+const MODE = { local: '本機雙人', train: '練習', online: '線上對戰', cpu: '對電腦', quest: '闖關' };
 const pad2 = (n) => String(n).padStart(3, '0');
 
 // 一張卡：深色卡身＋金框 → 上面名字牌（屬性寶石）、等級星 → 畫框（寶石色的底＋魔法陣）→ 羊皮紙說明欄（種族、一句話、三項能力、編號）。
@@ -122,11 +122,13 @@ function cardHtml(c, i) {
   </div>`;
 }
 
-// 選角：mode 'local' 兩人各用自己的鍵；'train' P1 先選自己再選對手；'online' 只選自己那邊（side），對方的由 setOther 更新
+// 選角：mode 'local' 兩人各用自己的鍵；'train'、'cpu' P1 先選自己再選對手；'quest' 只選自己一隻；'online' 只選自己那邊（side），對方的由 setOther 更新
 // onHover(c0, c1)：游標停在誰身上
 export function selectScreen({ mode, side = 0, done, back, onPick, onHover }) {
   const st = { cur: [0, 1], ok: [false, false], step: 0 };
-  const who = (p) => (mode === 'train' && p === 1 ? '木樁' : `${p + 1}P`);
+  const one = mode === 'quest';                          // 只選自己（闖關）
+  const solo = mode === 'train' || mode === 'cpu' || one;   // 一個人選：先選自己、再選對手（one 就只選自己）
+  const who = (p) => (solo && p === 1 ? (mode === 'cpu' ? '電腦' : '木樁') : `${p + 1}P`);
   const keys = () => {
     const ks = (k) => `<span>${kbd(k('left'), k('right'))}選</span><span>${kbd(k('A'))}確定</span>`;
     if (mode === 'local') return `<span class="who">1P</span>${ks(k0)}<span class="who">2P</span>${ks(k1)}<span data-back>${kbd(k0('J'))}返回</span>`;
@@ -135,7 +137,7 @@ export function selectScreen({ mode, side = 0, done, back, onPick, onHover }) {
   // 下面那條：一個玩家一欄
   const info = (p) => {
     const c = ROSTER[st.cur[p]], k = c.card || {};
-    const wait = mode === 'train' && p === 1 && st.step === 0;
+    const wait = solo && p === 1 && st.step === 0;
     const state = st.ok[p] ? '<b class="okm">好了</b>' : mode === 'online' && p !== side ? '<b class="wt">等對方…</b>' : wait ? '<b class="wt">等一下</b>' : '<b class="wt">選擇中</b>';
     return `<div class="hd"><b>${who(p)}</b><span>〔${k.type || ''}〕</span></div>
       <div class="big">${gt(c.full, { sw: 0.05, k: 0.06 })}</div><p>${c.blurb || ''}</p>
@@ -156,11 +158,11 @@ export function selectScreen({ mode, side = 0, done, back, onPick, onHover }) {
     update(root) {
       root.querySelectorAll('.scard').forEach((el) => {
         const on = [0, 1].filter((p) => ROSTER[st.cur[p]].id === el.dataset.ch);
-        const lock = on.length > 0 && !(mode === 'train' && st.step === 0 && on.length === 1 && on[0] === 1);
+        const lock = on.length > 0 && !(solo && st.step === 0 && on.length === 1 && on[0] === 1);
         el.classList.toggle('lock', lock);
         el.classList.toggle('ok', on.some((p) => st.ok[p]));
         el.classList.toggle('c0', on.includes(0));
-        el.classList.toggle('c1', on.includes(1) && !(mode === 'train' && st.step === 0));
+        el.classList.toggle('c1', on.includes(1) && !(solo && st.step === 0));
         el.classList.toggle('ok0', on.includes(0) && st.ok[0]);
         el.classList.toggle('ok1', on.includes(1) && st.ok[1]);
         el.dataset.p = mode === 'online' ? side : st.step;
@@ -170,9 +172,10 @@ export function selectScreen({ mode, side = 0, done, back, onPick, onHover }) {
         const el = root.querySelector(`.pi.p${p}`);
         const html = info(p);
         if (el.dataset.h !== html) { el.dataset.h = html; el.innerHTML = html; el.setAttribute('style', palStyle(ROSTER[st.cur[p]].id)); }
-        el.classList.toggle('wait', mode === 'train' && p === 1 && st.step === 0);
+        el.classList.toggle('wait', solo && p === 1 && st.step === 0);
       }
-      root.querySelector('.hint').textContent = '　・　' + (mode === 'train' ? (st.step ? '選練習對手' : '選自己的角色') : mode === 'online' ? (st.ok[1 - side] ? '對方好了' : '等對方選') : '兩個人各選一隻');
+      root.querySelector('.pi.p1').style.visibility = root.querySelector('.vsbox').style.visibility = one ? 'hidden' : '';
+      root.querySelector('.hint').textContent = '　・　' + (solo ? (st.step ? (mode === 'cpu' ? '選對手' : '選練習對手') : '選自己的角色') : mode === 'online' ? (st.ok[1 - side] ? '對方好了' : '等對方選') : '兩個人各選一隻');
     },
     hover() { onHover?.(ROSTER[st.cur[0]].id, ROSTER[st.cur[1]].id); },
     pick(p, ch, confirm) {
@@ -186,7 +189,7 @@ export function selectScreen({ mode, side = 0, done, back, onPick, onHover }) {
     confirm(p) {
       st.ok[p] = true; play('pick');
       onPick?.(ROSTER[st.cur[p]].id, true);
-      if (mode === 'train' && st.step === 0) { st.step = 1; }
+      if (solo && st.step === 0) { if (one) st.ok[1] = true; else st.step = 1; }
       scr.refresh();
       if (st.ok[0] && st.ok[1]) done2();
     },
@@ -200,12 +203,12 @@ export function selectScreen({ mode, side = 0, done, back, onPick, onHover }) {
     onKey(nav, p) {
       if (nav === 'back') {
         play('back');
-        if (mode === 'train' && st.step === 1 && !st.ok[1]) { st.step = 0; st.ok[0] = false; scr.refresh(); return; }
+        if (solo && st.step === 1 && !st.ok[1]) { st.step = 0; st.ok[0] = false; scr.refresh(); return; }
         back(); return;
       }
-      const who = mode === 'online' ? side : mode === 'train' ? st.step : p;
+      const who = mode === 'online' ? side : solo ? st.step : p;
       if (mode === 'online' && p !== 0) return;            // 線上只用 P1 的鍵
-      if (mode === 'train' && p !== 0) return;
+      if (solo && p !== 0) return;
       if (st.ok[who]) return;
       if (nav === 'left' || nav === 'right') { st.cur[who] = (st.cur[who] + (nav === 'right' ? 1 : ROSTER.length - 1)) % ROSTER.length; play('move'); onPick?.(ROSTER[st.cur[who]].id, false); scr.hover(); scr.refresh(); }
       else if (nav === 'ok') scr.confirm(who);
@@ -215,21 +218,34 @@ export function selectScreen({ mode, side = 0, done, back, onPick, onHover }) {
   return scr;
 }
 
+// 觸控的按法跟鍵盤不一樣的那幾條（照 SYS_LIST 的指令那欄對）：菱形＝旁邊兩顆一起按
+const TOUCH_SYS = {
+  '→→': ['搖桿推到外圈', '跑（放開就停；撥兩下也可以）'], '攻跳 同按': ['攻◆跳', '吹飛（打飛很遠）'], '跳防 同按': ['防◆跳', '翻滾（往推著的方向）'],
+  '蹲＋攻': ['蹲◆攻', '下段攻擊，打到再按接短手、再按掃腿'], '蹲＋防': ['防◆蹲', '蹲防'],
+};
+const sysList = () => (device.touch ? SYS_LIST.map((r) => TOUCH_SYS[r[0]] || r) : SYS_LIST);
+
 // 招式表：兩隻都列，必殺、超必殺、系統操作
 export function moveListHtml(only) {
   const list = only ? [CHARS[only]] : ROSTER;
   const row = (s) => `<tr><td>${s.name}</td><td>${cmdHtml(s.d, s.btn)}</td><td class="note">${s.note || ''}　魔力 ${s.m.mp}</td></tr>`;
   return `<div class="movelist">${list.map((c) => `
     <section class="${c.id}" style="${palStyle(c.id)}"><h3><i class="gem"></i>${c.full}</h3>
-      <table><tr><th colspan="3">必殺技（→ 是面向的方向，往左按 ← 就往左出）</th></tr>${c.specials.map(row).join('')}
+      <table><tr><th colspan="3">${device.touch ? '必殺技（→ 是左或右，往哪邊推就往哪邊出）' : '必殺技（→ 是面向的方向，往左按 ← 就往左出）'}</th></tr>${c.specials.map(row).join('')}
       <tr><th colspan="3">超必殺技</th></tr>${c.supers.map(row).join('')}</table>
     </section>`).join('')}
-    <section class="sys"><h3><i class="gem"></i>共通</h3><div class="sysgrid">${SYS_LIST.map(([c, n]) => `<div><span class="cmd"><b>${withKeys(c)}</b></span><span>${n}</span></div>`).join('')}</div>
-    <p class="foot">指令照順序按，不用同時按。魔力會自己慢慢回，血少時回得快。</p></section>
+    <section class="sys"><h3><i class="gem"></i>共通</h3><div class="sysgrid">${sysList().map(([c, n]) => `<div><span class="cmd"><b>${withKeys(c)}</b></span><span>${n}</span></div>`).join('')}</div>
+    <p class="foot">${device.touch ? '必殺：搖桿推著方向，防接著按攻或跳（拇指從防滑過去也可以）。◆ 是兩顆中間的菱形，按它＝兩顆一起按。' : '指令照順序按，不用同時按。'}魔力會自己慢慢回，血少時回得快。</p></section>
   </div>`;
 }
 
 export function keysHtml() {
+  if (device.touch) {
+    const rows = [['搖桿', '左半邊哪裡按下去都可以；上下是往裡、往外走'], ['跑', '搖桿推到外圈，放開就停'], ['防、蹲', '按住'], ['必殺', '搖桿推著方向，防接著按攻或跳'],
+      ['◆', '兩顆中間的菱形＝兩顆一起按'], ['翻滾', '防◆跳'], ['吹飛', '攻◆跳'], ['下段', '蹲◆攻']];
+    return `<div class="keyhelp touchhelp"><section><h3><i class="gem"></i>觸控</h3><table>${rows.map(([a, b]) => `<tr><td>${a}</td><td>${b}</td></tr>`).join('')}</table></section>
+      <p class="foot">手指可以在按鈕之間滑，不用抬起來。搖桿可以在暫停選單換邊。</p></div>`;
+  }
   const kn = (p, a) => KEYMAP[p][a].map((c) => `<kbd>${keyName(c)}</kbd>`).join(' ');
   const t = (p) => `<table>${[['up', '上（往裡走）'], ['down', '下（往外走）'], ['left', '左'], ['right', '右'], ['A', '攻擊'], ['J', '跳'], ['D', '防禦'], ['S', '蹲']].map(([a, l]) => `<tr><td>${l}</td><td>${kn(p, a)}</td></tr>`).join('')}</table>`;
   return `<div class="keyhelp"><section><h3><i class="gem"></i>P1／線上</h3>${t(0)}</section><section><h3><i class="gem"></i>P2（同一台鍵盤，要有數字鍵盤）</h3>${t(1)}</section>
