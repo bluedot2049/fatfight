@@ -4,10 +4,11 @@
 
 import { HP, MP, WIN_ROUNDS, START_X, MAX_SEP, STAGE_HALF, PUSH_Z, PUSH_IN } from './const.js';
 import { CHARS } from './chars/index.js';
-import { newFighter, think, advance, record, toFree, FREE, isUnder } from './fighter.js';
-import { resolveHits, moveProjectiles } from './combat.js';
+import { newFighter, think, advance, record, toFree, FREE, isUnder, moveOf } from './fighter.js';
+import { resolveHits, moveProjectiles, pullStep } from './combat.js';
 import { newAI, aiBits } from './ai.js';
 import { questStep } from './quest.js';
+import { itemsStep, arenaDrop } from './item.js';
 
 // 對戰：兩隻，隊伍 0 和 1。opt：{ train: 練習模式（血會回、魔力無限）, cpu: 難度（有給的話 2P 換電腦）}
 export function newMatch(ch0, ch1, opt = {}) {
@@ -16,7 +17,8 @@ export function newMatch(ch0, ch1, opt = {}) {
     freeze: 0, fwho: -1, pid: 0,
     lo: -STAGE_HALF, hi: STAGE_HALF,     // 場地左右邊界（闖關時跟著推進）
     p: [], pr: [], ev: [],
-    opt: { train: opt.train ? 1 : 0 },
+    it: [], iid: 0, itT: 0, rs: 0x1d872b41, drops: 0,   // 地上的東西、下一個編號、對戰掉東西的計時、亂數、掉過幾個
+    opt: { train: opt.train ? 1 : 0, items: opt.items === undefined || opt.items ? 1 : 0 },
   };
   S.p.push(newFighter(ch0, 0, 0, -START_X, 1), newFighter(ch1, 1, 1, START_X, -1));
   S.p[0].pad = 0; S.p[1].pad = 1;
@@ -34,7 +36,7 @@ export function setCpu(S, i, lv) {
 }
 
 function resetRound(S) {
-  S.ph = 'intro'; S.pt = 0; S.pr = []; S.freeze = 0; S.rw = -2;
+  S.ph = 'intro'; S.pt = 0; S.pr = []; S.freeze = 0; S.rw = -2; S.it = []; S.itT = 0;
   for (const f of S.p) {
     const H = f.H, x = f.team ? START_X : -START_X;
     const ai = f.ai ? newAI(f.ai.lv, f.ai.r) : null;           // 電腦：難度和亂數接著用，其他重來
@@ -79,10 +81,13 @@ export function step(S, b0, b1) {
 export function world(S, ko) {
   for (const f of S.p) think(S, f, ko || f.hp <= 0);
   for (const f of S.p) advance(S, f);
+  pullStep(S);
   pushApart(S);
   keepTogether(S);
   moveProjectiles(S);
-  resolveHits(S);
+  const booms = itemsStep(S);
+  arenaDrop(S);
+  resolveHits(S, booms);
 }
 
 // 身體互推：不同隊的兩個人前後差不多、高度疊到，就左右各推開一半，不會互相穿過去。
@@ -95,6 +100,7 @@ function pushApart(S) {
     for (let j = i + 1; j < P.length; j++) {
       const a = P[i], b = P[j];
       if (a.team === b.team || NO_PUSH.has(a.act) || NO_PUSH.has(b.act) || isUnder(a) || isUnder(b)) continue;
+      if (moveOf(a)?.thru || moveOf(b)?.thru) continue;   // 衝過一排人的招：穿過去
       if (Math.abs(a.z - b.z) >= PUSH_Z) continue;
       const A = CHARS[a.ch], B = CHARS[b.ch];
       if (a.y >= b.y + (b.cr ? B.hc : B.h) || b.y >= a.y + (a.cr ? A.hc : A.h)) continue;

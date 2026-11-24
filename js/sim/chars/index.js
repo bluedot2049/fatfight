@@ -5,16 +5,23 @@
 import manatee from './manatee.js';
 import marmot from './marmot.js';
 import sealion from './sealion.js';
+import hammer from './hammer.js';
+import squid from './squid.js';
+import frog from './frog.js';
+import mushroom from './mushroom.js';
+import moss from './moss.js';
+import dwarf from './dwarf.js';
 import { SYS } from '../moves.js';
+import { ITEM_MOVES } from '../items.js';
 
-export const ALL = [manatee, marmot, sealion];
+export const ALL = [manatee, marmot, sealion, hammer, squid, frog, mushroom, moss, dwarf];
 export const ROSTER = ALL.filter((c) => !c.npc);
 export const CHARS = Object.fromEntries(ALL.map((c) => [c.id, c]));
 
 // MOVES[角色][招式 id] → 招式物件
 export const MOVES = {};
 for (const c of ALL) {
-  const t = { ...SYS };
+  const t = { ...SYS, ...ITEM_MOVES };
   for (const m of Object.values(c.normals)) t[m.id] = m;
   for (const s of [...c.specials, ...c.supers]) t[s.m.id] = s.m;
   MOVES[c.id] = t;

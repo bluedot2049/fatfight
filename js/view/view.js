@@ -8,13 +8,17 @@ import { poseOf, applyPose, ZERO } from './poses.js';
 import { FX, starSprite, bubbleMesh, beamMesh } from './fx.js';
 import { Stage } from './stage.js';
 import { SeaStage } from './sea.js';
+import { TunnelStage } from './tunnel.js';
 import { kit, toon } from './kit.js';
 import { CHARS, MOVES } from '../sim/chars/index.js';
 import { STAGE_HALF, Z_NEAR } from '../sim/const.js';
 import { QUESTS } from '../sim/quests/index.js';
 import { hurtBoxes } from '../sim/combat.js';
+import { ItemView, handAnchor } from './items.js';
+import { ITEMS } from '../sim/items.js';
 
 const U = 1 / 1000;
+const SCENES = { sea: SeaStage, tunnel: TunnelStage };   // 闖關的場景：關卡表的 scene → 哪個類別
 
 export class View {
   constructor(canvas) {
@@ -28,6 +32,7 @@ export class View {
     this.scenes = { arena: this.stage };
     this.sceneName = 'arena';
     this.fx = new FX(this.scene);
+    this.items = new ItemView(this.scene);
     this.fighters = [];
     this.projs = new Map();
     this.seen = new Set();
@@ -68,6 +73,7 @@ export class View {
       for (const m of this.projs.values()) this.scene.remove(m);
       this.projs.clear();
       this.seen.clear();
+      this.items.clear();
     }
     S.p.forEach((p, i) => {
       const key = p.ch + (p.mini ? '*' : '');
@@ -80,7 +86,10 @@ export class View {
   drop(f) { this.scene.remove(f.model.root, f.shadow, f.beam, ...f.stars); }
   make(p, key) {
     const model = BUILD[p.ch]();
-    if (p.mini) shade(model.root);
+    if (p.mini && !CHARS[p.ch].npc) shade(model.root);   // 拿可選角色當雜兵才壓成影子色；專門的雜兵（npc）照本來的顏色
+    // 每隻自己一份材質（打中整隻閃白用；共用的話同色的別人也會跟著閃）
+    const mats = [];
+    model.root.traverse((o) => { if (o.isMesh && o.material?.isMeshToonMaterial) { o.material = o.material.clone(); mats.push(o.material); } });
     this.scene.add(model.root);
     const shadow = new THREE.Mesh(new THREE.CircleGeometry(1, 24), new THREE.MeshBasicMaterial({ color: '#070a04', transparent: true, opacity: 0.55, depthWrite: false }));
     shadow.rotation.x = -Math.PI / 2;
@@ -91,7 +100,8 @@ export class View {
     this.renderer.initTexture(beam.material.map);
     const stars = [0, 1, 2].map((i) => starSprite(i === 1 ? '#ffffff' : '#ffe98a'));
     this.scene.add(...stars);
-    return { key, ch: p.ch, model, shadow, beam, stars, pose: { ...ZERO }, flash: 0, px: p.x };
+    const hand = handAnchor(model);                   // 拿東西的手（量好位置掛在手臂上）
+    return { key, ch: p.ch, model, shadow, beam, stars, pose: { ...ZERO }, flash: 0, px: p.x, mats, white: 0, whiteNow: 0, fxT: 0, hand };
   }
 
   // 對戰是競技場，闖關照關卡表的場景
@@ -101,7 +111,7 @@ export class View {
     if (name === this.sceneName) return;
     if (!this.scenes[name]) {
       const last = Q.secs[Q.secs.length - 1];
-      this.scenes[name] = new SeaStage(this.scene, Q.span, (last.lo + last.hi) >> 1);
+      this.scenes[name] = new SCENES[name](this.scene, Q.span, (last.lo + last.hi) >> 1);
     }
     for (const [k, st] of Object.entries(this.scenes)) st.show(this.scene, k === name);
     this.stage = this.scenes[name];
@@ -124,6 +134,7 @@ export class View {
 
     S.p.forEach((p, i) => this.updateFighter(S, p, this.fighters[i]));
     this.updateProjectiles(S);
+    this.items.update(S, this.fighters, this.clock, dt);
     this.stage.update(dt, this.clock, [0, 1].map((t) => Math.max(0, ...this.fighters.filter((v, i) => S.p[i].team === t).map((v) => v.flash * 0.6))));
     this.fx.update(dt);
     this.updateCamera(S, dt);
@@ -152,8 +163,54 @@ export class View {
           this.punch = Math.max(this.punch, su ? 0.9 : 0.55);
         } else if ((e.combo || 0) >= 3) { this.fx.bolts(x, y, c, 2, 0.8, z); this.fx.motes(x, y, c, 2, z); }
         this.shake = Math.max(this.shake, e.big ? (su ? 0.13 : 0.09) : 0.03);
+        const vd = this.fighters[e.d];
+        if (vd) vd.white = e.big ? 1 : 0.7;                                   // 被打的整隻閃白一下
         break;
       }
+      // 被打飛撞到場邊、撞到別人：地上的灰塵、一圈衝擊
+      case 'wall': {
+        const x = e.x * U, y = e.y * U;
+        this.fx.shock(x, y, '#e8dcc0', 2.0, z, 0.3); this.fx.dust(x, 0, 8, null, z); this.fx.dust(x, y, 6, null, z);
+        this.fx.shards(x, y, '#d8c8a8', 12, 5, z); this.fx.groundRing(x, z, '#b8a88e', 1.6, 0.35);
+        this.shake = Math.max(this.shake, 0.1); this.punch = Math.max(this.punch, 0.4);
+        break;
+      }
+      case 'bump': this.fx.dust(e.x * U, 0, 6, null, z); this.fx.groundRing(e.x * U, z, '#b8a88e', 1.4, 0.3); break;
+      case 'ext': {
+        const p = S.p[e.s], c = col(e.s), cy = CHARS[p.ch].h * U * 0.55;
+        this.fx.shock(p.x * U, cy, c, 1.4, p.z * U, 0.2); this.fx.motes(p.x * U, cy, c, 4, p.z * U);
+        this.fighters[e.s].flash = Math.max(this.fighters[e.s].flash, 0.4);
+        break;
+      }
+      case 'chgmax': {
+        const p = S.p[e.s], m = MOVES[p.ch][p.mv], c = col(e.s);
+        if (!m?.proj) break;
+        const x = (p.x + p.face * m.proj.x) * U, y = m.proj.y * U;
+        this.fx.flare(x, y, c, 4, p.z * U, 0.3); this.fx.rays(x, y, c, 2.4, p.z * U); this.fx.shock(x, y, HOT, 1.6, p.z * U, 0.25);
+        this.shake = Math.max(this.shake, 0.04);
+        break;
+      }
+      // ---- 地上的東西 ----
+      case 'item': if (e.ik && !S.quest) { this.fx.glow(e.x * U, 0.1, '#fff1c8', 1.2, z, 0.5); this.fx.groundRing(e.x * U, z, '#e8c45a', 1.2, 0.6); } break;   // 對戰從天上掉：落點先亮
+      case 'ipick': { const p = S.p[e.s]; this.fx.dust(p.x * U + p.face * 0.3, 0, 3, null, p.z * U); this.fx.motes(p.x * U + p.face * 0.3, 0.3, '#fff1c8', 3, p.z * U); break; }
+      case 'ithrow': { const p = S.p[e.s]; this.fx.shock((p.x + p.face * 400) * U, CHARS[p.ch].h * U * 0.6, '#fff6e8', 1.0, p.z * U, 0.15); break; }
+      case 'iland': this.fx.dust(e.x * U, 0, ITEMS[e.ik]?.cat === 'heavy' ? 7 : 3, null, z); if (ITEMS[e.ik]?.cat === 'heavy') { this.fx.groundRing(e.x * U, z, '#b8a88e', 1.4, 0.3); this.shake = Math.max(this.shake, 0.04); } break;
+      case 'iknock': this.fx.shards(e.x * U, e.y * U, '#b07a44', 6, 3, z); this.fx.dust(e.x * U, 0, 2, null, z); break;
+      case 'ibreak': this.fx.shards(e.x * U, e.y * U, ITEMS[e.ik]?.cat === 'light' ? '#d6aa6c' : '#b07a44', 16, 5, z); this.fx.dust(e.x * U, 0, 8, null, z); this.fx.shock(e.x * U, e.y * U, '#fff1c8', 1.4, z, 0.2); break;
+      case 'boom': {
+        const x = e.x * U, y = 0.5, r = (e.r || 1500) * U;
+        this.fx.burst(x, y, '#ff8a2a', r * 1.6, z); this.fx.flare(x, y, '#ffd27a', 7, z, 0.4); this.fx.shock(x, y, '#fff1c8', r * 1.8, z, 0.45);
+        this.fx.wave(x, z, '#ff6a2a', r * 2, 0.6); this.fx.shards(x, y, '#ffb347', 22, 7, z); this.fx.dust(x, 0, 14, '#3a2a1a', z); this.fx.bolts(x, y, '#ffd27a', 4, 1.6, z);
+        this.shake = 0.16; this.punch = Math.max(this.punch, 0.8);
+        break;
+      }
+      case 'sip': {                                   // 吃一口：補血綠、補魔藍，光點往上冒
+        const p = S.p[e.s], c = e.hp ? '#8fe08a' : '#7fb8ff', cy = CHARS[p.ch].h * U * 0.5;
+        this.fx.motes(p.x * U, cy, c, 8, p.z * U, 0.8); this.fx.glow(p.x * U, cy, c, 1.6, p.z * U, 0.3);
+        break;
+      }
+      case 'iempty': { const p = S.p[e.s]; this.fx.pop((p.x + p.face * 300) * U, CHARS[p.ch].h * U * 0.6, '#fff1c8', p.z * U); break; }
+      case 'igone': this.fx.dust(e.x * U, 0, 4, null, z); break;
       case 'block':
         this.fx.block(e.x * U, e.y * U, z);
         if (e.big) { this.fx.shock(e.x * U, e.y * U, '#bfe6ff', 1.2, z, 0.18); this.fx.bolts(e.x * U, e.y * U, '#bfe6ff', 2, 0.7, z); this.shake = Math.max(this.shake, 0.03); }
@@ -189,6 +246,7 @@ export class View {
       case 'proj': {
         const p = S.p[e.s], x = (p.x + p.face * 420) * U;
         this.fx.pop(x, 0.88, col(e.s), p.z * U);
+        if (e.big) { this.fx.shock(x, 0.88, col(e.s), 2.6, p.z * U, 0.3); this.fx.wave(x, p.z * U, col(e.s), 2.4, 0.4); this.shake = Math.max(this.shake, 0.06); }
         break;
       }
       case 'grab': { const p = S.p[e.s]; this.fx.spark((p.x + p.face * 300) * U, CHARS[p.ch].h * U * 0.6, 0, '#ffffff', p.z * U); break; }
@@ -233,7 +291,14 @@ export class View {
     const snap = p.act === 'atk' || p.act === 'hit' || p.act === 'block';
     for (const k in target) v.pose[k] = snap ? target[k] : v.pose[k] + (target[k] - v.pose[k]) * 0.45;
     applyPose(v.model, v.pose);
-    v.model.root.position.set(p.x * U, p.y * U, p.z * U);
+    // 頓格中被打的人左右抖（打的人不抖，看得出誰吃了這下）
+    const quake = p.stop > 0 && p.act !== 'atk' ? Math.sin(this.clock * 95) * Math.min(0.045, p.stop * 0.006)
+      : p.chg > 0 ? Math.sin(this.clock * 70) * 0.012 : 0;                       // 集氣中身體微微抖
+    v.model.root.position.set(p.x * U + quake, p.y * U, p.z * U);
+    // 打中閃白：整隻往白色亮，很快退掉
+    v.white = Math.max(0, v.white - 0.12);
+    const wn = Math.round(v.white * 20) / 20;
+    if (wn !== v.whiteNow) { v.whiteNow = wn; for (const mt of v.mats) mt.emissive.setScalar(wn * 0.85); }
     v.model.root.scale.x = p.face;
     // 闖關：退場的不畫；倒下快退場的、剛復活打不到的一閃一閃
     const blink = (p.iv > 0 || (p.gone === 1 && p.pl < 0 && p.t > 55)) && ((this.clock * 16) | 0) % 2 === 0;
@@ -254,6 +319,19 @@ export class View {
       for (let i = 0; i < (su ? 2 : 1); i++) this.fx.trail(p.x * U - Math.sign(dx) * 0.5, p.y * U + C.h * U * (0.25 + Math.random() * 0.5), C.color, su ? 2.2 : 1.4, p.z * U, su ? 0.22 : 0.14);
     }
     if (p.act === 'run' && (S.f + p.i * 3) % 7 === 0) this.fx.dust(p.x * U - p.face * 0.3, 0, 1, null, p.z * U);
+    // 集氣：嘴前光點往內吸、白芯越來越大；漩渦：身前一直往中間捲
+    v.fxT += 1;
+    if (m && m.charge && p.chg > 0 && p.t >= m.charge.at - 1 && p.t <= m.charge.at && m.proj) {   // 集氣中 sim 把 t 停在 at 前一幀
+      const k = p.chg / m.charge.max, x = (p.x + p.face * m.proj.x) * U, y = m.proj.y * U, c = CHARS[p.ch].pal?.[0] || C.color;
+      if (v.fxT % 4 === 0) this.fx.implode(x, y, c, 0.9 + k * 0.6, 4, p.z * U, 0.3);
+      if (v.fxT % 3 === 0) this.fx.glow(x, y, k >= 1 ? '#ffffff' : c, 0.35 + k * 0.9, p.z * U, 0.14);
+    }
+    if (m && m.pull && p.t >= m.pull.on[0] && p.t <= m.pull.on[1]) {
+      const x = (p.x + p.face * m.pull.x) * U, c = CHARS[p.ch].pal?.[0] || C.color;
+      if (v.fxT % 3 === 0) this.fx.implode(x, 0.7, c, 2.2, 6, p.z * U, 0.4);
+      if (v.fxT % 9 === 0) this.fx.groundRing(x, p.z * U, c, 2.4, 0.5);
+      if (v.fxT % 5 === 0) this.fx.motes(x, 0.5, '#bfeaff', 2, p.z * U, 1.6);
+    }
     // 頭暈：三顆星在頭上繞
     const dz = p.act === 'dizzy';
     v.stars.forEach((s, i) => {
@@ -274,6 +352,19 @@ export class View {
     } else v.beam.visible = false;
     // 海牛吐舌頭：出必殺技時伸長一點
     if (v.model.tongue) v.model.tongue.scale.y = m && m.kind !== 'n' ? 1.5 : 1;
+    // 舌頭、觸鬚（青蛙、鬚臉）：姿勢是 lash 的招，出手前 3 幀彈出去、打完 5 幀收回來；長度照打擊框最遠那格
+    if (v.model.lash) {
+      const L = v.model.lash;
+      let k = 0, len = 0;
+      if (m && (m.pose || m.id) === 'lash' && m.hits.length) {
+        const a0 = m.hits[0].on[0], a1 = m.hits[m.hits.length - 1].on[1];
+        k = p.t < a0 - 3 ? 0 : p.t < a0 ? (p.t - a0 + 3) / 3 : p.t <= a1 ? 1 : Math.max(0, 1 - (p.t - a1) / 5);
+        len = (Math.max(...m.hits.map((h) => h.box[2])) * U - 0.3) / 0.85;   // 模型斜站（臉往鏡頭轉一點），往前 1 公尺畫面上只有 0.85
+      }
+      L.j.visible = L.tip.visible = k > 0.02;
+      L.j.scale.z = Math.max(0.01, len * k);
+      L.tip.position.z = L.z0 + len * k;
+    }
     // 海獅鼻子上的球：頂出去之後到收招前不在鼻子上
     if (v.model.ball) v.model.ball.visible = !(m && m.proj && p.t >= m.proj.at);
   }
@@ -283,10 +374,10 @@ export class View {
     for (const q of S.pr) {
       live.add(q.id);
       let m = this.projs.get(q.id);
-      const ball = S.p[q.o]?.ch === 'sealion';
-      if (!m) { m = ball ? ballMesh() : bubbleMesh(); m.userData.ball = ball; this.projs.set(q.id, m); this.scene.add(m); }
+      const shot = CHARS[S.p[q.o]?.ch]?.shot, ball = !!shot;           // 角色表寫了 shot 的是一顆球（海獅的球、墨、石頭、孢子），沒寫是泡泡
+      if (!m) { m = ball ? ballMesh(shot) : bubbleMesh(); m.userData.ball = ball; m.userData.pop = ball ? lighten(shot[0]) : '#5cc8e0'; this.projs.set(q.id, m); this.scene.add(m); }
       m.position.set(q.x * U, q.y * U, q.z * U);
-      const c = ball ? CHARS.sealion.pal[0] : '#5cc8e0';
+      const c = ball ? shot[0] : '#5cc8e0';
       if (ball) { m.scale.setScalar(q.w * U * 0.75); m.rotation.z -= Math.sign(q.vx) * 0.2; }
       else {
         const w = 1 + 0.08 * Math.sin(this.clock * 14 + q.id);
@@ -294,9 +385,9 @@ export class View {
       }
       if (Math.random() < 0.5) this.fx.speck(q.x * U - Math.sign(q.vx) * 0.15, q.y * U + (Math.random() - 0.5) * 0.2, Math.random() < 0.3 ? '#fff1c8' : c, 0.6, q.z * U, -1.5);
       if (q.t % 5 === 0) this.fx.trail(q.x * U - Math.sign(q.vx) * 0.35, q.y * U, c, 0.9, q.z * U, 0.1);
-      if (q.t % 9 === 0) this.fx.bolts(q.x * U, q.y * U, ball ? '#ffd2c4' : '#bfeaff', 1, 0.4, q.z * U, 0.1);
+      if (q.t % 9 === 0) this.fx.bolts(q.x * U, q.y * U, ball ? m.userData.pop : '#bfeaff', 1, 0.4, q.z * U, 0.1);
     }
-    for (const [id, m] of this.projs) if (!live.has(id)) { this.scene.remove(m); this.projs.delete(id); this.fx.pop(m.position.x, m.position.y, m.userData.ball ? '#ffd2c4' : '#5cc8e0', m.position.z); }
+    for (const [id, m] of this.projs) if (!live.has(id)) { this.scene.remove(m); this.projs.delete(id); this.fx.pop(m.position.x, m.position.y, m.userData.pop, m.position.z); }
   }
 
   // 鏡頭從斜上方往下看地板，跟著場上的人左右移；人散得開就拉遠
@@ -392,11 +483,13 @@ function shade(root) {
   });
 }
 
-// 海獅頂出去的紅白球（半徑 1，view 照判定框縮放）
-function ballMesh() {
+// 飛行道具的球（半徑 1，view 照判定框縮放）：角色表的 shot [主色, 中間那條帶子的顏色或 null]
+function ballMesh([c, band]) {
   const g = new THREE.Group();
   const k = kit(g);
-  k.ball(1, '#d8453a', 0, 0, 0);
-  k.ball(1.01, '#f4eadc', 0, 0, 0, { sy: 0.32, line: false });
+  k.ball(1, c, 0, 0, 0);
+  if (band) k.ball(1.01, band, 0, 0, 0, { sy: 0.32, line: false });
   return g;
 }
+// 往白靠一半：特效的亮色
+const lighten = (c) => '#' + new THREE.Color(c).lerp(new THREE.Color('#ffffff'), 0.55).getHexString();

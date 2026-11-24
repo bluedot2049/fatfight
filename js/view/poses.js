@@ -27,6 +27,9 @@ const BASE = {
   backstep: { lean: -0.35, aN: 0.5, aF: 0.5 },
   brake: { lean: -0.4, sq: -0.12, aN: 0.8, aF: 0.6, lN: 0.6 },
   dizzy: { lean: -0.15, aN: 0.3, aF: 0.2, aNz: 0.6, aFz: 0.6, head: 0.2 },
+  pick: { sq: -0.3, by: -0.05, lean: 0.45, bend: 0.3, aN: 1.0, aF: 0.9, head: 0.15 },   // 彎腰撿東西
+  lift: { aN: 2.9, aF: 2.9, aNz: 0.2, aFz: 0.2, head: -0.1, sq: -0.04 },              // 兩手把重物舉在頭上
+  drink: { aN: 2.4, aNz: -0.55, head: -0.4, lean: -0.15, sq: 0.03 },                 // 拿到嘴邊仰頭
 };
 
 const ATK = {
@@ -48,6 +51,7 @@ const ATK = {
     tail: { w: { spin: -0.5, sq: -0.2 }, s: { spin: 3.1, lean: -0.3, tail: 0.8, aN: 1.0 } },
     bubble: { w: { bend: -0.25, head: -0.25 }, s: { bend: 0.25, head: 0.25, lean: 0.12, aN: 0.6, aF: 0.6 } },
     surge: { w: { sq: -0.25, aN: -0.6, aF: -0.6, lean: -0.1 }, s: { aN: 1.6, aF: 1.6, aNz: -0.2, aFz: -0.2, lean: 0.22, sq: 0.1 } },
+    vortex: { w: { sq: -0.18, aN: -0.5, aF: -0.5, lean: -0.15, spin: -0.3 }, s: { aN: 1.5, aF: 1.5, aNz: -0.45, aFz: -0.45, lean: 0.2, spin: 0.15 } },   // 兩鰭往前捲水
   },
   marmot: {
     sA: { w: { aN: -0.4 }, s: { aN: 1.65, lean: 0.12 } },
@@ -82,6 +86,50 @@ const ATK = {
     press: { w: { aN: 2.6, aF: 2.6, head: -0.3, sq: 0.05 }, s: { lean: 1.15, sq: -0.15, aN: 1.6, aF: 1.6, tail: 0.5 } },
   },
 };
+// 闖關的雜兵、頭目：大家共用一套普通技姿勢（GEN），各自補自己特別的
+const UPPER = { w: { sq: -0.25 }, s: { aN: 2.8, aF: 2.5, head: -0.35, sq: 0.15 } };   // 對空：兩手往上衝
+const GEN = {
+  sA: { w: { aN: -0.4 }, s: { aN: 1.6, lean: 0.14 } },
+  sC: { w: { aF: -0.6, spin: -0.3 }, s: { aF: 1.9, lean: 0.25, spin: 0.4 } },
+  cC: { w: { bend: -0.3, head: -0.3 }, s: { lean: 0.32, bend: 0.45, head: 0.4 } },
+  crA: { w: {}, s: { aN: 1.4 } },
+  crB: { w: {}, s: { lN: 1.4, aN: 0.4, lean: -0.15 } },
+  crD: { w: { spin: -0.4 }, s: { spin: 2.6, lean: 0.35, lF: 1.2, tail: 0.5 } },
+  jB: { w: {}, s: { lN: 1.45, lF: 0.8 } },
+  jC: { w: { aF: -0.5 }, s: { aF: 2.0, lean: 0.35 } },
+  jD: { w: { lean: -0.2 }, s: { lean: 0.9, sq: -0.15, aN: 1.2, aF: 1.2 } },
+  CD: { w: { lean: -0.3, bend: -0.3 }, s: { lean: 0.5, bend: 0.4, sq: -0.1, bz: 0.15 } },
+  lash: { w: { head: -0.25, lean: -0.1, aN: -0.3 }, s: { head: 0.02, lean: 0.18, aN: 0.9 } },   // 舌頭、觸鬚甩出去（長度 view 照框算）
+};
+Object.assign(ATK, {
+  hammer: { ...GEN,
+    hs: { w: { spin: -0.6, head: -0.2, lean: -0.1 }, s: { spin: 0.8, head: 0.3, lean: 0.25 } },     // 錘頭橫甩
+    bite: { w: { lean: -0.2, head: -0.4 }, s: { lean: 0.55, head: -0.3, bend: 0.3, aN: 0.6, aF: 0.6 } },
+    fin: UPPER,
+  },
+  squid: { ...GEN,
+    ink: { w: { head: -0.4, bend: -0.2 }, s: { head: 0.35, bend: 0.25, lean: 0.12 } },
+    rise: UPPER,
+  },
+  frog: { ...GEN,
+    kick2: { w: { sq: -0.2, lean: 0.3 }, s: { lN: 1.6, lF: 1.6, lean: -0.6, by: 0.15 } },               // 雙腳往前踹
+    hop: UPPER,
+  },
+  mushroom: { ...GEN,
+    puff: { w: { sq: -0.3 }, s: { sq: 0.25, aN: 0.5, aF: 0.5, aNz: 1.2, aFz: 1.2, head: -0.2 } },     // 整隻鼓起來噴孢子
+    capup: UPPER,
+  },
+  moss: { ...GEN,
+    smash: { w: { aN: 2.6, aF: 2.6, lean: -0.15, head: -0.2 }, s: { aN: 0.9, aF: 0.9, lean: 0.5, bend: 0.4, head: 0.2, sq: -0.1 } },   // 兩手舉高往下砸
+    hurl: { w: { aN: 2.8, aF: 2.6, lean: -0.25 }, s: { aN: 1.2, aF: 1.0, lean: 0.35 } },
+    heave: ATK.sealion.clap,
+  },
+  dwarf: { ...GEN,
+    chop: { w: { aN: 2.8, aF: 2.4, lean: -0.2, head: -0.2 }, s: { aN: 0.7, aF: 0.6, lean: 0.4, bend: 0.3 } },   // 鎬子從頭上劈下來
+    uppick: { w: { aN: -0.4, sq: -0.25 }, s: { aN: 2.9, aF: 2.0, head: -0.35, sq: 0.15 } },
+    cavein: { w: { aN: 2.6, aF: 2.6, head: -0.3 }, s: { aN: 0.6, aF: 0.6, lean: 0.8, bend: 0.4, sq: -0.15 } },
+  },
+});
 
 const KEYS = ['by', 'bz', 'lean', 'bend', 'sq', 'spin', 'tumble', 'head', 'aN', 'aF', 'aNz', 'aFz', 'lN', 'lF', 'tail', 'sink'];
 export const ZERO = Object.fromEntries(KEYS.map((k) => [k, 0]));
@@ -131,6 +179,8 @@ export function poseOf(f, clock) {
     case 'atk': p = attackPose(f, m, t, clock); break;
     default: p = {};
   }
+  // 舉著重物：手一直舉在頭上
+  if (f.ik === 2 && f.act !== 'atk') p = over(p, { aN: BASE.lift.aN, aF: BASE.lift.aF, aNz: BASE.lift.aNz, aFz: BASE.lift.aFz });
   return mix(ZERO, p, 1);
 }
 
@@ -159,6 +209,36 @@ function attackPose(f, m, t, clock) {
     const k = t - at;
     return { aN: 2.8, aF: 2.6, sq: 0.15, spin: Math.max(0, 3 * Math.PI * 2 * (1 - k / 14)), head: -0.3 };
   }
+  if (id === 'whirl') {                              // 錘頭旋風：往前那段整隻轉三圈（轉完剛好回到正面）
+    const a0 = m.vx[1][0], a1 = m.vx[m.vx.length - 1][0];
+    const spinP = { aN: 1.4, aF: 1.4, aNz: 1.0, aFz: 1.0, lean: 0.1 };
+    if (t < a0) return mix(BASE.idle, { spin: -0.5, sq: -0.15 }, t / Math.max(1, a0));
+    if (t <= a1) return over(spinP, { spin: (t - a0) / Math.max(1, a1 - a0) * 3 * Math.PI * 2 });
+    return mix(spinP, BASE.idle, Math.min(1, (t - a1) / 8));
+  }
+  // 撿、丟重物、喝（地上的東西；f.ik 是手上拿什麼，沒有道具的版本是 undefined）
+  if (id === 'pick') {
+    const at = m.it.at, up = f.ik === 2 ? BASE.lift : BASE.idle;
+    if (t < at) return mix(BASE.idle, BASE.pick, ease(t / at));
+    return mix(BASE.pick, up, Math.min(1, (t - at) / Math.max(1, m.total - at)));
+  }
+  if (id === 'hthrow') {
+    const at = m.it.at;
+    if (t < at) return over(BASE.lift, { lean: -0.25 * (t / at), bend: -0.2 * (t / at) });
+    return mix(over(BASE.throw, { lean: 0.45, bend: 0.3, aN: 1.6, aF: 1.6 }), BASE.idle, Math.min(1, (t - at) / Math.max(1, m.total - at)));
+  }
+  if (id === 'drink') {
+    const k = Math.min(1, t / 8, (m.total - t) / 6);
+    return mix(BASE.idle, BASE.drink, Math.max(0, k));
+  }
+  if (id === 'gnaw') {                               // 門牙連啃：壓低往前衝，頭一直啃
+    const a0 = m.vx[1][0], end = m.vx[m.vx.length - 1][0];
+    if (t < a0) return mix(BASE.idle, BASE.pre, t / Math.max(1, a0));
+    const s = Math.sin(t * 1.7);
+    const dash = over(BASE.run, { lean: 0.55, lN: 1.1 * s, lF: -1.1 * s, aN: 1.3, aF: 1.3, head: 0.2 + 0.35 * Math.abs(s), by: 0.04 * Math.abs(s) });
+    if (t <= end) return dash;
+    return mix(dash, BASE.idle, Math.min(1, (t - end) / 8));
+  }
   if (id === 'frenzy') {                             // 衝過去（照 vx 停下那幀）→ 亂打 → 最後一下往上打（照最後一下的幀數；兩版節奏不同也對得上）
     const dash = m.vx[m.vx.length - 1][0], fin = m.hits[m.hits.length - 1].on[0] - 2;
     if (t < dash) return BASE.run;
@@ -178,7 +258,7 @@ function attackPose(f, m, t, clock) {
   const W = over(base, P.w), Sx = over(base, P.s);
   if (t < a0) return mix(base, W, ease(t / Math.max(1, a0)));
   if (t <= a1 + 2) {
-    if (m.kind === 'su') return over(Sx, { aN: (Sx.aN || 0) + 0.25 * Math.sin(clock * 40), aF: (Sx.aF || 0) - 0.25 * Math.sin(clock * 40) });
+    if (m.kind === 'su' || m.pull) return over(Sx, { aN: (Sx.aN || 0) + 0.25 * Math.sin(clock * 40), aF: (Sx.aF || 0) - 0.25 * Math.sin(clock * 40) });
     return Sx;
   }
   if (m.air) return Sx;

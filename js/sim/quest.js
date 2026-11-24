@@ -9,13 +9,15 @@ import { pressed, consume } from './input.js';
 import { newAI } from './ai.js';
 import { world } from './match.js';
 import { QUESTS } from './quests/index.js';
+import { spawnItem } from './item.js';
 
 const MAX_P = 16;                 // 場上最多幾格（抓人、打到誰都用格子號碼記，hitList 只留 4 位元）
 const ZS = [-900, 700, -200, 1100, 300, -1200];   // 敵人進場的前後位置，照順序輪
 const DIE_WAIT = 70;              // 玩家倒下多久之後復活或出局
 const GONE_AT = 100;              // 敵人倒下多久之後退場
+const DROP_EVERY = 4;             // 雜兵每打倒幾隻掉一個吃的（關卡表 food 照順序輪）
 
-// chars：玩家選的角色（1 或 2 隻），id：哪一關。seed：亂數種子（線上兩邊要一樣）
+// chars：玩家選的角色（1 或 2 隻），id：哪一關。seed：亂數種子（線上兩邊要一樣）；score、lives：上一關帶過來的（每個玩家一格，沒寫就從頭）
 export function newQuest(chars, id, opt = {}) {
   const Q = QUESTS[id], sec = Q.secs[0];
   const S = {
@@ -23,15 +25,17 @@ export function newQuest(chars, id, opt = {}) {
     freeze: 0, fwho: -1, pid: 0,
     lo: sec.lo, hi: sec.hi,
     p: [], pr: [], ev: [],
-    opt: { train: 0 },
+    it: [], iid: 0, itT: 0, rs: ((opt.seed | 0) || 7) ^ 0x1d872b41, drops: 0, kills: 0,
+    opt: { train: 0, items: 1 },
     quest: id, sec: 0, wave: -1, wt: 0, go: 0, pend: [], st: 0, boss: -1, seed: (opt.seed | 0) || 7,
     lives: [], score: [], conts: 0,
   };
   chars.forEach((ch, k) => {
     const f = newFighter(ch, k, 0, sec.lo + 2500 - k * 600, 1);
     f.pad = k; f.pl = k; f.main = 1; f.z = k ? 600 : -300;
-    S.p.push(f); S.lives.push(LIVES); S.score.push(0);
+    S.p.push(f); S.lives.push(opt.lives?.[k] || LIVES); S.score.push(opt.score?.[k] | 0);
   });
+  placeItems(S, sec);
   return S;
 }
 
@@ -90,6 +94,9 @@ function lifeCycle(S) {
     if (!f.gone) {
       f.gone = 1;
       S.ev.push({ k: f.pl >= 0 ? 'die' : 'kill', s: f.i, x: f.x, z: f.z, boss: f.i === S.boss ? 1 : 0 });
+      // 雜兵每倒幾隻掉一個吃的（從身上彈出來）
+      const food = QUESTS[S.quest].food;
+      if (f.pl < 0 && food && ++S.kills % DROP_EVERY === 0) { const q = spawnItem(S, food[(S.kills / DROP_EVERY | 0) % food.length], f.x, f.z, 400); q.vy = 45; }
     }
     if (f.act !== 'ko') continue;
     if (f.pl < 0) { if (f.t >= GONE_AT) f.gone = 2; continue; }
@@ -133,6 +140,7 @@ function progress(S, Q) {
     if (lead >= next.lo + 3500) {
       S.sec++; S.lo = next.lo; S.hi = next.hi; S.go = 0; S.wave = -1; S.wt = 30;
       S.ev.push({ k: 'lock', n: S.sec });
+      placeItems(S, next);
     }
     return;
   }
@@ -149,6 +157,11 @@ function progress(S, Q) {
   S.ph = 'clear'; S.pt = 0;
   for (const f of players(S)) if (f.hp > 0) S.score[f.pl] += 3000 + 1000 * S.lives[f.pl];
   S.ev.push({ k: 'clear' });
+}
+
+// 這一段地上擺的東西：關卡表 items [種類, 離這段左邊多遠, 前後]
+function placeItems(S, sec) {
+  for (const [k, x, z] of sec.items || []) spawnItem(S, k, sec.lo + x, z);
 }
 
 // 待出場的一隻一隻進來（隔 24 幀），從畫面外面走進來；沒有空格就等
@@ -168,7 +181,9 @@ function spawnNext(S) {
   f.hp = f.mhp = e.hp;
   f.mp = e.boss ? MP : 300;
   f.mini = e.mini ? 1 : 0;
-  f.ai = newAI(e.lv, (S.seed ^ Math.imul(S.f + 1, 0x9e3779b1) ^ Math.imul(slot + 1, 0x85ebca6b)) >>> 0);
+  f.pow = e.pow ?? 100;
+  if (f.mini) f.mp = 0;                               // 雜兵不放必殺（ai.js 的 MOB 也不會按）
+  f.ai = newAI(e.lv, (S.seed ^ Math.imul(S.f + 1, 0x9e3779b1) ^ Math.imul(slot + 1, 0x85ebca6b)) >>> 0, f.mini);
   S.p[slot] = f;
   if (e.boss) { S.boss = slot; S.ev.push({ k: 'boss', s: slot }); }
   S.ev.push({ k: 'spawn', s: slot });

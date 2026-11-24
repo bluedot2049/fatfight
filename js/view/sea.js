@@ -7,8 +7,8 @@ import { Z_NEAR, Z_FAR } from '../sim/const.js';
 
 export const SEA_BG = '#0a2a36';
 
-function rng(seed) { let s = seed; return () => { s = (s * 16807) % 2147483647; return s / 2147483647; }; }
-function canvasTex(c, srgb = true) {
+export function rng(seed) { let s = seed; return () => { s = (s * 16807) % 2147483647; return s / 2147483647; }; }
+export function canvasTex(c, srgb = true) {
   const t = new THREE.CanvasTexture(c);
   if (srgb) t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = 4;
@@ -78,7 +78,7 @@ function causticTex() {
 }
 
 // 直的漸層（上亮下透明）：光柱用
-function shaftTex() {
+export function shaftTex() {
   const c = document.createElement('canvas');
   c.width = 64; c.height = 256;
   const g = c.getContext('2d');
@@ -92,7 +92,7 @@ function shaftTex() {
   return canvasTex(c, false);
 }
 
-function dot() {
+export function dot() {
   const c = document.createElement('canvas');
   c.width = c.height = 32;
   const g = c.getContext('2d');

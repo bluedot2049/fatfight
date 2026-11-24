@@ -20,7 +20,7 @@ export const SPEED = (v) => ((v * 16) / 5) | 0;
 // 整體慢 20%：每幀的速度 ×4/5（角色表的起跳速度在這裡換算）
 export const SLOW = (v) => ((v * 4) / 5) | 0;
 export const AIR_STEER = 1;         // 空中按方向，每幀往那邊加多少速度（稍微改方向；LF2 原本不能改）
-export const Z_REACH = 380;         // 普通技前後打得到的範圍（招式沒寫 zr 就用這個；原本 220 近身常揮空）
+export const Z_REACH = 500;         // 普通技前後打得到的範圍（招式沒寫 zr 就用這個；原本 220 近身常揮空，380 還是嫌窄，2026-11-24 改 500）
 export const PUSH_Z = 260;          // 不同隊的兩人前後差這麼近、高度有疊到，身體就互推，不會穿過去
 export const PUSH_IN = 80;          // 身體可以疊進去多少（衝刺連打貼身疊 60、抓人疊 80）
 
@@ -28,6 +28,12 @@ export const PUSH_IN = 80;          // 身體可以疊進去多少（衝刺連�
 export const DIZZY = 40, KNOCK = 60;
 // 防禦累積到 BREAK 就破防
 export const BREAK = 60;
+
+// 打飛的物理（使用者 2026-11-24：招式要爽、角色要猛）。速度都是節奏換算後每幀的量
+export const BOUNCE_V = 64;         // 落地時往下比這快就彈一次（彈回 5/8），之後才躺下；必殺打飛的都會彈，普通技不會
+export const WALL_V = 24;           // 被打飛撞到場邊，左右比這快就反彈（剩一半）
+export const BODY_V = 30;           // 被打飛、被丟出去的人左右比這快，撞到人會一起倒（打的人算丟的那個）
+export const MP_GAIN = 3;           // 打中回魔：傷害的幾分之一（被擋再減半；超必殺不回）
 
 // 一幀的輸入：一個位元組。上下左右是螢幕方向（上＝往裡走，下＝往鏡頭走）
 export const UP = 1, DOWN = 2, LEFT = 4, RIGHT = 8;

@@ -12,6 +12,12 @@
 //   cr    蹲著出的招（受擊框變矮）；next 打到人後按著蹲再按攻接哪一招
 //   mp    要多少魔力；flash 超必殺的定格；cancel 1＝打到人之後可以接必殺
 //   pose  畫面用哪個姿勢（poses.js 的 ATK 表，跟 KOF 版共用同一套角色和姿勢）
+//   爽度（使用者 2026-11-24）：
+//   hits 的 carry 1＝打中把對手一起帶上去（往上衝的必殺，最後一下再打飛；不算追打次數）
+//   hang  往上衝到頂點停幾幀；cancel 也能寫在必殺上（打到人、最後一下打完之後可以再出別的必殺）
+//   mash  { at, to, n, mp }：出招到 at 幀之前又按了攻，就跳回 to 幀再來一段（最多 n 次，每次扣 mp）。飛行道具會再吐一顆
+//   charge { at, max }：到 at 幀還按著攻（或跳），停在這幀集氣最多 max 幀；放開才出，飛行道具照集了多少變大，集滿一定打倒
+//   pull  { on, x, r, v }：on 幀之間把身前 x 那點附近 r 以內的敵人吸過去（每幀最多 v）；thru 1＝出招中穿過人不互推
 
 // 節奏（使用者 2026-11-24：場地加大、招式跟著快；同一天又說整體慢 20%）：每一招定義完都過一次 tune，
 // 幀數乘 15/16（原本 3/4 再拉長 5/4）、地上位移每幀 ×2.4、前後偏移 ×2.4、往上速度不變（重力跟著調，高度不變）、打飛的左右速度和飛行道具 ×1.6。
@@ -21,23 +27,33 @@ export const T = (t) => ((t * TEMPO[0] + (TEMPO[1] >> 1)) / TEMPO[1]) | 0;
 const sc = (n, d) => (v) => ((v * n) / d) | 0;
 const MOVE_V = sc(12, 5), ZM = sc(12, 5), LAUNCH_X = sc(8, 5), PROJ_V = sc(8, 5), JUMP_X = sc(8, 5);
 const R = (r) => r && [T(r[0]), Math.max(T(r[0]), T(r[1]))];
+// 攻擊框放大（使用者 2026-11-24：再大一點，特別是上下）：往前 BOX_X、往上 BOX_UP，前後寫了 zr 的加 BOX_Z（沒寫的看 const.js 的 Z_REACH）。
+// 底下不往下長，打得高的招照樣會從蹲著的人頭上揮空。飛行道具上下左右各加 BOX_P。
+const BOX_X = 60, BOX_UP = 120, BOX_Z = 120, BOX_P = 40;
+const grow = (b) => [b[0], b[1], b[2] + BOX_X, b[3] + BOX_UP];
 function tune(m) {
   m.total = T(m.total);
-  m.hits = m.hits.map((h) => ({ ...h, on: R(h.on), hs: T(h.hs), dvx: LAUNCH_X(h.dvx) }));
+  m.hits = m.hits.map((h) => ({ ...h, box: grow(h.box), zr: h.zr ? h.zr + BOX_Z : 0, on: R(h.on), hs: T(h.hs), dvx: LAUNCH_X(h.dvx) }));
   if (m.vx) m.vx = m.vx.map(([t, v]) => [T(t), MOVE_V(v)]);
   if (m.jump) m.jump = [T(m.jump[0]), JUMP_X(m.jump[1]), m.jump[2]];
   if (m.land) m.land = T(m.land);
   if (m.landW) m.landW = T(m.landW);
   m.inv = R(m.inv); m.under = R(m.under);
   if (m.zm) m.zm = ZM(m.zm);
-  if (m.proj) m.proj = { ...m.proj, at: T(m.proj.at), life: T(m.proj.life), vx: PROJ_V(m.proj.vx) };
+  if (m.proj) m.proj = { ...m.proj, w: m.proj.w + BOX_P, h: m.proj.h + BOX_P, at: T(m.proj.at), life: T(m.proj.life), vx: PROJ_V(m.proj.vx) };
+  if (m.hang) m.hang = T(m.hang);
+  if (m.mash) m.mash = { ...m.mash, at: T(m.mash.at), to: T(m.mash.to) };
+  if (m.charge) m.charge = { at: T(m.charge.at), max: T(m.charge.max) };
+  if (m.pull) m.pull = { ...m.pull, on: R(m.pull.on), v: MOVE_V(m.pull.v) };
+  if (m.it) m.it = { ...m.it, at: T(m.it.at) };
   return m;
 }
 
+// 頓格（stop）分級：輕 4、重 7、必殺 11（超必殺最後一下在 multi 裡 14）。必殺打中要比拳頭頓得重
 const W = {
   L: { dmg: 40, fall: 22, bdef: 16, hs: 14, stop: 4, dvx: 12, dvy: 40 },
-  H: { dmg: 60, fall: 70, bdef: 40, hs: 20, stop: 6, dvx: 16, dvy: 55 },
-  S: { dmg: 80, fall: 70, bdef: 45, hs: 22, stop: 6, dvx: 18, dvy: 60 },
+  H: { dmg: 60, fall: 70, bdef: 40, hs: 20, stop: 7, dvx: 16, dvy: 55 },
+  S: { dmg: 80, fall: 70, bdef: 45, hs: 22, stop: 11, dvx: 18, dvy: 60 },
 };
 export function hit(on, box, w = 'L', o = {}) {
   return { on, box, zr: 0, kd: 0, ...W[w], ...o };
@@ -51,7 +67,7 @@ export function multi(start, gap, n, box, dmg, last, o = {}) {
   for (let i = 0; i < n; i++) {
     const end = i === n - 1;
     out.push(hit([start + gap * i, start + gap * i + 2], box, 'S',
-      { dmg: end ? last : dmg, fall: end ? 80 : 0, hs: end ? 30 : gap + 14, stop: end ? 8 : 3, bdef: 12, dvx: 4, ...(end ? { kd: 1, dvx: 22, dvy: 90 } : {}), ...o }));
+      { dmg: end ? last : dmg, fall: end ? 80 : 0, hs: end ? 30 : gap + 14, stop: end ? 14 : 3, bdef: 12, dvx: 4, ...(end ? { kd: 1, dvx: 22, dvy: 90 } : {}), ...o }));
   }
   return out;
 }
@@ -69,4 +85,6 @@ export const SYS_LIST = [
   ['衝跳＋攻', '衝跳攻擊'], ['攻跳 同按', '吹飛（打飛很遠）'], ['跳防 同按', '翻滾（往按著的方向）'], ['跑＋防', '翻滾'],
   ['防', '防禦（按住；被打太多下會破防）'], ['蹲', '蹲下（按住；比較矮，有些招會揮空；可以慢慢走）'], ['蹲＋攻', '下段攻擊，打到再按接短手、再按掃腿'], ['蹲＋防', '蹲防'],
   ['走進頭暈的人', '抓住'], ['抓住時 攻', '抓著打'], ['抓住時 →＋攻', '丟出去'],
+  ['站在東西上 攻', '撿起來（重的舉起來）'], ['拿著武器 攻', '揮'], ['拿著吃的 攻', '吃一口'], ['拿著 跑＋攻', '丟出去（跳＋攻也行）'],
+  ['舉著 攻', '丟出去'], ['舉著 防', '放下'],
 ];

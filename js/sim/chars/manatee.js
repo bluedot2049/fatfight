@@ -23,20 +23,30 @@ const N = {
 
 // 必殺：防＋方向＋攻／跳。d 'f' 左右（按哪邊往哪邊）、'u' 上、'd' 下
 const SP = [
-  { id: 'bubble', name: '深海泡', yomi: 'shinkai ho-', d: 'f', btn: 'A', note: '吐泡泡',
-    m: mv('bubble', '深海泡', 40, { kind: 'sp', mp: 120, proj: { at: 14, x: 420, y: 880, vx: 60, w: 170, h: 170, dmg: 70, fall: 70, life: 120 } }) },
-  { id: 'wave', name: '翻滾浪', yomi: 'honkon ro-', d: 'f', btn: 'J', note: '滾過去撞兩下，按上下可以偏',
-    m: mv('wave', '翻滾浪', 46, { kind: 'sp', mp: 150, hurt: [-300, 0, 300, 900], vx: [[0, 0], [6, 52], [28, 0]], zm: 10, stick: 1,
-      hits: [hit([8, 13], [0, 0, 540, 1000], 'S', { dmg: 40, fall: 20, hs: 18 }), hit([18, 24], [0, 0, 540, 1000], 'S', { dmg: 50, kd: 1, dvx: 24, dvy: 70 })] }) },
+  // 按住攻集氣吐大泡（集滿一定打倒），吐完再按攻多吐，最多三顆
+  { id: 'bubble', name: '深海泡', yomi: 'shinkai ho-', d: 'f', btn: 'A', note: '吐泡泡；按住攻集氣變大，再按攻多吐',
+    m: mv('bubble', '深海泡', 32, { kind: 'sp', mp: 120, charge: { at: 9, max: 45 }, mash: { at: 24, to: 7, n: 2, mp: 60 },
+      proj: { at: 10, x: 420, y: 880, vx: 66, w: 170, h: 170, dmg: 70, fall: 70, life: 120 } }) },
+  { id: 'wave', name: '翻滾浪', yomi: 'honkon ro-', d: 'f', btn: 'J', note: '滾過去撞，按上下可以偏，再按攻多滾一圈',
+    m: mv('wave', '翻滾浪', 46, { kind: 'sp', mp: 150, cancel: 1, hurt: [-300, 0, 300, 900], vx: [[0, 0], [5, 60], [28, 0]], zm: 10, stick: 1,
+      mash: { at: 17, to: 7, n: 1, mp: 50 },
+      hits: [hit([7, 12], [0, 0, 540, 1000], 'S', { dmg: 40, fall: 20, hs: 22, stop: 7 }), hit([18, 24], [0, 0, 540, 1000], 'S', { dmg: 55, kd: 1, dvx: 30, dvy: 80 })] }) },
+  // 往上衝：前兩下把人帶上去，最後一下打飛，到頂點停一下
   { id: 'tail', name: '尾巴一甩', yomi: 'biha issui', d: 'u', btn: 'A', note: '對空，起手打不到',
-    m: mv('tail', '尾巴一甩', 30, { kind: 'sp', mp: 150, inv: [1, 8], jump: [4, 10, 100], land: 4, landW: 11,
-      hits: [hit([4, 14], [0, 400, 580, 1650], 'S', { dmg: 100, kd: 1, dvx: 16, dvy: 95 })] }) },
+    m: mv('tail', '尾巴一甩', 30, { kind: 'sp', mp: 150, inv: [1, 8], jump: [3, 10, 108], land: 4, landW: 11, hang: 6,
+      hits: [hit([3, 5], [0, 300, 580, 1650], 'S', { dmg: 30, fall: 0, carry: 1, stop: 5, hs: 24 }),
+        hit([7, 9], [0, 300, 580, 1650], 'S', { dmg: 30, fall: 0, carry: 1, stop: 5, hs: 24 }),
+        hit([11, 15], [0, 300, 600, 1700], 'S', { dmg: 60, kd: 1, dvx: 18, dvy: 100, stop: 13 })] }) },
+  // 身前捲起漩渦把人吸過來轉，最後往上甩出去
+  { id: 'vortex', name: '深海漩渦', yomi: 'shinkai uzu', d: 'd', btn: 'A', note: '把人吸過來轉，最後甩出去',
+    m: mv('vortex', '深海漩渦', 60, { kind: 'sp', mp: 200, pull: { on: [8, 44], x: 900, r: 2200, v: 16 },
+      hits: multi(14, 7, 5, [250, 0, 1550, 1350], 20, 70, { zr: 700, stop: 2 }).map((h, i, a) => (i === a.length - 1 ? { ...h, stop: 12 } : h)) }) },
 ];
 
 const BEAM = [150, 250, 2900, 1350];
 const SU = [
-  { id: 'surge', name: '深海霸氣', yomi: 'shinkai haki', d: 'u', btn: 'J', note: '整排浪打過去，前後也很寬',
-    m: mv('surge', '深海霸氣', 86, { kind: 'su', mp: 400, flash: 1, inv: [0, 16], hits: multi(16, 8, 6, BEAM, 40, 90, { zr: 650 }) }) },
+  { id: 'surge', name: '深海霸氣', yomi: 'shinkai haki', d: 'u', btn: 'J', note: '整排浪打過去，前後也很寬，連按攻多打幾下',
+    m: mv('surge', '深海霸氣', 86, { kind: 'su', mp: 400, flash: 1, inv: [0, 16], mash: { at: 54, to: 39, n: 2, mp: 60 }, hits: multi(16, 8, 6, BEAM, 40, 90, { zr: 650 }) }) },
 ];
 
 export default {

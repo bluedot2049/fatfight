@@ -5,6 +5,7 @@
 import { Z_REACH, UP, DOWN, LEFT, RIGHT, BA, BJ, BD, BS } from './const.js';
 import { CHARS, MOVES, ALL } from './chars/index.js';
 import { moveOf } from './fighter.js';
+import { ITEMS } from './items.js';
 
 // 難度（0 最弱）：闖關一關一關往上、對電腦連勝往上。機率都是 /256
 //   react 對方出招後幾幀才看到；think 幾幀重新想一次要幹嘛；guard 看到了去擋；dodge 看到了翻滾或往旁邊閃；
@@ -20,9 +21,16 @@ export const LV = [
   { react: 6, think: 10, guard: 215, dodge: 50, aa: 220, sp: 112, combo: 4, aggr: 190, punish: 230 },
 ];
 export const LV_MAX = LV.length - 1;
+// 闖關的雜兵（使用者 2026-11-24：照 LF2 的雜魚感，頭目才打得完整）：不放必殺、很少擋、不閃、看得慢、不接拳，走過來就揮。關卡表的 lv 0–2 挑這張
+export const MOB = [
+  { react: 34, think: 56, guard: 6, dodge: 0, aa: 0, sp: 0, combo: 0, aggr: 60, punish: 0 },
+  { react: 30, think: 48, guard: 14, dodge: 0, aa: 0, sp: 0, combo: 0, aggr: 75, punish: 10 },
+  { react: 26, think: 40, guard: 24, dodge: 4, aa: 0, sp: 0, combo: 1, aggr: 90, punish: 24 },
+];
+const lvOf = (A) => (A.mob ? MOB[Math.min(A.lv, MOB.length - 1)] : LV[A.lv]);
 
-export function newAI(lv, seed) {
-  return { lv: Math.max(0, Math.min(LV_MAX, lv | 0)), r: (seed >>> 0) || 1, q: [], plan: 'walk', pt: 0, tgt: -1, seen: -1, seenP: -1, seenJ: -1, gt: 0, chain: 0, cx: -1, gc: 0, last: 0, eng: 0, seenF: -1, fg: 0 };
+export function newAI(lv, seed, mob = 0) {
+  return { lv: Math.max(0, Math.min(LV_MAX, lv | 0)), mob: mob ? 1 : 0, r: (seed >>> 0) || 1, q: [], plan: 'walk', pt: 0, tgt: -1, seen: -1, seenP: -1, seenJ: -1, gt: 0, chain: 0, cx: -1, gc: 0, last: 0, eng: 0, seenF: -1, fg: 0, iw: 0 };
 }
 
 // 亂數 0–255
@@ -57,8 +65,33 @@ for (const C of ALL) {
     air: C.specials.filter((s) => kind(s) === 'air'),
     rush: C.specials.filter((s) => kind(s) === 'rush'),
     su: C.supers,
+    jump: C.ai?.jump ?? 0,           // 愛跳多少（想下一步時「跳」的份量多這麼多；青蛙）
     keep: C.ai?.keep ?? 0,           // 喜歡站多遠（身體之間的空隙）；角色表可以寫 ai: { keep }。站遠吐泡泡的海牛試過，會被胖鼠衝進來打爆
   };
+}
+
+// 道具（items.js）：回傳要按的鍵，-1＝不管道具照平常打
+function itemAI(S, f, A, rx, adz, tw, zb) {
+  const fresh = !(A.last & BA);
+  if (f.ik === 2) return rx < 2600 && adz < 250 ? (fresh ? BA | tw : tw) : tw | zb;      // 舉著重物：走近丟
+  if (f.ik === 3) return f.hp < (f.mhp * 17) / 20 || f.mp < 500 ? (fresh ? BA : 0) : -1;  // 拿著吃的：需要就吃
+  if (f.ik === 1) {                                                                        // 拿著武器：遠一點偶爾跳起來丟
+    if (rx > 1500 && rx < 3600 && adz < 200 && rnd(A) < 6) { A.q = [tw, tw, tw, tw, tw, BA | tw]; return BJ | tw; }
+    return -1;
+  }
+  if (S.f % 90 === f.i) A.iw = rnd(A) < 150 ? 1 : 0;                                      // 這陣子想不想撿東西
+  let best = null, bd = 3000;
+  for (const q of S.it) {
+    if (q.hold >= 0 || q.y > 0 || q.harm) continue;
+    const I = ITEMS[q.k], need = I.cat === 'food' ? (I.hp && f.hp < (f.mhp * 3) / 5) || (I.mp && f.mp < 400 && !f.mini) : A.iw;
+    if (!need || (f.mini && I.cat === 'food')) continue;                                  // 雜兵不搶吃的
+    const d = Math.abs(q.x - f.x) + 2 * Math.abs(q.z - f.z);
+    if (d < bd) { bd = d; best = q; }
+  }
+  if (!best || (rx < 900 && ITEMS[best.k].cat !== 'food')) return -1;                    // 對方貼著就先打
+  const dx = best.x - f.x, dz = best.z - f.z;
+  if (Math.abs(dx) <= CHARS[f.ch].w + 100 && Math.abs(dz) < 250) return fresh ? BA : 0;
+  return (dx > 60 ? RIGHT : dx < -60 ? LEFT : 0) | (dz > 120 ? DOWN : dz < -120 ? UP : 0);
 }
 
 // 必殺的按法：防 → 方向 → 攻／跳，一幀一顆（中間放開，每顆都是新按下）
@@ -106,7 +139,7 @@ function flash(S, f, A) {
   const e = S.p[S.fwho];
   if (!e || e.team === f.team || !CAN_ACT.has(f.act)) return 0;
   const key = e.i * 65536 + ((S.f + S.freeze) & 0xffff);   // 幀號＋剩幾幀在定格中不變
-  if (A.seenF !== key) { A.seenF = key; A.fg = rnd(A) < LV[A.lv].guard ? 1 : 0; }
+  if (A.seenF !== key) { A.seenF = key; A.fg = rnd(A) < lvOf(A).guard ? 1 : 0; }
   if (!A.fg) return 0;
   A.q.length = 0;
   A.gt = 50;
@@ -114,7 +147,7 @@ function flash(S, f, A) {
 }
 
 function decide(S, f, A) {
-  const L = LV[A.lv], C = CHARS[f.ch], K = KIT[f.ch], R = REACH[f.ch];
+  const L = lvOf(A), C = CHARS[f.ch], K = KIT[f.ch], R = REACH[f.ch];
   if (STUNNED.has(f.act) && f.act !== 'block') { A.q.length = 0; A.gt = 0; A.pt = 0; A.chain = 0; A.eng = 0; return 0; }
   if (A.q.length) return A.q.shift();
 
@@ -150,6 +183,13 @@ function decide(S, f, A) {
       const last = m.hits[m.hits.length - 1].on[1];
       if (A.chain <= L.combo && f.t >= last + 2 && !(A.last & BA)) return BA | tw | (m.cr ? BS : 0);
       return tw | (m.cr ? BS : 0);
+    }
+    // 會連按加段的招：快到的時候按攻（會接拳的難度才會）
+    if (m.mash && f.ext < m.mash.n && f.mp >= m.mash.mp && L.combo >= 2 && f.t >= m.mash.at - 8 && f.t < m.mash.at && !(A.last & BA)) return BA;
+    // 必殺打中、最後一下打完：照難度再接一招必殺
+    if (m.kind === 'sp' && m.cancel && f.con === 1 && !f.air && L.combo >= 3 && f.t === m.hits[m.hits.length - 1].on[1] + 1) {
+      const s = pickRush(S, f, A, L, K, R, rx, adz, true);
+      if (s) { A.q = cmd(s, tw); return A.q.shift(); }
     }
     return f.air ? tw : 0;
   }
@@ -187,6 +227,10 @@ function decide(S, f, A) {
     if (s) { A.q = cmd(s, tw); return A.q.shift(); }
     if (inR(R.A1)) return BA | tw;
   }
+
+  // ---------- 地上的東西：舉著的丟過去、血少去撿吃的、空手去撿武器 ----------
+  const ib = itemAI(S, f, A, rx, adz, tw, zb);
+  if (ib >= 0) return ib;
 
   // ---------- 對方頭暈：走過去抓或打重拳 ----------
   if (o.act === 'dizzy') {
@@ -243,7 +287,7 @@ const inR2 = (r, rx, adz) => r && rx <= r.far - 40 && adz <= r.zr - 60;
 
 // 挑一招必殺：combo＝打到人後接的（只挑衝過去的和超必殺）；不然看距離挑
 function pickRush(S, f, A, L, K, R, rx, adz, combo) {
-  if (rnd(A) >= L.sp + (combo ? 40 : 0)) return null;
+  if (!L.sp || rnd(A) >= L.sp + (combo ? 40 : 0)) return null;
   const ok = (s) => f.mp >= s.m.mp && inR2(R[s.m.id], rx, adz);
   if (A.lv >= 2) for (const s of K.su) if (ok(s) && rnd(A) < 110) return s;
   for (const s of K.rush) if (ok(s)) return s;
@@ -315,7 +359,7 @@ function plan(S, f, A, L, K, R, o, rx, adz) {
   const aggr = L.aggr;
   add(far ? 60 : 50, 'walk');
   add(far ? aggr >> 2 : near ? 0 : aggr >> 3, 'run');
-  add(near ? 0 : (far ? 6 : 18), 'jump');
+  add(near ? K.jump >> 1 : (far ? 6 : 18) + K.jump, 'jump');
   add((256 - aggr) >> 3, 'wait');
   add(near ? (256 - aggr) >> 3 : 6, 'back');
   add(near && o.act === 'atk' ? L.guard >> 2 : near ? L.guard >> 4 : 0, 'guard');

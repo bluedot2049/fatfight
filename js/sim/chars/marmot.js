@@ -21,21 +21,29 @@ const N = {
 };
 
 const SP = [
+  // 往上衝：前兩下把人帶上去，最後一下打飛，到頂點停一下
   { id: 'tooth', name: '門牙衝天', yomi: 'monga sho-ten', d: 'u', btn: 'A', note: '對空，起手打不到',
-    m: mv('tooth', '門牙衝天', 30, { kind: 'sp', mp: 150, inv: [1, 8], jump: [3, 16, 130], land: 4, landW: 11,
-      hits: [hit([3, 16], [0, 300, 500, 1600], 'S', { dmg: 110, kd: 1, dvx: 14, dvy: 105 })] }) },
+    m: mv('tooth', '門牙衝天', 30, { kind: 'sp', mp: 150, inv: [1, 8], jump: [2, 16, 136], land: 4, landW: 11, hang: 6,
+      hits: [hit([2, 4], [0, 250, 500, 1600], 'S', { dmg: 32, fall: 0, carry: 1, stop: 5, hs: 24 }),
+        hit([6, 8], [0, 250, 500, 1600], 'S', { dmg: 32, fall: 0, carry: 1, stop: 5, hs: 24 }),
+        hit([10, 15], [0, 250, 520, 1700], 'S', { dmg: 62, kd: 1, dvx: 14, dvy: 110, stop: 13 })] }) },
   { id: 'burrow', name: '鑽地三圈', yomi: 'sanchi sanken', d: 'd', btn: 'A', note: '鑽進地底往前，按上下轉彎，再飛上來；在地底什麼都打不到',
     m: mv('burrow', '鑽地三圈', 44, { kind: 'sp', mp: 180, under: [6, 40], vx: [[0, 0], [8, 36], [40, 0]], zm: 22,
       jump: [40, 14, 120], land: 4, landW: 11, hits: [hit([40, 52], [-80, 0, 480, 1350], 'S', { dmg: 120, kd: 1, dvx: 14, dvy: 100 })] }) },
   { id: 'ball', name: '胖鼠翻滾', yomi: 'hanso honkon', d: 'f', btn: 'J', note: '縮成一顆滾過去，按上下可以偏',
-    m: mv('ball', '胖鼠翻滾', 48, { kind: 'sp', mp: 150, hurt: [-280, 0, 280, 720], vx: [[0, 0], [8, 70], [32, 18], [38, 0]], zm: 12,
-      hits: [hit([8, 32], [0, 0, 540, 720], 'S', { dmg: 90, kd: 1, dvx: 24, dvy: 75 })] }) },
+    m: mv('ball', '胖鼠翻滾', 48, { kind: 'sp', mp: 150, cancel: 1, hurt: [-280, 0, 280, 720], vx: [[0, 0], [6, 76], [32, 18], [38, 0]], zm: 12,
+      hits: [hit([6, 32], [0, 0, 540, 720], 'S', { dmg: 90, kd: 1, dvx: 30, dvy: 80 })] }) },
+  // 衝過一排人：每個碰到的咬一口往上彈，穿過去不停；再按攻多衝一段
+  { id: 'gnaw', name: '門牙連啃', yomi: 'monga renkon', d: 'f', btn: 'A', note: '衝過一排人一路咬，再按攻多衝一段',
+    m: mv('gnaw', '門牙連啃', 40, { kind: 'sp', mp: 160, cancel: 1, thru: 1, pose: 'gnaw', vx: [[0, 0], [4, 64], [30, 0]], zm: 14,
+      mash: { at: 27, to: 10, n: 1, mp: 50 },
+      hits: [hit([4, 30], [0, 200, 540, 1000], 'S', { dmg: 55, fall: 60, kd: 1, dvx: 8, dvy: 85, stop: 7 })] }) },
 ];
 
 const RUSH = [0, 0, 620, 1200];
 const SU = [
-  { id: 'frenzy', name: '狂妄連擊', yomi: 'kyo-bo- rengeki', d: 'u', btn: 'J', note: '衝過去一頓亂打',
-    m: mv('frenzy', '狂妄連擊', 90, { kind: 'su', mp: 400, flash: 1, inv: [0, 16], stick: 1, vx: [[0, 0], [6, 92], [26, 0]],
+  { id: 'frenzy', name: '狂妄連擊', yomi: 'kyo-bo- rengeki', d: 'u', btn: 'J', note: '衝過去一頓亂打，連按攻多打幾拳',
+    m: mv('frenzy', '狂妄連擊', 90, { kind: 'su', mp: 400, flash: 1, inv: [0, 16], stick: 1, vx: [[0, 0], [6, 92], [26, 0]], mash: { at: 62, to: 47, n: 2, mp: 60 },
       hits: [hit([6, 26], [0, 0, 600, 1100], 'S', { dmg: 60, fall: 0, hs: 30, stop: 4, dvx: 2 }), ...multi(32, 8, 5, RUSH, 40, 90)] }) },
 ];
 

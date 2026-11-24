@@ -3,6 +3,7 @@
 // 音效：全部現場合成（雜訊＋低頻），不載檔。打中要悶要重、擋住是清脆的一下、連擊越打音越高、聲音跟著位置偏左偏右。
 // 必殺、超必殺每隻角色一套（KIT：海牛深海水壓、胖鼠爆炸打雷），念招式名稱在 voice.js。音樂在 music.js，共用這裡的輸出。
 
+import { ITEMS } from '../sim/items.js';
 import { MOVES, CHARS } from '../sim/chars/index.js';
 import { speak } from './voice.js';
 
@@ -208,6 +209,7 @@ const KIT = {
       bubble(t) { noise(t, 0.08, 300, 1, 0.35, 'lowpass', 1600, 0.2); tone(t, 0.1, 70, 150, 0.4, 'sine', 0.18); sonar(t + 0.02, 1180, 0.7); },
       wave(t) { surf(t, 0.75, 1.1); via(lp(380), () => tone(t, 0.6, 55, 82, 0.4, 'sawtooth', 0.08)); sonar(t, 880, 0.5); bloops(t + 0.1, 5, 260); },
       tail(t) { noise(t, 0.2, 400, 1.4, 0.35, 'bandpass', 3800); tone(t, 0.2, 160, 720, 0.25, 'triangle'); noise(t + 0.12, 0.3, 3200, 0.8, 0.3, 'bandpass', 1100); bloops(t + 0.1, 4, 400); },
+      vortex(t) { surf(t, 1.0, 0.8); via(lp(420), () => tone(t, 0.9, 50, 95, 0.4, 'sawtooth', 0.2)); sonar(t + 0.05, 660, 0.6); bloops(t + 0.2, 9, 200); },   // 漩渦：浪捲起來、低音往上轉
     },
     super(t) {
       sonar(t, 740, 1.2); sonar(t + 0.24, 740, 0.5);
@@ -231,6 +233,7 @@ const KIT = {
       tooth(t) { via(crush(5), () => tone(t, 0.2, 140, 1700, 0.22, 'sawtooth')); crackle(t, 0.22, 18, 3200, 0.3, 0.6); noise(t + 0.05, 0.04, 3000, 0.7, 0.5, 'highpass'); },
       burrow(t) { boom(t, 0.55); drill(t + 0.08, 0.55); crackle(t + 0.1, 0.5, 20, 1300, 0.18); },
       ball(t) { rumble(t, 0.65, 0.5, 220); crackle(t, 0.6, 30, 1800, 0.16); noise(t, 0.4, 400, 1.2, 0.25, 'bandpass', 1600); crackle(t + 0.1, 0.4, 8, 4200, 0.2); },
+      gnaw(t) { via(crush(5), () => tone(t, 0.12, 300, 1200, 0.2, 'sawtooth')); crackle(t, 0.5, 26, 2600, 0.24, 0.5); rumble(t, 0.45, 0.4, 260); },   // 衝出去：電弧劈啪往前拉
     },
     cue: {   // 鑽地飛出來：地面炸開
       burrow: { up(t) { boom(t, 0.9); noise(t, 0.04, 2600, 0.7, 0.5, 'highpass'); via(crush(5), () => tone(t, 0.25, 200, 1400, 0.18, 'sawtooth')); crackle(t, 0.2, 14, 3600, 0.3); } },
@@ -290,6 +293,19 @@ const SND = {
     else noise(t, 0.18, 600, 1.2, 0.28, 'bandpass', 2400);
   },
   bubble() { const t = ctx.currentTime; tone(t, 0.12, 300, 900, 0.3); tone(t + 0.05, 0.1, 500, 1200, 0.2); noise(t, 0.1, 1800, 2, 0.15, 'bandpass', 700); tone(t, 0.25, 120, 45, 0.5); bloops(t + 0.04, 4, 380); },
+  // 集氣：低音往上爬；集滿亮一聲
+  charge() { const t = ctx.currentTime; tone(t, 0.75, 90, 420, 0.35, 'sine', 0.1); noise(t, 0.7, 300, 1, 0.2, 'bandpass', 1400, 0.3); bloops(t + 0.1, 6, 300); },
+  chargeMax() { const t = ctx.currentTime; tone(t, 0.4, 1320, 1320, 0.14, 'triangle', 0.003); tone(t, 0.4, 1980, 1980, 0.08, 'sine', 0.003); noise(t, 0.05, 5000, 1, 0.25, 'highpass'); },
+  // 地上的東西：撿起來、丟、落地、敲到、破掉、炸、吃一口
+  ipick({ heavy }) { const t = ctx.currentTime; if (heavy) { tone(t, 0.18, 120, 70, 0.4); noise(t, 0.15, 400, 1, 0.25, 'lowpass'); } else { tone(t, 0.06, 520, 780, 0.12, 'triangle'); noise(t, 0.04, 2400, 1.5, 0.12); } },
+  ithrow() { const t = ctx.currentTime; noise(t, 0.16, 500, 1.4, 0.25, 'bandpass', 2600); tone(t, 0.12, 300, 160, 0.12, 'triangle'); },
+  iland({ heavy }) { const t = ctx.currentTime; if (heavy) { tone(t, 0.2, 110, 40, 0.6); noise(t, 0.14, 300, 0.8, 0.45, 'lowpass'); } else { tone(t, 0.05, 900, 700, 0.12, 'triangle'); noise(t, 0.04, 1800, 2, 0.15); } },
+  iknock() { const t = ctx.currentTime; noise(t, 0.06, 900, 2, 0.35); tone(t, 0.08, 260, 180, 0.3, 'triangle'); },
+  ibreak() { const t = ctx.currentTime; noise(t, 0.18, 1200, 1, 0.45); crackle(t, 0.2, 10, 1800, 0.3); tone(t, 0.12, 200, 90, 0.35); },
+  explode() { const t = ctx.currentTime; boom(t, 1); thunder(t + 0.02, 0.7); crackle(t + 0.05, 0.5, 20, 1600, 0.25, 0.5); },
+  sip({ mp }) { const t = ctx.currentTime; tone(t, 0.08, 300, 180, 0.2); bloops(t + 0.04, 2, 260, 0.6); const f = mp ? 1175 : 880; tone(t + 0.1, 0.25, f, f, 0.08, 'triangle', 0.005); tone(t + 0.18, 0.3, f * 1.5, f * 1.5, 0.06, 'triangle', 0.005); },
+  // 被打飛撞到場邊：悶一聲加碎石
+  wall() { const t = ctx.currentTime; noise(t, 0.2, 260, 0.7, 0.7, 'lowpass'); tone(t, 0.3, 120, 32, 0.8); crackle(t + 0.02, 0.25, 12, 2400, 0.25); },
   pop() { const t = ctx.currentTime; tone(t, 0.07, 950, 280, 0.3); noise(t, 0.035, 5200, 1, 0.3, 'highpass'); tone(t + 0.04, 0.09, 1400, 1900, 0.1); },
   // 超必殺：角色有自己那套就用；沒有的話往上衝的蓄力、閃亮的幾個音，最後一聲轟
   super({ ch }) {
@@ -347,8 +363,8 @@ const SND = {
     lastVoice[who] = speak(ctx, dest, noiseBuf, e.yomi, { amp: 0.5, ...c.voice }, t + 0.03);
   },
 };
-const ECHO = { hit: 0.25, shatter: 0.5, super: 0.5, ko: 0.9, fight: 0.5, clash: 0.4, win: 0.3, voice: 0.15 };
-const VERB = { super: 0.9, whoosh: 0.35, cue: 0.5, hit: 0.3, voice: 0.12, ko: 0.4 };
+const ECHO = { hit: 0.25, explode: 0.5, wall: 0.2, shatter: 0.5, super: 0.5, ko: 0.9, fight: 0.5, clash: 0.4, win: 0.3, voice: 0.15 };
+const VERB = { super: 0.9, explode: 0.6, whoosh: 0.35, cue: 0.5, hit: 0.3, voice: 0.12, ko: 0.4 };
 
 // play('hit', { big: 1 }, 偏左偏右)。舊的寫法 play('beep', 1) 也收
 export function play(name, arg = {}, pan = 0) {
@@ -372,6 +388,18 @@ export function sfxEvent(e, pan = 0, S = null) {
     case 'dizzy': play('dizzy', e, pan); break;
     case 'sp': play('whoosh', { ...e, ch }, pan); play('voice', { ch, id: e.id, who: e.s }, pan * 0.6); break;
     case 'proj': play('bubble', e, pan); break;
+    case 'chg': play('charge', e, pan); break;
+    case 'chgmax': play('chargeMax', e, pan); break;
+    case 'ext': if (S?.p[e.s]?.mv !== 'bubble') play('whoosh', { ...e, ch }, pan); break;   // 連按加段：再一聲出手（泡泡的話吐泡泡那聲就夠）
+    case 'wall': play('wall', e, pan); break;
+    case 'ipick': play('ipick', { heavy: ITEMS[e.ik]?.cat === 'heavy' }, pan); break;
+    case 'ithrow': play('ithrow', e, pan); break;
+    case 'iland': play('iland', { heavy: ITEMS[e.ik]?.cat === 'heavy' }, pan); break;
+    case 'iknock': play('iknock', e, pan); break;
+    case 'ibreak': play('ibreak', e, pan); break;
+    case 'boom': play('explode', e, pan); break;
+    case 'sip': play('sip', e, pan); break;
+    case 'iempty': play('pop', e, pan); break;
     case 'super': play('super', { ...e, ch }, pan * 0.5); play('voice', { ch, id: e.id, who: e.s, force: 1, su: 1 }, pan * 0.4); break;
     case 'ko': play('ko'); break;
     case 'land': play('land', e, pan); break;

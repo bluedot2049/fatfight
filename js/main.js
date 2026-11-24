@@ -15,7 +15,7 @@ import { magicCircle } from './ui/arcane.js';
 import { CardStage } from './view/cardstage.js';
 import { newMatch, step, setCpu } from './sim/match.js';
 import { newQuest } from './sim/quest.js';
-import { ORDER } from './sim/quests/index.js';
+import { ORDER, QUESTS } from './sim/quests/index.js';
 import { LV_MAX } from './sim/ai.js';
 import { CHARS, MOVES } from './sim/chars/index.js';
 import { LEFT, RIGHT, BD, BJ, BS } from './sim/const.js';
@@ -59,6 +59,15 @@ const mine = () => (G.S.quest ? G.S.p.find((f) => f.pl === 0) : G.S.p[G.kind ===
 const MOVES_KEY = 'fatfight.moves';
 let movesOn = false;
 try { movesOn = localStorage.getItem(MOVES_KEY) === '1'; } catch {}
+// 對戰掉道具（記在瀏覽器；線上一律開，兩邊才一樣）
+const ITEMS_KEY = 'fatfight.items';
+let itemsOn = true;
+try { itemsOn = localStorage.getItem(ITEMS_KEY) !== '0'; } catch {}
+function setItemsOn(on) {
+  itemsOn = on;
+  if (G.S?.opt && !G.S.quest) G.S.opt.items = on ? 1 : 0;
+  try { localStorage.setItem(ITEMS_KEY, on ? '1' : '0'); } catch {}
+}
 function setMovesOn(on) {
   movesOn = on; hud.showMoves(on);
   try { localStorage.setItem(MOVES_KEY, on ? '1' : '0'); } catch {}
@@ -203,7 +212,7 @@ function startFight(c0, c1) {
   menu.hide(); closeOverlay(); cards3d?.stop();
   view.camOffset = 0;
   G.chars = [c0, c1];
-  G.S = newMatch(c0, c1, { train: G.kind === 'train', cpu: G.kind === 'cpu' ? G.cpuLv : undefined });
+  G.S = newMatch(c0, c1, { train: G.kind === 'train', cpu: G.kind === 'cpu' ? G.cpuLv : undefined, items: itemsOn });
   if (G.kind === 'train' && G.dummy === 6) setCpu(G.S, 1, TRAIN_CPU);
   G.mode = 'fight'; G.paused = false; acc = 0; G.overShown = false;
   hud.show(true); hud.setNames(G.S); hud.setMoves(G.S, 0); hud.showMoves(movesOn);
@@ -211,12 +220,12 @@ function startFight(c0, c1) {
   music.muffle(false); music.level(1); music.battle();
 }
 
-// 闖關：一個人（之後兩人合作），從第一關開始
-function startQuest(c0, id = ORDER[0]) {
+// 闖關：一個人（之後兩人合作），從第一關開始；carry：過關後打下一關，帶著上一關的分數和命
+function startQuest(c0, id = ORDER[0], carry = null) {
   menu.hide(); closeOverlay(); cards3d?.stop();
   view.camOffset = 0;
   G.kind = 'quest'; G.chars = [c0]; G.quest = id;
-  G.S = newQuest([c0], id, { seed: (Math.random() * 0x7fffffff) | 0 });
+  G.S = newQuest([c0], id, { seed: (Math.random() * 0x7fffffff) | 0, ...(carry || {}) });
   G.mode = 'fight'; G.paused = false; acc = 0; G.overShown = false;
   hud.show(true); hud.setNames(G.S); hud.setMoves(G.S, 0); hud.showMoves(movesOn);
   document.body.classList.remove('at-title');
@@ -240,6 +249,7 @@ function pauseMenu() {
     const setDummy = (n) => { G.dummy = (n + DUMMY.length) % DUMMY.length; setCpu(G.S, 1, G.dummy === 6 ? TRAIN_CPU : -1); hud.setNames(G.S); };
     items.push({ label: '對手', value: () => DUMMY[G.dummy], on: () => setDummy(G.dummy + 1), cycle: (d) => setDummy(G.dummy + d) });
   }
+  if (G.kind !== 'quest') items.push({ label: '道具', value: () => (itemsOn ? '會掉' : '不掉'), on: () => setItemsOn(!itemsOn), cycle: () => setItemsOn(!itemsOn) });
   items.push({ label: '判定框', value: () => (view.debug ? '顯示' : '不顯示'), on: () => { view.debug = !view.debug; }, cycle: () => { view.debug = !view.debug; } });
   if (G.kind === 'quest') items.push({ label: '從頭再打', on: () => startQuest(G.chars[0], G.quest) });
   items.push(soundItem(), { label: '換角色', on: () => toSelect(G.kind) }, { label: '回標題', on: toTitle });
@@ -259,10 +269,12 @@ function showResult() {
   }
   if (G.kind === 'quest') {
     const won = G.S.winner === 0, sc = G.S.score[0].toLocaleString('en-US');
+    const next = won ? ORDER[ORDER.indexOf(G.quest) + 1] : null;
+    const items = [{ label: '再打一次', on: () => startQuest(G.chars[0], G.quest) }, { label: '換角色', on: () => toSelect('quest') }, { label: '回標題', on: toTitle }];
+    if (next) items.unshift({ label: '下一關', on: () => startQuest(G.chars[0], next, { score: [...G.S.score], lives: [...G.S.lives] }) });
     menu.show({
-      title: won ? '過關' : '結束', sub: `分數 ${sc}${G.S.conts ? `　接關 ${G.S.conts} 次` : ''}${won ? '　下一關還在蓋' : ''}`, cls: 'result',
-      items: [{ label: '再打一次', on: () => startQuest(G.chars[0], G.quest) }, { label: '換角色', on: () => toSelect('quest') }, { label: '回標題', on: toTitle }],
-      back: () => {},
+      title: won ? '過關' : '結束', sub: `分數 ${sc}${G.S.conts ? `　接關 ${G.S.conts} 次` : ''}${won && !next ? '　下一關還在蓋' : ''}`, cls: 'result',
+      items, back: () => {},
     });
     return;
   }
@@ -401,8 +413,8 @@ function netStatus() {
 
 // ---------- 開始 ----------
 if (qs.has('debug')) window.__g = { G, view, hud, keys, menu, touch, step, newMatch, CHARS, music, play };
-// ?fight=manatee,marmot 直接進本機對戰（截圖、測試用）；&train 練習；&cpu=3 對電腦（幾級）；?quest=marmot 直接闖關
-if (qs.has('quest')) startQuest(CHARS[qs.get('quest')] && !CHARS[qs.get('quest')].npc ? qs.get('quest') : 'marmot');
+// ?fight=manatee,marmot 直接進本機對戰（截圖、測試用）；&train 練習；&cpu=3 對電腦（幾級）；?quest=marmot 直接闖關、&stage=tunnel 從哪一關開始
+if (qs.has('quest')) startQuest(CHARS[qs.get('quest')] && !CHARS[qs.get('quest')].npc ? qs.get('quest') : 'marmot', QUESTS[qs.get('stage')] ? qs.get('stage') : ORDER[0]);
 else if (qs.has('fight')) {
   const [a, b] = (qs.get('fight') || 'manatee,marmot').split(',');
   G.kind = qs.has('train') ? 'train' : qs.has('cpu') ? 'cpu' : 'local';

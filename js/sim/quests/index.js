@@ -3,6 +3,7 @@
 // 闖關的關卡登記表：加一關＝quests/ 加一支檔、這裡加一行（ORDER 是打的順序）。
 
 import sea from './sea.js';
+import tunnel from './tunnel.js';
 
-export const QUESTS = { sea };
-export const ORDER = ['sea'];
+export const QUESTS = { sea, tunnel };
+export const ORDER = ['sea', 'tunnel'];

@@ -41,6 +41,7 @@ export default {
   id: 'sealion', name: '海獅', full: '沉船的海獅', color: '#ff8a6a', npc: 1,      // npc：不在選角卡裡（闖關的頭目）
   blurb: '頂球、滑壘、整隻壓下來', stat: [5, 4, 1],
   pal: ['#e0604a', '#4a1410'], card: { attr: '水', type: '頂球之獸', lv: 6, art: 'sea' },
+  shot: ['#d8453a', '#f4eadc'],   // 頂出去的球（畫面用）：主色、中間那條帶子
   voice: { f0: 70, size: 0.8, mora: 0.14 },
   w: 460, h: 1500, hc: 1000,
   walkX: 13, walkZ: 9, run: 38, runZ: 8, jumpV: 130, jumpX: 14, jumpZ: 10, dashV: 95, dashX: 48,
