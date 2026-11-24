@@ -4,8 +4,9 @@
 
 import { Z_REACH, DIZZY, KNOCK, BREAK, MP, MP_GAIN, BODY_V, PUSH_Z, BD, JD_WIN, JD_WIN_Q, JD_LOCK, JD_RECOIL, JD_PUSH, JD_STOP, GANG_T } from './const.js';
 import { CHARS, MOVES } from './chars/index.js';
-import { moveOf, strikeInv, isUnder, setAct, release, startMove, GUARD_MIN } from './fighter.js';
+import { moveOf, strikeInv, isUnder, setAct, release, startMove, GUARD_MIN, crackBoom } from './fighter.js';
 import { itemHits, wear, dropItem } from './item.js';
+import { WEAR_HIT, WPN_KNOCK } from './items.js';
 
 const box = (f, b) => {
   const xa = f.x + f.face * b[0], xb = f.x + f.face * b[2];
@@ -155,7 +156,7 @@ function applyHit(S, a, d, h, kind, fromX, isProj, m = null) {
   }
   d.stop = h.stop;
   if (!isProj) { a.stop = h.stop; a.con = 1; }
-  if (d.item >= 0 && (d.ik !== 1 || d.act === 'fall')) dropItem(S, d, dir);   // 被打：重物、吃的一定掉，武器被打飛才掉
+  if (d.item >= 0 && (d.ik !== 1 || d.act === 'fall' || h.fall >= WPN_KNOCK || kind === 'sp' || kind === 'su')) dropItem(S, d, dir);   // 被打：重物、吃的一定掉，武器被重擊、必殺、打飛才掉
   S.ev.push({ k: 'hit', s: a.i, d: d.i, x: ex, y: ey, z: ez, big: h.fall >= KNOCK || kind === 'su' || h.kd ? 1 : 0, dmg: h.dmg, combo: d.combo, kind, stop: h.stop });
 }
 
@@ -237,7 +238,7 @@ export function resolveHits(S, booms = []) {
     a.hitList.push(i * 16 + d.i);
     if (!hittable(d)) continue;          // 同一幀被兩個人打，第一下打倒了就不再算
     applyHit(S, a, d, h, kind, a.x, false, m);
-    if (m.wpn) wear(S, a);
+    if (m.wpn) wear(S, a, WEAR_HIT);
   }
   bodyHits(S);
   // 道具：丟出去的撞人、地上的被打破；炸開的一起算
@@ -258,6 +259,7 @@ export function resolveHits(S, booms = []) {
   }
   for (const q of pr) {
     if (q.life <= 0) continue;
+    if (q.gr) { crackHits(S, q); continue; }
     const qb = [q.x - q.w, q.y - q.h, q.x + q.w, q.y + q.h];
     for (const d of S.p) {
       if (d.team === q.team || !hittable(d) || Math.abs(d.z - q.z) > Z_REACH) continue;
@@ -265,15 +267,38 @@ export function resolveHits(S, booms = []) {
       q.life = 0;
       // 集滿的大泡泡：一定打倒、飛得遠、頓得重
       const h = q.big ? { dmg: q.dmg, fall: 80, bdef: 60, hs: 24, stop: 14, dvx: 40, dvy: 85, kd: 1, y: q.y }
-        : { dmg: q.dmg, fall: q.fall, bdef: 40, hs: 19, stop: 9, dvx: 26, dvy: 55, kd: 0, y: q.y };
+        : { dmg: q.dmg, fall: q.fall, bdef: 40, hs: 19, stop: 9, dvx: q.dvx ?? 26, dvy: q.dvy ?? 55, kd: q.kd ?? 0, y: q.y };
       applyHit(S, S.p[q.o], d, h, 'sp', q.x - q.vx, true);
       break;
     }
   }
 }
 
+// 地裂：竄的時候碰到敵人就原地炸開；炸開的柱子裡每個人打一次（往上彈）
+function crackHits(S, q) {
+  const a = S.p[q.o], b = MOVES[a.ch][q.mv].proj.boom;
+  const reach = (d) => d.team !== q.team && hittable(d) && Math.abs(d.z - q.z) <= Z_REACH &&
+    hurtBoxes(d).some((hb) => overlap([q.x - q.w, q.y - q.h, q.x + q.w, q.y + q.h], box(d, hb)));
+  if (!q.bt) { if (!S.p.some(reach)) return; crackBoom(S, q, b); }
+  for (const d of S.p) {
+    if (q.hl.includes(d.i) || !reach(d)) continue;
+    q.hl.push(d.i);
+    applyHit(S, a, d, { dmg: q.dmg, fall: q.fall, bdef: 45, hs: 22, stop: 11, dvx: q.dvx ?? 16, dvy: q.dvy ?? 90, kd: q.kd ?? 1, y: 600 }, 'sp', q.x - q.vx, true);
+  }
+}
+
 export function moveProjectiles(S) {
   for (const q of S.pr) {
+    if (q.gr) {
+      // 地裂：炸開的時候停住；還在竄的時候出手的人不在這招了（被打斷）就消失，竄到底就炸
+      const a = S.p[q.o];
+      if (q.bt) { q.bt--; q.t++; q.life--; continue; }
+      if (a.act !== 'atk' || a.mv !== q.mv) { q.life = 0; S.ev.push({ k: 'fizzle', s: q.o, x: q.x, z: q.z, id: q.id }); continue; }
+      q.x += q.vx; q.t++; q.life--;
+      if (q.x < S.lo || q.x > S.hi) { q.x = Math.max(S.lo, Math.min(S.hi, q.x)); q.life = 0; }
+      if (q.life <= 0) crackBoom(S, q, MOVES[a.ch][q.mv].proj.boom);
+      continue;
+    }
     q.x += q.vx; q.t++; q.life--;
     if (q.x < S.lo - 600 || q.x > S.hi + 600) q.life = 0;   // 飛出場地才消失（原本寫死 5200，場地加寬後在場邊射不出來）
   }

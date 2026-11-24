@@ -252,6 +252,15 @@ function attackPose(f, m, t, clock) {
     if (t <= end) return dash;
     return mix(dash, BASE.idle, Math.min(1, (t - end) / 8));
   }
+  if (id === 'crack') {                             // 地裂雷：兩手舉高 → 拍地 → 手按著地壓低（控制裂縫，身體跟著抖）→ 收（提早炸的話 t 直接跳到收招）
+    const at = m.proj.at, end = m.total - (m.proj.boom?.rec || 8);
+    const up = { aN: 2.7, aF: 2.5, sq: 0.1, lean: -0.15, head: -0.25 };
+    const slam = { sq: -0.22, by: -0.04, lean: 0.34, bend: 0.32, aN: 1.35, aF: 1.3, head: -0.05, tail: 0.4 };
+    if (t < at) return mix(BASE.idle, up, ease(Math.min(1, t / Math.max(1, at - 2))));
+    if (t < at + 2) return mix(up, slam, (t - at + 1) / 2);
+    if (t < end) { const s = Math.sin(clock * 50); return over(slam, { sq: slam.sq + 0.03 * s, aN: slam.aN + 0.06 * s, aF: slam.aF - 0.06 * s }); }
+    return mix(slam, BASE.idle, ease(Math.min(1, (t - end) / Math.max(1, m.total - end))));
+  }
   if (id === 'frenzy') {                             // 衝過去（照 vx 停下那幀）→ 亂打 → 最後一下往上打（照最後一下的幀數；兩版節奏不同也對得上）
     const dash = m.vx[m.vx.length - 1][0], fin = m.hits[m.hits.length - 1].on[0] - 2;
     if (t < dash) return BASE.run;

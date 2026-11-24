@@ -124,7 +124,8 @@ function cardHtml(c, i) {
 
 // 選角：mode 'local' 兩人各用自己的鍵；'train'、'cpu' P1 先選自己再選對手；'quest' 只選自己一隻；'online' 只選自己那邊（side），對方的由 setOther 更新
 // onHover(c0, c1)：游標停在誰身上
-export function selectScreen({ mode, side = 0, done, back, onPick, onHover }) {
+// coop：線上闖關（兩人各選一隻、同一隊，中間不寫 VS）
+export function selectScreen({ mode, side = 0, coop = false, done, back, onPick, onHover }) {
   const st = { cur: [0, 1], ok: [false, false], step: 0 };
   const one = mode === 'quest';                          // 只選自己（闖關）
   const solo = mode === 'train' || mode === 'cpu' || one;   // 一個人選：先選自己、再選對手（one 就只選自己）
@@ -149,9 +150,9 @@ export function selectScreen({ mode, side = 0, done, back, onPick, onHover }) {
     back,
     html: () => `<div class="sel-bg"><div class="bigc">${magicCircle({ seed: 'table', runes: 24, star: 6 })}</div></div>
       <div class="fit9">
-        <div class="sel-h">${gt('選角色', { sw: 0.05, k: 0.06 })}<small>${MODE[mode]}<span class="hint"></span></small></div>
+        <div class="sel-h">${gt('選角色', { sw: 0.05, k: 0.06 })}<small>${coop ? '線上闖關' : MODE[mode]}<span class="hint"></span></small></div>
         <div class="cards">${ROSTER.map(cardHtml).join('')}</div>
-        <div class="info"><div class="pi p0"></div><div class="vsbox">${gt('VS', { sw: 0.05, k: 0.06 })}</div><div class="pi p1"></div></div>
+        <div class="info"><div class="pi p0"></div><div class="vsbox">${gt(coop ? '&' : 'VS', { sw: 0.05, k: 0.06 })}</div><div class="pi p1"></div></div>
         <div class="keys">${keys()}</div>
       </div>`,
     // 之後每次只改這些：卡的鎖定和游標、下面兩欄、提示

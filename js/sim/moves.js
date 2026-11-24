@@ -8,7 +8,9 @@
 //           hs 受擊硬直, stop 頓格, dvx dvy 倒地時往後、往上飛多快, kd 一定打倒 }]
 //   vx    [[從第幾幀, 往前速度], …]；stick 1＝打到人之後不再往前（角色會互相穿過，衝刺連打要停在對方面前）；zm 出招中按上下還能前後移動多快；jump [第幾幀起跳, 往前速度, 往上速度]＋land 打中時落地硬直、landW 揮空或被擋的落地硬直
 //   inv   [起,迄] 打不到；under [起,迄] 鑽到地底（什麼都打不到）
-//   proj  { at 第幾幀射出, x 從身前多遠, y 高度, vx, w, h, dmg, fall, life }
+//   proj  { at 第幾幀射出, x 從身前多遠, y 高度, vx, w, h, dmg, fall, life }；另外可寫 kd dvx dvy（打中怎麼飛，沒寫照預設）
+//         gr 1＝貼地的裂縫（view 畫裂縫不畫球）：zm 出招中按上下轉彎多快；boom { w, h, t, rec }＝碰到人或竄到底就原地炸開 t 幀（框換成 w h、y＝h，
+//         炸開範圍內每個人打一次），出招中再按攻當場炸、出招跳到剩 rec 幀；出招被打斷（不在這招了）裂縫還沒炸就消失
 //   cr    蹲著出的招（受擊框變矮）；next 打到人後按著蹲再按攻接哪一招
 //   mp    要多少魔力；flash 超必殺的定格；cancel 1＝打到人之後可以接必殺
 //   pose  畫面用哪個姿勢（poses.js 的 ATK 表，跟 KOF 版共用同一套角色和姿勢）
@@ -40,7 +42,12 @@ function tune(m) {
   if (m.landW) m.landW = T(m.landW);
   m.inv = R(m.inv); m.under = R(m.under);
   if (m.zm) m.zm = ZM(m.zm);
-  if (m.proj) m.proj = { ...m.proj, w: m.proj.w + BOX_P, h: m.proj.h + BOX_P, at: T(m.proj.at), life: T(m.proj.life), vx: PROJ_V(m.proj.vx) };
+  if (m.proj) {
+    const p = (m.proj = { ...m.proj, w: m.proj.w + BOX_P, h: m.proj.h + BOX_P, at: T(m.proj.at), life: T(m.proj.life), vx: PROJ_V(m.proj.vx) });
+    if (p.zm) p.zm = ZM(p.zm);
+    if (p.dvx) p.dvx = LAUNCH_X(p.dvx);
+    if (p.boom) p.boom = { w: p.boom.w + BOX_P, h: p.boom.h + BOX_P, t: T(p.boom.t), rec: T(p.boom.rec) };
+  }
   if (m.hang) m.hang = T(m.hang);
   if (m.mash) m.mash = { ...m.mash, at: T(m.mash.at), to: T(m.mash.to) };
   if (m.charge) m.charge = { at: T(m.charge.at), max: T(m.charge.max) };

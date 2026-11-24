@@ -7,7 +7,7 @@ import { hit, mv } from './moves.js';
 // 一種東西的欄位：
 //   name 名字；cat 'light' 輕武器（拿在手上揮）／'heavy' 重物（舉起來丟）／'food' 吃的喝的（一口一口）
 //   w h   判定框半寬、高（丟出去撞人、地上被打用）
-//   swing [第一下, 第二下] 拿著按攻輪流出的招（輕武器）；dur 打中幾下就壞掉
+//   swing [第一下, 第二下] 拿著按攻輪流出的招（輕武器）；dur 耐用（揮空扣 WEAR_SWING、打中一個人扣 WEAR_HIT，扣完就壞）
 //   thr   丟出去：{ vx 往前, vy 往上, g 重力, dmg, fall, kd, dvx, dvy, stop }
 //   brk   地上被打幾下會破（寶箱、木箱、炸藥桶）；drop 破掉掉出什麼（照順序輪）；land 1＝丟出去落地也會破
 //   boom  { r 範圍, dmg } 破掉就炸（炸到丟的人那隊以外的人）
@@ -15,7 +15,7 @@ import { hit, mv } from './moves.js';
 //   hp mp 一口補多少；sips 幾口
 export const ITEMS = {
   // ---- 競技場（對戰從天上掉）----
-  sword: { name: '木劍', cat: 'light', w: 300, h: 140, swing: ['w_sword1', 'w_sword2'], dur: 14,
+  sword: { name: '木劍', cat: 'light', w: 300, h: 140, swing: ['w_sword1', 'w_sword2'], dur: 20,
     thr: { vx: 92, vy: 10, g: 2, dmg: 60, fall: 70, kd: 1, dvx: 30, dvy: 60, stop: 8 } },
   crate: { name: '木箱', cat: 'heavy', w: 300, h: 420, brk: 3, land: 1, drop: ['redpot', 'bluepot'],
     thr: { vx: 66, vy: 46, g: 7, dmg: 90, fall: 80, kd: 1, dvx: 36, dvy: 70, stop: 10 } },
@@ -26,7 +26,7 @@ export const ITEMS = {
   bluepot: { name: '藍藥水', cat: 'food', w: 120, h: 260, hp: 0, mp: 100, sips: 5,
     thr: { vx: 88, vy: 10, g: 2, dmg: 30, fall: 30, kd: 0, dvx: 20, dvy: 40, stop: 5 } },
   // ---- 第一關海底沉船 ----
-  harpoon: { name: '魚叉', cat: 'light', w: 420, h: 120, swing: ['w_harpoon1', 'w_harpoon2'], dur: 12,
+  harpoon: { name: '魚叉', cat: 'light', w: 420, h: 120, swing: ['w_harpoon1', 'w_harpoon2'], dur: 18,
     thr: { vx: 110, vy: 6, g: 1, dmg: 80, fall: 80, kd: 1, dvx: 34, dvy: 55, stop: 10 } },
   chest: { name: '沉船寶箱', cat: 'heavy', w: 300, h: 380, brk: 3, land: 1, drop: ['seaweed', 'jelly'],
     thr: { vx: 64, vy: 46, g: 7, dmg: 90, fall: 80, kd: 1, dvx: 36, dvy: 70, stop: 10 } },
@@ -37,9 +37,9 @@ export const ITEMS = {
   jelly: { name: '水母罐', cat: 'food', w: 130, h: 260, hp: 0, mp: 100, sips: 5,
     thr: { vx: 88, vy: 10, g: 2, dmg: 30, fall: 30, kd: 0, dvx: 20, dvy: 40, stop: 5 } },
   // ---- 第二關地道 ----
-  pick: { name: '鶴嘴鎬', cat: 'light', w: 340, h: 200, swing: ['w_pick1', 'w_pick2'], dur: 10,
+  pick: { name: '鶴嘴鎬', cat: 'light', w: 340, h: 200, swing: ['w_pick1', 'w_pick2'], dur: 14,
     thr: { vx: 84, vy: 18, g: 3, dmg: 85, fall: 80, kd: 1, dvx: 36, dvy: 70, stop: 11 } },
-  torch: { name: '火把', cat: 'light', w: 260, h: 160, swing: ['w_torch1', 'w_torch2'], dur: 10,
+  torch: { name: '火把', cat: 'light', w: 260, h: 160, swing: ['w_torch1', 'w_torch2'], dur: 14,
     thr: { vx: 90, vy: 14, g: 2, dmg: 60, fall: 70, kd: 1, dvx: 30, dvy: 60, stop: 8 } },
   keg: { name: '炸藥桶', cat: 'heavy', w: 260, h: 420, brk: 1, land: 1, boom: { r: 1700, dmg: 120 },
     thr: { vx: 62, vy: 46, g: 7, dmg: 60, fall: 80, kd: 1, dvx: 30, dvy: 70, stop: 8 } },
@@ -56,6 +56,9 @@ export const ARENA_POOL = ['sword', 'redpot', 'crate', 'bluepot', 'rubble', 'swo
 export const ITEM_GAP = 720;      // 對戰每幾幀掉一個（12 秒）
 export const ITEM_MAX = 4;        // 對戰地上最多幾個（拿在手上的不算）
 export const ITEM_LIFE = 1800;    // 放在地上多久沒人撿就消失（30 秒）
+export const WEAR_SWING = 1;     // 武器揮空扣多少耐用
+export const WEAR_HIT = 2;       // 武器打中一個人扣多少
+export const WPN_KNOCK = 60;     // 拿著武器被打：倒值這麼重（或被必殺打到）武器就脫手
 export const ITEM_REACH = 140;    // 撿得到：東西的中心在身體裡、或離身體邊緣這麼近（要站到東西上，站旁邊按攻是打它）
 
 // 撿、丟、喝這些動作（每隻角色都有，跟 SYS 一起放進 MOVES）。it：{ do 做什麼, at 第幾幀 }

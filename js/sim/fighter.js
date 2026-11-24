@@ -5,8 +5,8 @@
 import { MP, MP_REGEN, HP, GRAV, Z_NEAR, Z_FAR, SPEED, SLOW, AIR_STEER, BOUNCE_V, WALL_V, WAKE_IV, DOWN_T, DOWN_QUICK, LEFT, RIGHT, BA, BJ, BD, BS } from './const.js';
 import { CHARS, MOVES } from './chars/index.js';
 import { newHistory, record, pressed, pressedBoth, consume, consumeCommand, command, tapTwice, useTap, holding, dirX, dirZ } from './input.js';
-import { ITEMS } from './items.js';
-import { heldItem, pickTry, itemAct, keepSipping, dropItem } from './item.js';
+import { ITEMS, WEAR_SWING } from './items.js';
+import { heldItem, pickTry, itemAct, keepSipping, dropItem, wear } from './item.js';
 
 export const FREE = new Set(['stand', 'walk', 'crouch']);
 const GRAB_TIME = 85;           // 抓住最多幾幀，時間到對方掙脫
@@ -112,6 +112,17 @@ function punch(S, f) {
   startMove(S, f, m);
 }
 
+// 手上有東西、防＋攻同按（沒按方向）：直接丟出去（重物丟重物的招）
+function tryToss(S, f) {
+  if (!f.ik) return false;
+  const b = pressedBoth(f.H, BD, BA);
+  if (!b) return false;
+  consume(f.H, b[0]); consume(f.H, b[1]);
+  faceInput(f);
+  startMove(S, f, MOVES[f.ch][f.ik === 2 ? 'iHThrow' : 'iThrow']);
+  return true;
+}
+
 // 兩鍵同按：攻＋跳＝吹飛、跳＋防＝翻滾（往按著的方向滾）
 function tryCombo(S, f) {
   const H = f.H;
@@ -195,6 +206,7 @@ export function think(S, f, noInput) {
 
   // 出招中：普通技打到人之後可以接必殺、打完那下就能接下一拳；揮空的話收招最後一段可以翻滾、防、跳
   if (m) {
+    if ((m.wpn || m.id === 'iDrink') && f.t <= 2 && tryToss(S, f)) return;   // 先按攻、兩幀內補按防：還是丟
     // 喝東西中：攻＝把瓶子丟出去，防、跳、翻滾＝不喝了
     if (m.id === 'iDrink') {
       if ((k = pressed(H, BA)) >= 0) { consume(H, k); faceInput(f); startMove(S, f, MOVES[f.ch].iThrow); return; }
@@ -220,8 +232,9 @@ export function think(S, f, noInput) {
   if (!free) return;
   // 舉著重物：攻＝丟、防＝放下，只能走（慢），不能跑跳、不能出必殺
   if (f.ik === 2) {
+    if (tryToss(S, f)) return;
     if ((k = pressed(H, BA)) >= 0) { consume(H, k); faceInput(f); startMove(S, f, MOVES[f.ch].iHThrow); return; }
-    if ((k = pressed(H, BD)) >= 0) { consume(H, k); dropItem(S, f, 0); setAct(f, 'stand'); return; }
+    if ((k = pressed(H, BD)) >= 0 && H.n - H.t[k] >= 2) { consume(H, k); dropItem(S, f, 0); setAct(f, 'stand'); return; }   // 等兩幀，看是不是防＋攻
     if (dx) f.face = dx;
     f.cr = 0;
     const want = dx || dz ? 'walk' : 'stand';
@@ -229,6 +242,7 @@ export function think(S, f, noInput) {
     return;
   }
   if (trySpecial(S, f)) return;
+  if (tryToss(S, f)) return;
   if (tryCombo(S, f)) return;
 
   if (f.act === 'run') {
@@ -397,6 +411,12 @@ function airSteer(f, C) {
   if (dz && f.vz * dz < capZ) f.vz = dz > 0 ? Math.min(capZ, f.vz + AIR_STEER) : Math.max(-capZ, f.vz - AIR_STEER);
 }
 
+// 地裂炸開：停在原地，框換成往上的一根柱子，炸 t 幀（炸開範圍內每個人打一次，combat 算）
+export function crackBoom(S, q, b) {
+  q.bt = b.t; q.life = b.t; q.w = b.w; q.h = b.h; q.y = b.h;
+  S.ev.push({ k: 'erupt', s: q.o, x: q.x, z: q.z, id: q.id });
+}
+
 // 被抓的人貼在抓的人前面
 function pin(f, o) {
   o.x = f.x + f.face * (CHARS[f.ch].w + CHARS[o.ch].w - 80);
@@ -423,6 +443,7 @@ function atkStep(S, f, C) {
   }
   if (m.hang && f.air && f.hang === 0 && f.vy <= 0) f.hang = m.hang;
   if (m.it && f.t === m.it.at) itemAct(S, f, m);
+  if (m.wpn && !f.con && f.t === m.hits[m.hits.length - 1].on[1] + 1) wear(S, f, WEAR_SWING);   // 武器揮空也磨
   if (!f.air) {
     f.vx = m.vx && !(m.stick && f.con) ? sched(m.vx, f.t) * f.face : 0;
     f.vz = m.zm ? m.zm * dirZ(f.H) : 0;
@@ -442,9 +463,28 @@ function atkStep(S, f, C) {
     // 集氣：大小最多兩倍、傷害最多 1.6 倍，集滿一定打倒
     const c = m.charge ? ((f.chg * 100) / m.charge.max) | 0 : 0, big = m.charge && f.chg >= m.charge.max ? 1 : 0;
     const sc = (v) => ((v * (100 + c)) / 100) | 0;
-    S.pr.push({ o: f.i, team: f.team, x: f.x + f.face * sc(p.x), y: p.y, z: f.z, vx: p.vx * f.face, w: sc(p.w), h: sc(p.h), dmg: ((p.dmg * (100 + ((c * 3) / 5 | 0))) / 100) | 0, fall: p.fall, big, life: p.life, t: 0, id: S.pid++ });
-    S.ev.push({ k: 'proj', s: f.i, n: f.ext, big });
+    const q = { o: f.i, team: f.team, x: f.x + f.face * sc(p.x), y: p.y, z: f.z, vx: p.vx * f.face, w: sc(p.w), h: sc(p.h), dmg: ((p.dmg * (100 + ((c * 3) / 5 | 0))) / 100) | 0, fall: p.fall, big, life: p.life, t: 0, id: S.pid++ };
+    if (p.kd) q.kd = p.kd;
+    if (p.dvx) q.dvx = p.dvx;
+    if (p.dvy) q.dvy = p.dvy;
+    if (p.gr) { q.gr = 1; q.mv = m.id; q.bt = 0; q.hl = []; }
+    S.pr.push(q);
+    S.ev.push({ k: 'proj', s: f.i, n: f.ext, big, gr: p.gr ? 1 : 0 });
     f.chg = 0;
+  }
+  // 地裂：手按著地，按上下轉彎、再按攻當場炸
+  if (m.proj && m.proj.gr && f.t > m.proj.at) {
+    const q = S.pr.find((e) => e.o === f.i && e.gr && !e.bt && e.life > 0);
+    if (q) {
+      const dz = dirZ(H);
+      if (dz && m.proj.zm) q.z = Math.max(Z_FAR, Math.min(Z_NEAR, q.z + dz * m.proj.zm));
+      const k2 = m.proj.boom && f.t > m.proj.at + 2 ? pressed(H, BA) : -1;
+      if (k2 >= 0) {
+        consume(H, k2);
+        crackBoom(S, q, m.proj.boom);
+        f.t = Math.max(f.t, m.total - m.proj.boom.rec);
+      }
+    }
   }
   // 抓著打、丟：對手是抓住的那個
   if (m.id === 'gA' || m.id === 'toss') {

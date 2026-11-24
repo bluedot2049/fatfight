@@ -80,8 +80,14 @@ for (const C of ALL) {
 function itemAI(S, f, A, rx, adz, tw, zb) {
   const fresh = !(A.last & BA);
   if (f.ik === 2) return rx < 2600 && adz < 250 ? (fresh ? BA | tw : tw) : tw | zb;      // 舉著重物：走近丟
-  if (f.ik === 3) return f.hp < (f.mhp * 17) / 20 || f.mp < 500 ? (fresh ? BA : 0) : -1;  // 拿著吃的：需要就吃
-  if (f.ik === 1) {                                                                        // 拿著武器：遠一點偶爾跳起來丟
+  const toss = rx > 1200 && rx < 3400 && adz < 200 && f.face === (tw & RIGHT ? 1 : -1) && !(A.last & (BA | BD));   // 防＋攻直接丟（不能按方向，按了是必殺）
+  if (f.ik === 3) {                                                                        // 拿著吃的：需要就吃，不需要偶爾丟人
+    if (f.hp < (f.mhp * 17) / 20 || f.mp < 500) return fresh ? BA : 0;
+    return toss && rnd(A) < 8 ? BD | BA : -1;
+  }
+  if (f.ik === 1) {                                                                        // 拿著武器：遠一點偶爾跳起來丟，快壞了就直接丟
+    const q = S.it.find((o) => o.id === f.item);
+    if (toss && q && q.dur <= 4 && rnd(A) < 40) return BD | BA;
     if (rx > 1500 && rx < 3600 && adz < 200 && rnd(A) < 6) { A.q = [tw, tw, tw, tw, tw, BA | tw]; return BJ | tw; }
     return -1;
   }
@@ -203,6 +209,15 @@ function decide(S, f, A) {
     if (m.kind === 'sp' && m.cancel && f.con === 1 && !f.air && L.combo >= 3 && f.t === m.hits[m.hits.length - 1].on[1] + 1) {
       const s = pickRush(S, f, A, L, K, R, rx, adz, true);
       if (s) { A.q = cmd(s, tw); return A.q.shift(); }
+    }
+    // 地裂：往對方那條前後線轉，竄到對方腳下就炸（會接拳的難度才會提早炸）
+    if (m.proj && m.proj.gr) {
+      const q = S.pr.find((e) => e.o === f.i && e.gr && !e.bt);
+      if (q) {
+        const qz = o.z - q.z, b = qz > 90 ? DOWN : qz < -90 ? UP : 0;
+        if (L.combo >= 2 && Math.abs(o.x - q.x) < 260 && Math.abs(qz) < 300 && !(A.last & BA) && o.act !== 'down') return BA | b;
+        return b;
+      }
     }
     return f.air ? tw : 0;
   }
@@ -446,8 +461,14 @@ function react(S, f, A, L, K, tw, aw, sx) {
     if (q.team === f.team || q.id === A.seenP) continue;
     const d = (f.x - q.x) * (q.vx > 0 ? 1 : -1);
     if (d < 0 || d > 2400 || Math.abs(q.z - f.z) > Z_REACH + 100) continue;
+    if (q.bt) continue;                                        // 地裂已經炸了，來不及
     A.seenP = q.id;
     const v = rnd(A);
+    if (q.gr) {                                                // 地裂：貼地、會轉彎，只能擋或跳過（晚一點才跳，跳早了落地剛好被炸）
+      if (v < L.guard) { A.gt = 18 + (d / Math.max(1, Math.abs(q.vx)) | 0); return BD | (f.face !== sx ? tw : 0); }
+      if (v < L.guard + L.dodge * 3) { const w = Math.max(0, ((d - 900) / Math.max(1, Math.abs(q.vx))) | 0); A.q = [...Array(Math.min(20, w)).fill(0), BJ | tw]; return A.q.shift(); }
+      continue;
+    }
     if (v < L.guard) { A.gt = 18 + (d / Math.max(1, Math.abs(q.vx)) | 0); return BD | (f.face !== sx ? tw : 0); }
     if (v < L.guard + L.dodge * 2) { const zd = f.z > 0 ? UP : DOWN; A.q = Array(16).fill(zd); return zd; }
     if (v < L.guard + L.dodge * 3) { A.q = [tw, tw, tw]; return BJ | tw; }
@@ -469,7 +490,8 @@ function plan(S, f, A, L, K, R, o, rx, adz) {
   add(near ? (256 - aggr) >> 3 : 6, 'back');
   add(near && o.act === 'atk' ? L.guard >> 2 : near ? L.guard >> 4 : 0, 'guard');
   // 飛行道具：對齊了而且隔得遠
-  for (const s of K.far) if (f.mp >= s.m.mp && adz < 200 && rx > 1200 && !S.pr.some((q) => q.o === f.i)) add(L.sp >> 1, s);
+  // 地裂會轉彎、打不遠：前後差一點也放，但要在打得到的距離裡
+  for (const s of K.far) if (f.mp >= s.m.mp && adz < (s.m.proj.gr ? 700 : 200) && rx > 1200 && (!s.m.proj.gr || rx < R[s.m.id].far - 300) && !S.pr.some((q) => q.o === f.i)) add(L.sp >> 1, s);
   for (const s of K.su) if (f.mp >= s.m.mp && inR2(R[s.m.id], rx, adz)) add(L.sp >> 2, s);
   for (const s of K.rush) if (f.mp >= s.m.mp + 200 && inR2(R[s.m.id], rx, adz)) add(L.sp >> 3, s);
   let tot = 0;

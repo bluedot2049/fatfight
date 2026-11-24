@@ -233,6 +233,7 @@ const KIT = {
       tooth(t) { via(crush(5), () => tone(t, 0.2, 140, 1700, 0.22, 'sawtooth')); crackle(t, 0.22, 18, 3200, 0.3, 0.6); noise(t + 0.05, 0.04, 3000, 0.7, 0.5, 'highpass'); },
       burrow(t) { boom(t, 0.55); drill(t + 0.08, 0.55); crackle(t + 0.1, 0.5, 20, 1300, 0.18); },
       ball(t) { rumble(t, 0.65, 0.5, 220); crackle(t, 0.6, 30, 1800, 0.16); noise(t, 0.4, 400, 1.2, 0.25, 'bandpass', 1600); crackle(t + 0.1, 0.4, 8, 4200, 0.2); },
+      crack(t) { noise(t, 0.2, 500, 1.2, 0.22, 'bandpass', 2600); via(crush(4), () => tone(t, 0.18, 120, 520, 0.16, 'sawtooth')); },   // 地裂雷：舉手（拍地和炸開另外響）
       gnaw(t) { via(crush(5), () => tone(t, 0.12, 300, 1200, 0.2, 'sawtooth')); crackle(t, 0.5, 26, 2600, 0.24, 0.5); rumble(t, 0.45, 0.4, 260); },   // 衝出去：電弧劈啪往前拉
     },
     cue: {   // 鑽地飛出來：地面炸開
@@ -292,6 +293,10 @@ const SND = {
     else if (id === 'wave' || id === 'ball') { noise(t, 0.2, 320, 1.2, 0.3, 'bandpass', 1500); noise(t + 0.18, 0.22, 1500, 1.2, 0.25, 'bandpass', 400); tone(t, 0.35, 140, 90, 0.25, 'triangle'); }
     else noise(t, 0.18, 600, 1.2, 0.28, 'bandpass', 2400);
   },
+  // 地裂：拍地一下悶響，裂縫竄的那半秒鑽頭＋電弧劈啪；炸開是土裡的爆炸＋往上的電；被打斷只剩碎石
+  crack() { const t = ctx.currentTime; tone(t, 0.16, 150, 45, 0.55); noise(t, 0.12, 700, 0.8, 0.35, 'lowpass'); drill(t + 0.03, 0.5, 0.6); crackle(t + 0.03, 0.5, 22, 2400, 0.2, 0.6); },
+  erupt() { const t = ctx.currentTime; boom(t, 0.8); via(crush(5), () => tone(t, 0.22, 180, 1300, 0.16, 'sawtooth')); crackle(t, 0.3, 18, 3400, 0.3); noise(t + 0.02, 0.25, 900, 0.7, 0.3, 'bandpass', 300); },
+  fizzle() { const t = ctx.currentTime; noise(t, 0.12, 900, 1, 0.18, 'bandpass', 300); crackle(t, 0.12, 4, 2000, 0.1); },
   bubble() { const t = ctx.currentTime; tone(t, 0.12, 300, 900, 0.3); tone(t + 0.05, 0.1, 500, 1200, 0.2); noise(t, 0.1, 1800, 2, 0.15, 'bandpass', 700); tone(t, 0.25, 120, 45, 0.5); bloops(t + 0.04, 4, 380); },
   // 集氣：低音往上爬；集滿亮一聲
   charge() { const t = ctx.currentTime; tone(t, 0.75, 90, 420, 0.35, 'sine', 0.1); noise(t, 0.7, 300, 1, 0.2, 'bandpass', 1400, 0.3); bloops(t + 0.1, 6, 300); },
@@ -369,8 +374,8 @@ const SND = {
     lastVoice[who] = speak(ctx, dest, noiseBuf, e.yomi, { amp: 0.5, ...c.voice }, t + 0.03);
   },
 };
-const ECHO = { hit: 0.25, explode: 0.5, wall: 0.2, shatter: 0.5, super: 0.5, ko: 0.9, fight: 0.5, clash: 0.4, win: 0.3, voice: 0.15 };
-const VERB = { super: 0.9, explode: 0.6, whoosh: 0.35, cue: 0.5, hit: 0.3, voice: 0.12, ko: 0.4 };
+const ECHO = { hit: 0.25, explode: 0.5, erupt: 0.4, wall: 0.2, shatter: 0.5, super: 0.5, ko: 0.9, fight: 0.5, clash: 0.4, win: 0.3, voice: 0.15 };
+const VERB = { super: 0.9, explode: 0.6, erupt: 0.4, whoosh: 0.35, cue: 0.5, hit: 0.3, voice: 0.12, ko: 0.4 };
 
 // play('hit', { big: 1 }, 偏左偏右)。舊的寫法 play('beep', 1) 也收
 export function play(name, arg = {}, pan = 0) {
@@ -397,7 +402,9 @@ export function sfxEvent(e, pan = 0, S = null) {
     case 'tell': play('tell', e, pan); break;
     case 'wake': play('roll', e, pan); break;
     case 'sp': play('whoosh', { ...e, ch }, pan); play('voice', { ch, id: e.id, who: e.s }, pan * 0.6); break;
-    case 'proj': play('bubble', e, pan); break;
+    case 'proj': play(e.gr ? 'crack' : 'bubble', e, pan); break;
+    case 'erupt': play('erupt', e, pan); break;
+    case 'fizzle': play('fizzle', e, pan); break;
     case 'chg': play('charge', e, pan); break;
     case 'chgmax': play('chargeMax', e, pan); break;
     case 'ext': if (S?.p[e.s]?.mv !== 'bubble') play('whoosh', { ...e, ch }, pan); break;   // 連按加段：再一聲出手（泡泡的話吐泡泡那聲就夠）
@@ -426,7 +433,7 @@ export function sfxEvent(e, pan = 0, S = null) {
 let prev = null;
 export function sfxState(S, panOf = () => 0) {
   if (!ctx || ctx.state !== 'running') { prev = null; return; }
-  if (!prev || prev.f > S.f || prev.p.length !== S.p.length) prev = { f: S.f, p: S.p.map((f) => ({ act: f.act, mv: f.mv, mp: f.mp, t: f.t })), pr: S.pr.map((q) => q.x) };
+  if (!prev || prev.f > S.f || prev.p.length !== S.p.length) prev = { f: S.f, p: S.p.map((f) => ({ act: f.act, mv: f.mv, mp: f.mp, t: f.t })), pr: S.pr.filter((q) => !q.gr).map((q) => q.x) };
   S.p.forEach((f, i) => {
     const o = prev.p[i], pan = panOf(f.x);
     if (f.act === 'atk' && (o.act !== 'atk' || o.mv !== f.mv)) {
@@ -445,7 +452,8 @@ export function sfxState(S, panOf = () => 0) {
     if (S.ph === 'fight' && f.pad >= 0 && o.mp < need && f.mp >= need && f.mp - o.mp < 20) play('ready', {}, pan);
     o.act = f.act; o.mv = f.mv; o.mp = f.mp; o.t = f.t;
   });
-  if (S.pr.length < prev.pr.length && S.ph === 'fight') play('pop', {}, panOf(prev.pr[0]));
-  prev.pr = S.pr.map((q) => q.x);
+  const flying = S.pr.filter((q) => !q.gr);          // 地裂炸開、散掉有自己的聲音，不算泡泡破掉
+  if (flying.length < prev.pr.length && S.ph === 'fight') play('pop', {}, panOf(prev.pr[0]));
+  prev.pr = flying.map((q) => q.x);
   prev.f = S.f;
 }

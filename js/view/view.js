@@ -17,6 +17,7 @@ import { hurtBoxes } from '../sim/combat.js';
 import { ItemView, handAnchor } from './items.js';
 import { ITEMS } from '../sim/items.js';
 
+const ROCK = '#8a5a2e';   // 地裂噴出來的碎石
 const U = 1 / 1000;
 const SCENES = { sea: SeaStage, tunnel: TunnelStage };   // 闖關的場景：關卡表的 scene → 哪個類別
 
@@ -272,12 +273,29 @@ export class View {
         this.fighters[e.s].flash = Math.max(this.fighters[e.s].flash, 0.35);
         break;
       }
-      case 'proj': {
+      // 地裂（胖鼠）：拍地那下、從地底炸上來、出招被打斷裂縫散掉。跟海牛的泡泡相反：貼地、硬、碎石、電弧
+      case 'proj': if (e.gr) {
+        const p = S.p[e.s], x = (p.x + p.face * 380) * U, pz = p.z * U, c = col(e.s);
+        this.fx.groundRing(x, pz, c, 1.5, 0.3); this.fx.glow(x, 0.15, c, 1.2, pz, 0.2); this.fx.bolts(x, 0.2, '#ffe58a', 3, 0.8, pz);
+        this.fx.shards(x, 0.1, ROCK, 8, 3, pz); this.fx.dust(x, 0, 6, null, pz);
+        this.shake = Math.max(this.shake, 0.04);
+        break;
+      } else {
         const p = S.p[e.s], x = (p.x + p.face * 420) * U;
         this.fx.pop(x, 0.88, col(e.s), p.z * U);
         if (e.big) { this.fx.shock(x, 0.88, col(e.s), 2.6, p.z * U, 0.3); this.fx.wave(x, p.z * U, col(e.s), 2.4, 0.4); this.shake = Math.max(this.shake, 0.06); }
         break;
       }
+      case 'erupt': {
+        const x = e.x * U, c = col(e.s);
+        this.fx.pillar(x, z, c, 3.4); this.fx.groundRing(x, z, c, 2.4, 0.4); this.fx.wave(x, z, c, 2.2, 0.4);
+        this.fx.shock(x, 0.7, HOT, 1.5, z, 0.22); this.fx.bolts(x, 0.9, '#ffe58a', 4, 1.5, z); this.fx.bolts(x, 0.3, c, 3, 1.0, z);
+        this.fx.shards(x, 0.3, ROCK, 14, 6, z); this.fx.shards(x, 0.5, c, 8, 5, z); this.fx.dust(x, 0, 12, '#3a2a1a', z);
+        this.fx.crack(x - 0.6, z - 0.3, x + 0.6, z + 0.3, c, 1.3); this.fx.crack(x - 0.55, z + 0.35, x + 0.55, z - 0.35, c, 1.3);   // 炸開的地方裂成一個叉
+        this.shake = Math.max(this.shake, 0.08); this.punch = Math.max(this.punch, 0.35);
+        break;
+      }
+      case 'fizzle': { const x = e.x * U; this.fx.dust(x, 0, 5, null, z); this.fx.shards(x, 0.1, ROCK, 4, 2, z); this.fx.bolts(x, 0.15, col(e.s), 1, 0.5, z); break; }
       case 'grab': { const p = S.p[e.s]; this.fx.spark((p.x + p.face * 300) * U, CHARS[p.ch].h * U * 0.6, 0, '#ffffff', p.z * U); break; }
       case 'dizzy': { const p = S.p[e.s]; this.fx.shards(p.x * U, CHARS[p.ch].h * U, '#ffe98a', 8, 2.5, p.z * U); break; }
       case 'land':
@@ -403,6 +421,7 @@ export class View {
     for (const q of S.pr) {
       live.add(q.id);
       let m = this.projs.get(q.id);
+      if (q.gr) { this.crackFx(S, q, m); continue; }
       const shot = CHARS[S.p[q.o]?.ch]?.shot, ball = !!shot;           // 角色表寫了 shot 的是一顆球（海獅的球、墨、石頭、孢子），沒寫是泡泡
       if (!m) { m = ball ? ballMesh(shot) : bubbleMesh(); m.userData.ball = ball; m.userData.pop = ball ? lighten(shot[0]) : '#5cc8e0'; this.projs.set(q.id, m); this.scene.add(m); }
       m.position.set(q.x * U, q.y * U, q.z * U);
@@ -416,7 +435,23 @@ export class View {
       if (q.t % 5 === 0) this.fx.trail(q.x * U - Math.sign(q.vx) * 0.35, q.y * U, c, 0.9, q.z * U, 0.1);
       if (q.t % 9 === 0) this.fx.bolts(q.x * U, q.y * U, ball ? m.userData.pop : '#bfeaff', 1, 0.4, q.z * U, 0.1);
     }
-    for (const [id, m] of this.projs) if (!live.has(id)) { this.scene.remove(m); this.projs.delete(id); this.fx.pop(m.position.x, m.position.y, m.userData.pop, m.position.z); }
+    for (const [id, m] of this.projs) if (!live.has(id)) { this.scene.remove(m); this.projs.delete(id); if (!m.userData.gr) this.fx.pop(m.position.x, m.position.y, m.userData.pop, m.position.z); }
+  }
+  // 地裂：沒有本體，前端走過的地方一段段裂開，前端一團電弧、碎石往上噴；炸開的那幾幀柱子裡劈啪
+  crackFx(S, q, m) {
+    const x = q.x * U, z = q.z * U, c = CHARS[S.p[q.o]?.ch]?.pal?.[0] || '#f2a93b';
+    if (!m) {
+      m = new THREE.Object3D(); m.userData.gr = 1; m.userData.lx = (q.x - q.vx) * U; m.userData.lz = z;
+      this.projs.set(q.id, m); this.scene.add(m);
+    }
+    m.position.set(x, 0, z);
+    if (q.bt) { if (Math.random() < 0.5) this.fx.bolts(x, 0.3 + Math.random() * 1.2, '#ffe58a', 1, 0.7, z, 0.1); return; }
+    const u = m.userData;
+    if (Math.hypot(x - u.lx, z - u.lz) > 0.06) { this.fx.crack(u.lx, u.lz, x, z, c); u.lx = x; u.lz = z; }
+    if (Math.random() < 0.6) this.fx.speck(x, 0.05, Math.random() < 0.6 ? ROCK : c, 2.4, z, 9, 1.3);
+    if (Math.random() < 0.45) this.fx.bolts(x, 0.12, Math.random() < 0.5 ? '#ffe58a' : c, 1, 0.55, z, 0.1);
+    if (q.t % 4 === 0) this.fx.glow(x, 0.1, c, 0.55, z, 0.12);
+    if (q.t % 4 === 0) this.fx.dust(x, 0, 1, null, z);
   }
 
   // 鏡頭從斜上方往下看地板，跟著場上的人左右移；人散得開就拉遠

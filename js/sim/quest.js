@@ -16,6 +16,8 @@ const ZS = [-900, 700, -200, 1100, 300, -1200];   // 敵人進場的前後位置
 const DIE_WAIT = 70;              // 玩家倒下多久之後復活或出局
 const GONE_AT = 100;              // 敵人倒下多久之後退場
 const DROP_EVERY = 4;             // 雜兵每打倒幾隻掉一個吃的（關卡表 food 照順序輪）
+const HP_BY_N = [100, 100, 140];  // 幾個玩家時敵人血量幾成（關卡表照一個人寫；兩人加四成）
+const AI_CONT = 60;               // 電腦代打的玩家（線上朋友斷線後）出局多久自己接關
 
 // chars：玩家選的角色（1 或 2 隻），id：哪一關。seed：亂數種子（線上兩邊要一樣）；score、lives：上一關帶過來的（每個玩家一格，沒寫就從頭）
 export function newQuest(chars, id, opt = {}) {
@@ -28,7 +30,7 @@ export function newQuest(chars, id, opt = {}) {
     it: [], iid: 0, itT: 0, rs: ((opt.seed | 0) || 7) ^ 0x1d872b41, drops: 0, kills: 0,
     opt: { train: 0, items: 1 },
     quest: id, sec: 0, wave: -1, wt: 0, go: 0, pend: [], st: 0, boss: -1, seed: (opt.seed | 0) || 7,
-    lives: [], score: [], conts: 0,
+    lives: [], score: [], conts: 0, np: chars.length,
   };
   chars.forEach((ch, k) => {
     const f = newFighter(ch, k, 0, sec.lo + 2500 - k * 600, 1);
@@ -122,8 +124,8 @@ function contCheck(S) {
   for (const f of players(S)) {
     if (!out(S, f) || f.act !== 'ko') continue;
     const k = pressed(f.H, BA);
-    if (k < 0) continue;
-    consume(f.H, k);
+    if (k >= 0) consume(f.H, k);
+    else if (!f.ai || f.t < DIE_WAIT + AI_CONT) continue;
     S.lives[f.pl] = LIVES; S.score[f.pl] = 0; S.conts++;
     respawn(S, f);
     S.ev.push({ k: 'cont', s: f.i });
@@ -178,7 +180,7 @@ function spawnNext(S) {
   if (slot < 0) slot = S.p.length;
   const f = newFighter(e.ch, slot, 1, x, e.side === 'L' ? 1 : -1);
   f.z = ZS[(S.f + slot) % ZS.length];
-  f.hp = f.mhp = e.hp;
+  f.hp = f.mhp = (e.hp * HP_BY_N[Math.min(S.np, HP_BY_N.length - 1)] / 100) | 0;
   f.mp = e.boss ? MP : 300;
   f.mini = e.mini ? 1 : 0;
   f.pow = e.pow ?? 100;
