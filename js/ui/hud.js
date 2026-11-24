@@ -265,6 +265,8 @@ export class Hud {
         this.announce(e.w < 0 ? '平手' : `${CHARS[this.players(S)[e.w].ch].name} 勝`, 99, 'win', e.w < 0 ? 'DRAW' : 'VICTORY'); break;
       case 'super': this.callout(sideOf(e.s), MOVES[S.p[e.s].ch][e.id].name, '超必殺・發動'); this.flash(0.25); break;
       case 'break': this.callout(sideOf(e.s), '破防'); break;
+      case 'parry': this.callout(sideOf(e.s), '格檔'); this.flash(0.1); break;
+      case 'burst': this.callout(sideOf(e.s), '爆氣'); this.flash(0.3); break;
       case 'hit': {
         const a = sideOf(e.s);
         if ((e.combo || 1) <= 1) this.cdmg[a] = 0;

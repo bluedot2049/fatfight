@@ -29,6 +29,18 @@ export const DIZZY = 40, KNOCK = 60;
 // 防禦累積到 BREAK 就破防
 export const BREAK = 60;
 
+// 格檔（使用者 2026-11-24）：被打到之前 JD_WIN 幀內才按下防＝格檔（不扣血、不累積破防，打的人那招被打斷、往後彈開）
+//   闖關 JD_WIN_Q；闖關被打的硬直中抓準下一拳按防＝爆氣（往四周震開）。
+//   失手：按了防卻沒格到，JD_LOCK 幀內被打只算普通的擋，破防值 ×3/2。超必殺不能格檔；格到吹飛算破防
+export const JD_WIN = 5, JD_WIN_Q = 6, JD_LOCK = 24;
+export const JD_RECOIL = 12;        // 被格檔的人彈開後幾幀不能動（格檔的人馬上能動：搶先手）
+export const JD_PUSH = 520;         // 被格檔的人往後滑多遠（推出拳頭打得到的距離，不是白送一套）
+export const JD_STOP = 9;           // 格檔的頓格
+// 起身（使用者 2026-11-24：被圍不能一直動不了）：原地起來之後 WAKE_IV 幀打不到；躺著先按方向＝往那邊滾、按攻＝起身攻擊（都比較早起來）
+export const WAKE_IV = 24, DOWN_T = 30, DOWN_QUICK = 18;
+// 被圍不頭暈：不同的人 GANG_T 幀內接著打你，倒值只會讓你倒地、不會頭暈（頭暈留給單挑）
+export const GANG_T = 90;
+
 // 打飛的物理（使用者 2026-11-24：招式要爽、角色要猛）。速度都是節奏換算後每幀的量
 export const BOUNCE_V = 64;         // 落地時往下比這快就彈一次（彈回 5/8），之後才躺下；必殺打飛的都會彈，普通技不會
 export const WALL_V = 24;           // 被打飛撞到場邊，左右比這快就反彈（剩一半）

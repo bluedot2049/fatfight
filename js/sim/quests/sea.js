@@ -7,7 +7,7 @@
 // mini 雜兵（畫面上換成影子色、不放必殺）、pow 打人的傷害幾成（百分比）、boss 頭目
 // 雜兵照 LF2 的雜魚感（使用者 2026-11-24）：一套連打打倒一次，大約兩次倒地就掛；打人七成痛。
 // 這關的雜兵：青蛙（愛跳、血少）、錘頭（衝得快、血厚一點）、鬚臉（觸鬚甩得遠）
-const m = (ch, lv, hp, side = 'R') => ({ ch, lv, hp, side, mini: 1, pow: 70 });
+const m = (ch, lv, hp, side = 'R') => ({ ch, lv, hp, side, mini: 1, pow: 85 });   // 打人 85%（2026-11-24：原本 70；雜兵改成輪流上、出手前有預告，被打到的那下就要痛）
 
 export default {
   id: 'sea', no: 1, name: '海底沉船', scene: 'sea',

@@ -170,6 +170,7 @@ export function poseOf(f, clock) {
     case 'grabbed': p = over(BASE.hit, { aN: 1.2, aF: 1.0, head: -0.2 }); break;
     case 'land': p = mix(BASE.land, BASE.idle, Math.min(1, t / Math.max(1, f.lag))); break;
     case 'hit': p = mix(f.cr ? BASE.hitLow : BASE.hit, f.cr ? BASE.crouch : BASE.idle, Math.max(0, (t - f.stun * 0.5) / (f.stun * 0.5))); break;
+    case 'parried': p = mix(over(BASE.backstep, { lean: -0.5, bend: -0.2, aN: 1.4, aF: 0.9, head: -0.3 }), BASE.idle, Math.max(0, (t - f.stun * 0.6) / (f.stun * 0.4))); break;   // 被格檔彈開：手被彈上去、往後仰
     case 'fall': p = over(BASE.hit, { tumble: -Math.min(1.4, t * 0.06), lean: -0.6 }); break;
     case 'down': case 'ko': p = BASE.lie; break;
     case 'getup': p = mix(BASE.lie, BASE.crouch, Math.min(1, t / 18)); break;
@@ -192,6 +193,18 @@ function attackPose(f, m, t, clock) {
     return over(BASE.crouch, { tumble: (id === 'rollB' ? -1 : 1) * k * Math.PI * 2, sq: -0.3 });
   }
   if (id === 'backstep') return BASE.backstep;
+  if (id === 'wake') {                               // 起身攻擊：從躺著撐起來，低低地轉一圈掃兩邊
+    const a0 = m.hits[0].on[0], a1 = m.hits[0].on[1];
+    if (t < a0) return mix(BASE.lie, over(BASE.crouch, { spin: -0.4 }), ease(t / a0));
+    if (t <= a1 + 3) return over(BASE.crouch, { spin: (t - a0) / Math.max(1, a1 + 3 - a0) * Math.PI * 2, lF: 1.3, aN: 1.2, aF: 1.2, lean: 0.25 });
+    return mix(BASE.crouch, BASE.idle, Math.min(1, (t - a1 - 3) / Math.max(1, m.total - a1 - 3)));
+  }
+  if (id === 'burst') {                              // 爆氣：縮一下，兩手往兩邊炸開
+    const a0 = m.hits[0].on[0];
+    if (t < a0) return mix(BASE.idle, { sq: -0.3, aN: 0.6, aF: 0.6, head: 0.2 }, t / a0);
+    const k = Math.min(1, (t - a0) / 4);
+    return mix({ sq: 0.12, aN: 1.5, aF: 1.5, aNz: 2.0, aFz: 2.0, head: -0.25, lean: -0.1 }, BASE.idle, Math.max(0, (t - a0 - 12) / Math.max(1, m.total - a0 - 12)) * k);
+  }
   if (id === 'throw') {                              // 丟：抓著轉半圈甩出去
     const k = Math.min(1, t / 8);
     return t <= 8 ? over(BASE.throw, { spin: -0.6 * k, lean: -0.15 }) : mix(over(BASE.throw, { spin: 1.2, lean: 0.4, aN: 2.0, aF: 1.8 }), BASE.idle, Math.min(1, (t - 11) / 11));

@@ -7,7 +7,7 @@ import { hit, mv, multi } from '../moves.js';
 // 普通技：A1 A2 輪流出，對方頭暈時變 A3；蹲攻 crA（踢）打到接 crB（短手）再接 crD（掃）；攻跳同按吹飛 CD；跑、衝跳、空中各一招
 const N = {
   A1: mv('A1', '鰭拍', 16, { pose: 'sA', cancel: 1, hits: [hit([4, 6], [80, 780, 580, 1200], 'L')] }),   // 打得高，胖鼠蹲下會揮空
-  A2: mv('A2', '反手拍', 18, { pose: 'sC', cancel: 1, hits: [hit([5, 7], [80, 450, 620, 1100], 'L')] }),
+  A2: mv('A2', '反手拍', 18, { pose: 'sC', cancel: 1, hits: [hit([5, 7], [80, 450, 570, 1100], 'L')] }),   // 反手比正手短一點（2026-11-24 平衡：原本 620，比 A1 還遠）
   A3: mv('A3', '尾巴橫掃', 30, { pose: 'sD', cancel: 1, hits: [hit([8, 11], [100, 250, 860, 950], 'H', { dmg: 70, kd: 1, dvx: 20, dvy: 60 })] }),
   crA: mv('crA', '蹲尾尖', 16, { pose: 'crB', cr: 1, cancel: 1, next: 'crB', hits: [hit([5, 7], [80, 0, 640, 300], 'L', { dmg: 34 })] }),
   // 蹲著的短手（姿勢表裡叫 crA；招式 id 照按的順序排所以是 crB）：手短，出手時往前蹭一點才接得上
@@ -25,8 +25,8 @@ const N = {
 const SP = [
   // 按住攻集氣吐大泡（集滿一定打倒），吐完再按攻多吐，最多三顆
   { id: 'bubble', name: '深海泡', yomi: 'shinkai ho-', d: 'f', btn: 'A', note: '吐泡泡；按住攻集氣變大，再按攻多吐',
-    m: mv('bubble', '深海泡', 32, { kind: 'sp', mp: 120, charge: { at: 9, max: 45 }, mash: { at: 24, to: 7, n: 2, mp: 60 },
-      proj: { at: 10, x: 420, y: 880, vx: 66, w: 170, h: 170, dmg: 70, fall: 70, life: 120 } }) },
+    m: mv('bubble', '深海泡', 32, { kind: 'sp', mp: 150, charge: { at: 9, max: 45 }, mash: { at: 24, to: 7, n: 2, mp: 60 },
+      proj: { at: 10, x: 420, y: 880, vx: 66, w: 170, h: 170, dmg: 70, fall: 70, life: 120 } }) },   // 魔力 120→150（2026-11-24 平衡）
   { id: 'wave', name: '翻滾浪', yomi: 'honkon ro-', d: 'f', btn: 'J', note: '滾過去撞，按上下可以偏，再按攻多滾一圈',
     m: mv('wave', '翻滾浪', 46, { kind: 'sp', mp: 150, cancel: 1, hurt: [-300, 0, 300, 900], vx: [[0, 0], [5, 60], [28, 0]], zm: 10, stick: 1,
       mash: { at: 17, to: 7, n: 1, mp: 50 },

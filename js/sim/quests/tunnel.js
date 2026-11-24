@@ -3,7 +3,7 @@
 // 闖關第二關「土撥鼠的地道」的關卡表：四段，雜兵是蘑菇和苔人，最後一段頭目矮人（老礦工）。比第一關多一點、強一點。
 
 // 欄位跟第一關一樣（見 sea.js）
-const m = (ch, lv, hp, side = 'R') => ({ ch, lv, hp, side, mini: 1, pow: 75 });
+const m = (ch, lv, hp, side = 'R') => ({ ch, lv, hp, side, mini: 1, pow: 90 });   // 打人 90%（2026-11-24：原本 75，跟第一關一起調）
 
 export default {
   id: 'tunnel', no: 2, name: '土撥鼠的地道', scene: 'tunnel',

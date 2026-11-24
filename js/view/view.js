@@ -222,6 +222,35 @@ export class View {
         this.shake = Math.max(this.shake, 0.08);
         break;
       }
+      // 格檔：接觸點金白一閃、一圈往外推，兩邊都亮一下（比被擋亮很多，一眼看得出不一樣）
+      case 'parry': {
+        const x = e.x * U, y = e.y * U, GOLD = '#ffe9a8';
+        this.fx.flare(x, y, GOLD, 4.5, z, 0.2); this.fx.shock(x, y, GOLD, 2.0, z, 0.22); this.fx.shock(x, y, HOT, 1.1, z, 0.14);
+        this.fx.rays(x, y, GOLD, 2.4, z, 0.25); this.fx.shards(x, y, GOLD, 10, 4, z); this.fx.slash(x, y, HOT, 1, z);
+        this.fighters[e.s].flash = Math.max(this.fighters[e.s].flash, 0.6);
+        const va = this.fighters[e.a]; if (va) va.white = 0.6;
+        this.shake = Math.max(this.shake, 0.05); this.punch = Math.max(this.punch, 0.3);
+        break;
+      }
+      // 爆氣：腳下一圈往外炸、光柱、四周的人被震開
+      case 'burst': {
+        const p = S.p[e.s], x = p.x * U, pz = p.z * U, c = col(e.s), cy = CHARS[p.ch].h * U * 0.5;
+        this.fx.wave(x, pz, c, 5, 0.55); this.fx.wave(x, pz, HOT, 3.4, 0.4); this.fx.groundRing(x, pz, c, 3.6, 0.5);
+        this.fx.pillar(x, pz, c, 3.5); this.fx.flare(x, cy, c, 5, pz, 0.3); this.fx.rays(x, cy, c, 3.4, pz, 0.35);
+        this.fx.shock(x, cy, HOT, 3.2, pz, 0.3); this.fx.motes(x, cy, c, 10, pz);
+        this.fighters[e.s].flash = 1;
+        this.shake = Math.max(this.shake, 0.1); this.punch = Math.max(this.punch, 0.6);
+        break;
+      }
+      // 雜兵出手前的預告：頭頂上亮一顆暖黃的光、腳下亮一圈（停 16 幀，亮的時間差不多一樣長；跟打中的特效分開，不放在身前）
+      // 不用橘紅：疊在海底的青綠上會變灰
+      case 'tell': {
+        const p = S.p[e.s], C = CHARS[p.ch], x = p.x * U, y = C.h * U + 0.28, pz = p.z * U;
+        this.fx.glow(x, y, '#ffd070', 1.0, pz, 0.3); this.fx.glow(x, y, '#ffffff', 0.4, pz, 0.3); this.fx.shock(x, y, '#ffe0a0', 0.8, pz, 0.28);
+        this.fx.groundRing(x, pz, '#ffd070', 1.6, 0.32); this.fx.groundRing(x, pz, '#ffffff', 0.8, 0.22);
+        break;
+      }
+      case 'wake': { const p = S.p[e.s]; this.fx.dust(p.x * U, 0, 5, null, p.z * U); this.fx.groundRing(p.x * U, p.z * U, '#b8a88e', 1.3, 0.3); break; }
       case 'clash': this.fx.spark(e.x * U, e.y * U, 1, '#ffffff', z); this.fx.slash(e.x * U, e.y * U, HOT, 1, z); this.fx.pop(e.x * U, e.y * U, '#5cc8e0', z); this.fx.flare(e.x * U, e.y * U, '#ffffff', 3.5, z); this.fx.bolts(e.x * U, e.y * U, '#bfeaff', 3, 1, z); break;
       case 'super': {
         const p = S.p[e.s], x = p.x * U, pz = p.z * U, c = col(e.s);

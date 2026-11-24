@@ -326,6 +326,12 @@ const SND = {
   jump() { const t = ctx.currentTime; tone(t, 0.09, 260, 560, 0.1, 'triangle'); noise(t, 0.07, 900, 1.5, 0.08, 'bandpass', 2200); },
   dash() { const t = ctx.currentTime; noise(t, 0.14, 500, 1.5, 0.16, 'bandpass', 1800); },
   roll() { const t = ctx.currentTime; noise(t, 0.26, 380, 1.2, 0.2, 'bandpass', 1300); tone(t, 0.2, 180, 120, 0.1, 'triangle'); },
+  // 格檔：清脆的金屬「叮」加一下往上滑的亮音（跟被擋的悶聲分得開）
+  parry() { const t = ctx.currentTime; noise(t, 0.04, 6000, 1.2, 0.5, 'highpass'); tone(t, 0.5, 1568, 1560, 0.2, 'triangle', 0.002); tone(t, 0.42, 2349, 2340, 0.12, 'sine', 0.002); tone(t, 0.08, 700, 2400, 0.12, 'sine', 0.002); tone(t, 0.1, 220, 120, 0.3); },
+  // 爆氣：往內吸一下再一聲悶爆往外推
+  burst() { const t = ctx.currentTime; tone(t, 0.12, 300, 900, 0.18, 'sawtooth'); boom(t + 0.08, 0.6); noise(t + 0.08, 0.5, 900, 0.6, 0.4, 'bandpass', 250); tone(t + 0.08, 0.5, 660, 880, 0.08, 'triangle'); },
+  // 雜兵出手前的預告：短短一聲低的「嗯」（不搶戲，聽得出有人要打過來）
+  tell() { const t = ctx.currentTime; tone(t, 0.12, 180, 240, 0.12, 'square', 0.004); noise(t, 0.06, 1400, 2, 0.06); },
   guard() { const t = ctx.currentTime; noise(t, 0.03, 2200, 2, 0.12); tone(t, 0.04, 520, 480, 0.06, 'square'); },
   grab() { const t = ctx.currentTime; noise(t, 0.07, 1200, 2, 0.4); tone(t, 0.08, 200, 120, 0.25); },
   clash() { const t = ctx.currentTime; noise(t, 0.08, 3800, 2, 0.5); tone(t, 0.3, 1480, 1400, 0.16, 'triangle'); tone(t, 0.3, 2217, 2100, 0.1, 'triangle'); tone(t, 0.12, 300, 90, 0.4); },
@@ -386,6 +392,10 @@ export function sfxEvent(e, pan = 0, S = null) {
     case 'block': play('block', e, pan); break;
     case 'break': play('shatter', e, pan); break;
     case 'dizzy': play('dizzy', e, pan); break;
+    case 'parry': play('parry', e, pan); break;
+    case 'burst': play('burst', e, pan); break;
+    case 'tell': play('tell', e, pan); break;
+    case 'wake': play('roll', e, pan); break;
     case 'sp': play('whoosh', { ...e, ch }, pan); play('voice', { ch, id: e.id, who: e.s }, pan * 0.6); break;
     case 'proj': play('bubble', e, pan); break;
     case 'chg': play('charge', e, pan); break;
