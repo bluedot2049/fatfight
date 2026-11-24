@@ -1,0 +1,11 @@
+{
+  "name": "胖頭打架",
+  "short_name": "胖頭打架",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone"],
+  "orientation": "landscape",
+  "background_color": "#0d0a0c",
+  "theme_color": "#0d0a0c"
+}
