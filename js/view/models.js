@@ -340,10 +340,10 @@ export function buildDwarf() {
   return { root, turn, J: { body, upper, head, aN, aF, tail, lN, lF }, tongue: null, h: 1.25 };
 }
 
-// 小象（可選角色）：灰紫色大圓身體、兩片大耳朵（裡面粉紅）、一條往下彎的鼻子（鼻子捲那招另外伸一條 lash 出去）、短短的柱子腳
+// 小象（可選角色）：粉紅肉色大圓身體、兩片大耳朵（裡面深一點的粉紅）、一條往下彎的鼻子（鼻子捲那招另外伸一條 lash 出去）、短短的柱子腳
 export function buildElephant() {
   const { root, turn, body } = rig();
-  const C = '#a9adbf', EAR = '#eaa6b8', DARK = '#868aa0', NAIL = '#f1ebdf', CHEEK = '#f0a0b0';
+  const C = '#f2b8ac', EAR = '#e48c98', DARK = '#cf8a82', NAIL = '#f7f0e4', CHEEK = '#ea7f8e';
   const k = kit(body);
   k.ball(0.47, C, 0, 0.5, 0, { sx: 1.04, sy: 1.05, sz: 0.95 });
   const lN = joint(body, -0.21, 0.2, 0.02), lF = joint(body, 0.21, 0.2, 0.02);
@@ -465,7 +465,7 @@ export function buildDog() {
 export const ALT = {
   manatee: { '#8fa8b2': '#a88e84', '#aac0c8': '#c8b0a4' },                                   // 灰藍 → 粉褐
   marmot: { '#8a7b55': '#6e4a33', '#a69770': '#8f6a4c', '#bcae86': '#ad8c6a', '#5a4f33': '#42291a' },   // 橄欖褐 → 巧克力
-  elephant: { '#a9adbf': '#c4ab8e', '#868aa0': '#9c8468', '#eaa6b8': '#e8b48a' },           // 灰紫 → 沙色
+  elephant: { '#f2b8ac': '#a9adbf', '#cf8a82': '#868aa0', '#e48c98': '#eaa6b8' },           // 粉紅肉色 → 灰紫
   penguin: { '#f3efe6': '#7d90a6', '#eadcbc': '#e8c87a', '#d9cdb8': '#e0b868' },            // 白 → 石板藍、嘴腳偏黃
   dog: { '#f6c93c': '#b8673a', '#d9a62a': '#8e4826', '#e6b232': '#a3552e' },                 // 黃 → 紅棕（真的臘腸狗那種）
 };
