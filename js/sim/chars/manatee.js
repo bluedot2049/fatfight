@@ -55,7 +55,7 @@ const SU = [
 ];
 
 export default {
-  id: 'manatee', name: '海牛', full: '灰色海牛', color: '#7fe6ff',
+  id: 'manatee', name: '灰牛', full: '灰牛', color: '#7fe6ff',
   blurb: '遠處吐泡泡、尾巴對空', stat: [4, 5, 2],
   pal: ['#5cc8e0', '#123a5c'], card: { attr: '水', type: '深海之獸', lv: 5, art: 'sea' },   // 介面：寶石色（亮、暗）；卡片的屬性、種族、等級星、畫框底色     // 選角畫面：一句話、力氣／距離／速度（1–5）
   voice: { f0: 92, size: 0.9, mora: 0.12 },   // 念招式名稱的聲音（js/ui/voice.js）：音高、體型、一拍幾秒；招式的 yomi 是念法

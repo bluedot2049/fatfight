@@ -49,6 +49,9 @@ export const ITEMS = {
     thr: { vx: 80, vy: 12, g: 3, dmg: 20, fall: 20, kd: 0, dvx: 16, dvy: 30, stop: 4 } },
   crystal: { name: '魔力晶石', cat: 'food', w: 130, h: 260, hp: 0, mp: 100, sips: 5,
     thr: { vx: 88, vy: 10, g: 2, dmg: 30, fall: 30, kd: 0, dvx: 20, dvy: 40, stop: 5 } },
+  // ---- 臘腸狗埋的（招式放的，不會從天上掉）----
+  bone: { name: '骨頭', cat: 'food', w: 170, h: 140, hp: 50, mp: 0, sips: 2,
+    thr: { vx: 84, vy: 12, g: 3, dmg: 30, fall: 30, kd: 0, dvx: 18, dvy: 40, stop: 5 } },
 };
 
 // 對戰從天上掉什麼（照順序輪，表裡重複的出得多）

@@ -14,6 +14,7 @@ import { music } from './ui/music.js';
 import { gt } from './ui/gt.js';
 import { myName, setName, cleanName, NAME_MAX } from './ui/name.js';
 import { magicCircle } from './ui/arcane.js';
+import { decorate } from './ui/ornate.js';
 import { CardStage } from './view/cardstage.js';
 import { newMatch, step, setCpu } from './sim/match.js';
 import { newQuest } from './sim/quest.js';
@@ -97,6 +98,7 @@ view.onEvent = (e, S) => {
   if (e.k === 'ko') music.level(0.3, 0.2); else if (e.k === 'round') music.level(1, 0.6); else if (e.k === 'over') music.level(0.25, 0.5);
   // 闖關的事件先借現有的音效
   if (e.k === 'stage') play('round');
+  else if (e.k === 'hit' && e.armor) play('clank', {}, panOf(e.x));
   else if (e.k === 'kill') { if (e.boss) { play('ko'); music.level(0.3, 0.2); } else play('shatter', {}, panOf(e.x)); }
   else if (e.k === 'die') play('ko');
   else if (e.k === 'clear') play('win');
@@ -165,28 +167,41 @@ function dummyBits() {
 }
 
 // ---------- 畫面流程 ----------
+// 首頁：左半邊由上到下是標誌 → 分區的選單 → 按鍵提示，右半邊留給場上兩隻。
+// 分三區：「一個人」「一起玩」＝要玩什麼（主按鈕：紅的，一項一顆橫的）；「說明・設定」＝不是玩的（次按鈕：深色的，小顆排一列）。
+// 回首頁時游標停在上次選的那一項
+let titleAt = '';
 function toTitle() {
   if (G.net) { G.net.close(); G.net = null; }
   G.wait?.stop(); closeLobby();
   G.side = 0; G.room = null;
   titleBg();
   G.mode = 'title';
+  const mode = (label, on) => ({ label, on: () => { titleAt = label; on(); } });
+  const groups = [
+    { head: '一個人', cls: 'play', items: [
+      mode('闖關', () => toSelect('quest')),
+      mode('對電腦', () => { G.cpuLv = 1; toSelect('cpu'); }),
+      mode('練習', () => toSelect('train')),
+    ] },
+    { head: '一起玩', cls: 'play', items: [
+      mode('線上', onlineMenu),
+      ...(device.touch ? [] : [mode('本機雙人', () => toSelect('local'))]),
+    ] },
+    { head: '說明・設定', cls: 'etc', items: [
+      { label: '招式表', on: () => showOverlay(moveListHtml()) },
+      { label: device.touch ? '操作' : '按鍵', on: () => showOverlay(keysHtml()) },
+      { label: '聲音', value: () => SOUND_NAMES[soundMode()], on: () => setSoundMode(soundMode() + 1) },
+    ] },
+  ];
   menu.show({
     cls: 'title',
     logo: `<div class="tcircle">${magicCircle({ seed: 'title', runes: 22, star: 6 })}</div>
-      <h1 class="logo">${gt('胖頭打架', { sw: 0.04, k: 0.06 })}</h1>
-      <div class="tagline"><i></i>海牛　對　土撥鼠<i></i></div>`,
-    items: [
-      ...(device.touch ? [] : [{ label: '本機雙人', desc: '同一台鍵盤兩個人', on: () => toSelect('local') }]),
-      { label: '闖關', desc: '一路打到頭目', on: () => toSelect('quest') },
-      { label: '對電腦', desc: '贏了電腦會變強', on: () => { G.cpuLv = 1; toSelect('cpu'); } },
-      { label: '練習', desc: '木樁、血會回', on: () => toSelect('train') },
-      { label: '線上', desc: '跟朋友對戰或闖關', on: onlineMenu },
-      { label: '招式表', desc: '兩隻的必殺技', on: () => showOverlay(moveListHtml()) },
-      { label: device.touch ? '操作' : '按鍵', desc: 'P1、P2 的鍵位', on: () => showOverlay(keysHtml()) },
-      soundItem(),
-    ],
-    foot: `<span><kbd>↑</kbd><kbd>↓</kbd>選</span><span><kbd>${keyName(KEYMAP[0].A[0])}</kbd>確定</span><span><kbd>${keyName(KEYMAP[0].J[0])}</kbd>返回</span>`,
+      <div class="brand"><h1 class="logo">${gt('胖頭打架', { sw: 0.04, k: 0.06 })}</h1>
+      <div class="tagline"><i></i><b>FAT FIGHT</b><i></i></div></div>`,
+    groups,
+    sel: Math.max(0, groups.flatMap((g) => g.items).findIndex((it) => it.label === titleAt)),
+    foot: `<span><kbd>↑</kbd><kbd>↓</kbd>選</span><span><kbd>${keyName(KEYMAP[0].A[0])}</kbd>確定</span>`,
     extra: `<div class="ver">α 0.2</div>`,
   });
 }
@@ -241,7 +256,7 @@ function startFight(c0, c1) {
   music.muffle(false); music.level(1); music.battle();
 }
 
-// 闖關：一個人（之後兩人合作），從第一關開始；carry：過關後打下一關，帶著上一關的分數和命
+// 闖關：一個人（之後兩人合作），從第一關開始；carry：過關後打下一關，帶著上一關的分數（命每關補滿）
 function startQuest(c0, id = ORDER[0], carry = null) {
   menu.hide(); closeOverlay(); cards3d?.stop();
   view.camOffset = 0;
@@ -287,7 +302,7 @@ function showResult() {
       : [vote('again', '再來一場'), { label: '換角色', on: () => { G.net.ctl({ t: 'reselect' }); toSelect('online', G.side); } }];
     items.push({ label: '回房間', on: () => toRoom(true) }, { label: '離開', on: toTitle });
     const sc = (k) => (G.S.score[k] | 0).toLocaleString('en-US');
-    G.resultSub = Q ? `1P ${sc(0)}　2P ${sc(1)}${G.S.conts ? `　接關 ${G.S.conts} 次` : ''}${won && !next ? '　下一關還在蓋' : ''}` : '';
+    G.resultSub = Q ? `1P ${sc(0)}　2P ${sc(1)}${G.S.conts ? `　接關 ${G.S.conts} 次` : ''}${won && !next ? '　下一關還在蓋' : ''}<br>掉命 1P ${G.S.dead[0]}　2P ${G.S.dead[1]}` : '';
     menu.show({ title: Q ? (won ? '過關' : '結束') : '比賽結束', cls: 'result', sub: G.resultSub, items, back: () => {} });
     if (G.otherVote) voteLine(`對方想${G.otherVote === 'next' ? '打下一關' : '再來'}`);
     return;
@@ -296,11 +311,13 @@ function showResult() {
     const k = G.side;                                  // 線上闖關朋友斷線、電腦接手之後，自己可能是 2P
     const won = G.S.winner === 0, sc = G.S.score[k].toLocaleString('en-US');
     const next = won ? ORDER[ORDER.indexOf(G.quest) + 1] : null;
-    const carry = { score: [G.S.score[k]], lives: [G.S.lives[k]] };
+    const carry = { score: [G.S.score[k]] };           // 只帶分數；命每關補滿（quest.js newQuest）
+    // 難度的尺（docs/方向.md「闖關難度的尺」）：這一關掉了幾條命、每一段被打掉幾條血。跟 tools/quest-balance.mjs 的表同一個單位，對一下就知道自己大約是代打幾級
+    const toll = `掉 ${G.S.dead[k]} 條命　每段掉血 ${G.S.hurt[k].map((h) => (h / G.S.p[k].mhp).toFixed(1)).join('／')} 條`;
     const items = [{ label: '再打一次', on: () => startQuest(G.chars[0], G.quest) }, { label: '換角色', on: () => toSelect('quest') }, { label: '回標題', on: toTitle }];
     if (next) items.unshift({ label: '下一關', on: () => startQuest(G.chars[0], next, carry) });
     menu.show({
-      title: won ? '過關' : '結束', sub: `分數 ${sc}${G.S.conts ? `　接關 ${G.S.conts} 次` : ''}${won && !next ? '　下一關還在蓋' : ''}`, cls: 'result',
+      title: won ? '過關' : '結束', sub: `分數 ${sc}${G.S.conts ? `　接關 ${G.S.conts} 次` : ''}${won && !next ? '　下一關還在蓋' : ''}<br>${toll}`, cls: 'result',
       items, back: () => {},
     });
     return;
@@ -324,8 +341,9 @@ function showResult() {
 
 // ---------- 招式表、按鍵說明（蓋在上面的一層） ----------
 function showOverlay(html) {
-  overlay.innerHTML = `<div class="sheet">${html}<p class="close">${device.touch ? '點這裡關閉' : 'Esc／X 關閉'}</p></div>`;
+  overlay.innerHTML = `<div class="sheet">${html}<p class="close"><span class="cbtn" data-orn="sub">關閉${device.touch ? '' : '<small>Esc</small>'}</span></p></div>`;
   overlay.hidden = false;
+  decorate(overlay);
 }
 function closeOverlay() { overlay.hidden = true; overlay.innerHTML = ''; }
 overlay.addEventListener('click', (e) => {
@@ -365,11 +383,11 @@ function onlineMenu() {
     // 最多列幾間（手機選單兩欄，放不下太多）；近的、等比較久的排前面
     const rooms = L ? L.rooms.filter((r) => !nearOnly || r.far === 0).slice(0, device.touch ? 3 : 6) : [];
     const items = [{ key: 'quick', label: '找人打', desc: '自動找近的對手', on: () => quickMatch() }];
-    items.push(...rooms.map((r) => ({ key: 'r' + r.code, label: `${r.name}的房間`, value: () => `${FAR[r.far]}・${waited(r.t)}`, on: () => { closeLobby(); goOnline(r.code, false); } })));
+    items.push(...rooms.map((r) => ({ key: 'r' + r.code, lv: 'sub', label: `${r.name}的房間`, value: () => `${FAR[r.far]}・${waited(r.t)}`, on: () => { closeLobby(); goOnline(r.code, false); } })));
     if (!rooms.length) items.push({ key: 'none', off: true, label: err || (!L ? '找房間中…' : L.rooms.length ? '附近沒有開著的房間' : '現在沒有開著的房間') });
     items.push(
-      { key: 'open', label: '開一間等人', desc: '大廳看得到，等的時候可以打電腦', on: () => goOnline(newCode(), true, { pub: true }) },
-      { key: 'priv', label: '私人房間', desc: '傳連結或房間碼給朋友', on: privateMenu },
+      { key: 'open', lv: 'sub', label: '開一間等人', desc: '大廳看得到，等的時候可以打電腦', on: () => goOnline(newCode(), true, { pub: true }) },
+      { key: 'priv', lv: 'sub', label: '私人房間', desc: '傳連結或房間碼給朋友', on: privateMenu },
       { key: 'near', label: '只找近的', value: () => (nearOnly ? '開' : '關'), on: toggle, cycle: toggle },
       { key: 'name', label: '名字', value: myName, on: namePrompt },
       { key: 'back', label: '返回', on: toTitle },
@@ -475,7 +493,7 @@ async function goOnline(code, host, o = {}) {
   const title = quick ? '找人打' : pub ? '開一間等人' : host ? '建立房間' : hostName ? `加入${hostName}的房間` : '加入房間';
   const scr = {
     html: () => `<div class="panel"><i class="shape"></i><h2>${gt(title, { sw: 0.05, k: 0.06 })}</h2>
-      ${host && !quick ? `<p class="code">${code}</p><button class="mbtn" data-share>${device.touch ? '傳連結給朋友' : '複製連結'}</button> ` : ''}${pub ? `<button class="mbtn" data-cpu>先打電腦</button>` : ''}
+      ${host && !quick ? `<p class="code">${code}</p><button class="mbtn" data-share>${device.touch ? '傳連結給朋友' : '複製連結'}</button> ` : ''}${pub ? `<button class="mbtn" data-orn="sub" data-cpu>先打電腦</button>` : ''}
       ${host ? `<p class="sub">${quick ? (o.sub?.() || '') : pub ? '大廳看得到這間，有人進來會叫你' : '朋友點連結就進來，或輸入這四個字'}</p>` : ''}<p class="status">${msg}</p>
       <p class="foot">${host && !quick && !device.touch ? `<kbd>${keyName(KEYMAP[0].A[0])}</kbd>複製連結　` : ''}${pub && !device.touch ? `<kbd>${keyName(cpuKey)}</kbd>先打電腦　` : ''}Esc 取消</p></div>`,
     onKey: (nav, p, k) => {
@@ -637,7 +655,7 @@ function toRoom(send) {
     },
     items: host
       ? [{ label: '對戰', desc: '一對一', on: () => pick('fight') },
-        { label: '闖關', desc: '兩人一隊', value: () => stageName(G.room.stage), on: () => pick('quest'), cycle },
+        { label: '闖關', lv: 'main', desc: '兩人一隊', value: () => stageName(G.room.stage), on: () => pick('quest'), cycle },
         { label: '離開', on: toTitle }]
       : [{ label: '離開', on: toTitle }],
     back: toTitle,
@@ -698,7 +716,7 @@ function castVote(v) {
   voteLine('等對方…');
   maybeStart();
 }
-// 兩邊選了一樣的，房主開始；下一關帶著分數和命
+// 兩邊選了一樣的，房主開始；下一關帶著分數（命每關補滿）
 function maybeStart() {
   if (!G.vote || G.vote !== G.otherVote || G.side !== 0 || !G.net) return;
   const S = G.S;
@@ -706,7 +724,7 @@ function maybeStart() {
     const next = ORDER[ORDER.indexOf(S.quest) + 1];
     if (!next) return;
     G.room.stage = next;
-    startOnline(...G.chars, { score: [...S.score], lives: [...S.lives] });
+    startOnline(...G.chars, { score: [...S.score] });
   } else {
     if (S.quest) G.room.stage = S.quest;
     startOnline(...G.chars);
@@ -745,7 +763,7 @@ function netStatus() {
 }
 
 // ---------- 開始 ----------
-if (qs.has('debug')) window.__g = { G, view, hud, keys, menu, touch, step, newMatch, CHARS, music, play, toRoom };
+if (qs.has('debug')) window.__g = { G, view, hud, keys, menu, touch, step, newMatch, CHARS, music, play, toRoom, toSelect };
 // ?fight=manatee,marmot 直接進本機對戰（截圖、測試用）；&train 練習；&cpu=3 對電腦（幾級）；?quest=marmot 直接闖關、&stage=tunnel 從哪一關開始
 if (qs.has('quest')) startQuest(CHARS[qs.get('quest')] && !CHARS[qs.get('quest')].npc ? qs.get('quest') : 'marmot', QUESTS[qs.get('stage')] ? qs.get('stage') : ORDER[0]);
 else if (qs.has('fight')) {

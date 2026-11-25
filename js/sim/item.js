@@ -33,6 +33,20 @@ function remove(S, q) {
 }
 
 // 手上的東西放掉：toss 往哪邊彈一下（0＝放在腳邊）
+// 一進場就拿著（闖關：海牛員工扛著箱子進來，關卡表的 carry）
+export function giveItem(S, f, k) {
+  const q = spawnItem(S, k, f.x, f.z);
+  q.hold = f.i; f.item = q.id; f.ik = catOf(k);
+  return q;
+}
+// 念力丟（小灰人，招式的 tk）：地上的東西飛起來砸向 o，算 f 丟的
+export function flingItem(S, f, q, o) {
+  const T = ITEMS[q.k].thr, dz = o.z - q.z;
+  q.y = 700; q.vx = T.vx * (o.x >= q.x ? 1 : -1); q.vy = 16; q.vz = Math.max(-24, Math.min(24, (dz / 14) | 0));
+  q.harm = 1; q.by = f.i; q.team = f.team; q.hb = 0; q.t = 0;
+  S.ev.push({ k: 'ithrow', id: q.id, s: f.i, ik: q.k, tk: 1, x: q.x, z: q.z });
+}
+
 export function dropItem(S, f, toss = 0) {
   const q = heldItem(S, f);
   f.item = -1; f.ik = 0;

@@ -13,10 +13,20 @@ import moss from './moss.js';
 import dwarf from './dwarf.js';
 import elephant from './elephant.js';
 import penguin from './penguin.js';
+import dog from './dog.js';
+import fox from './fox.js';
+import owl from './owl.js';
+import boar from './boar.js';
+import warrior from './warrior.js';
+import archer from './archer.js';
+import mage from './mage.js';
+import robot from './robot.js';
+import worker from './worker.js';
+import alien from './alien.js';
 import { SYS } from '../moves.js';
 import { ITEM_MOVES } from '../items.js';
 
-export const ALL = [manatee, marmot, elephant, penguin, sealion, hammer, squid, frog, mushroom, moss, dwarf];
+export const ALL = [manatee, marmot, elephant, penguin, dog, sealion, hammer, squid, frog, mushroom, moss, dwarf, fox, owl, boar, warrior, archer, mage, robot, worker, alien];
 export const ROSTER = ALL.filter((c) => !c.npc);
 export const CHARS = Object.fromEntries(ALL.map((c) => [c.id, c]));
 

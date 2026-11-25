@@ -6,20 +6,25 @@ import { MP, LIVES, CONT_TIME, BA } from './const.js';
 import { CHARS } from './chars/index.js';
 import { newFighter } from './fighter.js';
 import { pressed, consume } from './input.js';
-import { newAI } from './ai.js';
+import { newAI, LV_MAX } from './ai.js';
 import { world } from './match.js';
 import { QUESTS } from './quests/index.js';
-import { spawnItem } from './item.js';
+import { spawnItem, giveItem } from './item.js';
 
 const MAX_P = 16;                 // 場上最多幾格（抓人、打到誰都用格子號碼記，hitList 只留 4 位元）
 const ZS = [-900, 700, -200, 1100, 300, -1200];   // 敵人進場的前後位置，照順序輪
 const DIE_WAIT = 70;              // 玩家倒下多久之後復活或出局
 const GONE_AT = 100;              // 敵人倒下多久之後退場
 const DROP_EVERY = 4;             // 雜兵每打倒幾隻掉一個吃的（關卡表 food 照順序輪）
-const HP_BY_N = [100, 100, 140];  // 幾個玩家時敵人血量幾成（關卡表照一個人寫；兩人加四成）
+// 兩個玩家（關卡表照一個人寫；2026-11-25 用 tools/quest-balance.mjs 量過：原本只加四成血，兩人每人掉的命只有單人的三到五成）：
+// 主要靠多幾隻，不靠把每隻加厚（加厚只是每隻打比較久）。目標是每人掉的命是單人的七到八成半
+const HP_BY_N = [100, 100, 130];  // 雜兵血量幾成
+const BOSS_BY_N = [100, 100, 220]; // 頭目血量幾成（頭目一次只追一個人，兩個人輪流打它，要厚一點才撐得到差不多的時間）
+const ADD_BY_N = [0, 0, 2];       // 每一波多幾隻雜兵（照這一波的雜兵輪著抄，從另一邊進來）
 const AI_CONT = 60;               // 電腦代打的玩家（線上朋友斷線後）出局多久自己接關
 
-// chars：玩家選的角色（1 或 2 隻），id：哪一關。seed：亂數種子（線上兩邊要一樣）；score、lives：上一關帶過來的（每個玩家一格，沒寫就從頭）
+// chars：玩家選的角色（1 或 2 隻），id：哪一關。seed：亂數種子（線上兩邊要一樣）；score：上一關帶過來的分數（每個玩家一格，沒寫就從頭）。
+// 命每關開始都補滿（2026-11-25：原本帶過去，但接關免費補滿，剩一條命進下一關反而不如故意死）
 export function newQuest(chars, id, opt = {}) {
   const Q = QUESTS[id], sec = Q.secs[0];
   const S = {
@@ -31,11 +36,13 @@ export function newQuest(chars, id, opt = {}) {
     opt: { train: 0, items: 1 },
     quest: id, sec: 0, wave: -1, wt: 0, go: 0, pend: [], st: 0, boss: -1, seed: (opt.seed | 0) || 7,
     lives: [], score: [], conts: 0, np: chars.length,
+    dead: [], hurt: [],             // 難度的尺：每個玩家掉了幾條命、每一段被打掉多少血（結算畫面、tools/quest-balance.mjs 看）
   };
   chars.forEach((ch, k) => {
     const f = newFighter(ch, k, 0, sec.lo + 2500 - k * 600, 1);
     f.pad = k; f.pl = k; f.main = 1; f.z = k ? 600 : -300;
-    S.p.push(f); S.lives.push(opt.lives?.[k] || LIVES); S.score.push(opt.score?.[k] | 0);
+    S.p.push(f); S.lives.push(LIVES); S.score.push(opt.score?.[k] | 0);
+    S.dead.push(0); S.hurt.push(Q.secs.map(() => 0));
   });
   placeItems(S, sec);
   return S;
@@ -67,7 +74,10 @@ export function questStep(S) {
 
   const hp0 = S.p.map((f) => f.hp);
   world(S, false);
+  for (const f of S.p) if (f.pl >= 0 && f.hp < hp0[f.i]) S.hurt[f.pl][S.sec] += hp0[f.i] - Math.max(0, f.hp);
   score(S, hp0);
+  // 第二階段（關卡表 rage）：頭目血剩一半，電腦高兩級、魔力補滿、一下子打不到
+  for (const f of S.p) if (f.rage === 1 && f.hp > 0 && f.hp * 2 <= f.mhp) { f.rage = 2; if (f.ai) f.ai.lv = Math.min(LV_MAX, f.ai.lv + 2); f.mp = MP; f.iv = Math.max(f.iv, 50); S.ev.push({ k: 'boss', s: f.i, name: Q.rageName || '' }); }
   lifeCycle(S);
   contCheck(S);
   if (players(S).every((f) => out(S, f))) { S.ph = 'cont'; S.pt = 0; S.ev.push({ k: 'contask' }); return; }
@@ -85,7 +95,7 @@ function score(S, hp0) {
     if (f.team === 0 || hp0[i] <= 0 || f.hp > 0) return;
     let by = -1;
     for (const e of S.ev) if (e.k === 'hit' && S.p[e.s]?.pl >= 0) by = S.p[e.s].pl;
-    if (by >= 0) S.score[by] += i === S.boss ? 5000 : 300;
+    if (by >= 0) S.score[by] += f.pack ? 1700 : i === S.boss ? 5000 : 300;
   });
 }
 
@@ -95,7 +105,9 @@ function lifeCycle(S) {
     if (f.hp > 0 || f.gone >= 2) continue;
     if (!f.gone) {
       f.gone = 1;
-      S.ev.push({ k: f.pl >= 0 ? 'die' : 'kill', s: f.i, x: f.x, z: f.z, boss: f.i === S.boss ? 1 : 0 });
+      const pack = f.pack ? S.p.filter((g) => g.pack && g.hp > 0) : null;     // 一起上的頭目：最後一個倒了才算頭目倒下；倒一個，剩下的電腦高一級
+      if (pack) for (const g of pack) if (g.ai) g.ai.lv = Math.min(LV_MAX, g.ai.lv + 1);
+      S.ev.push({ k: f.pl >= 0 ? 'die' : 'kill', s: f.i, x: f.x, z: f.z, boss: (pack ? !pack.length : f.i === S.boss) ? 1 : 0 });
       // 雜兵每倒幾隻掉一個吃的（從身上彈出來）
       const food = QUESTS[S.quest].food;
       if (f.pl < 0 && food && ++S.kills % DROP_EVERY === 0) { const q = spawnItem(S, food[(S.kills / DROP_EVERY | 0) % food.length], f.x, f.z, 400); q.vy = 45; }
@@ -104,7 +116,7 @@ function lifeCycle(S) {
     if (f.pl < 0) { if (f.t >= GONE_AT) f.gone = 2; continue; }
     if (f.gone !== 1 || f.t < DIE_WAIT) continue;
     f.gone = 3;                                       // 玩家：這條命算過了（復活時 newFighter 會歸零）
-    S.lives[f.pl]--;
+    S.lives[f.pl]--; S.dead[f.pl]++;
     if (S.lives[f.pl] > 0) respawn(S, f);
     else S.ev.push({ k: 'out', s: f.i });
   }
@@ -152,6 +164,8 @@ function progress(S, Q) {
   if (S.wave + 1 < sec.waves.length) {
     S.wave++;
     S.pend = sec.waves[S.wave].map((e) => ({ ...e }));
+    const minis = S.pend.filter((e) => e.mini), add = minis.length ? ADD_BY_N[Math.min(S.np, ADD_BY_N.length - 1)] : 0;
+    for (let k = 0; k < add; k++) { const e = minis[k % minis.length]; S.pend.push({ ...e, side: e.side === 'L' ? 'R' : 'L' }); }
     S.st = 0; S.wt = 50;
     return;
   }
@@ -180,13 +194,17 @@ function spawnNext(S) {
   if (slot < 0) slot = S.p.length;
   const f = newFighter(e.ch, slot, 1, x, e.side === 'L' ? 1 : -1);
   f.z = ZS[(S.f + slot) % ZS.length];
-  f.hp = f.mhp = (e.hp * HP_BY_N[Math.min(S.np, HP_BY_N.length - 1)] / 100) | 0;
+  f.hp = f.mhp = (e.hp * (e.boss ? BOSS_BY_N : HP_BY_N)[Math.min(S.np, HP_BY_N.length - 1)] / 100) | 0;
   f.mp = e.boss ? MP : 300;
   f.mini = e.mini ? 1 : 0;
   f.pow = e.pow ?? 100;
-  if (f.mini) f.mp = 0;                               // 雜兵不放必殺（ai.js 的 MOB 也不會按）
+  if (f.mini) f.mp = e.elite ? 200 : 0;               // 雜兵不放必殺（ai.js 的 MOB 也不會按）；精英（elite）有魔力、會放
+  if (e.elite) f.elite = 1;
+  if (e.carry) giveItem(S, f, e.carry);               // 扛著東西進場（海牛員工）
+  if (e.rage) f.rage = 1;                             // 血剩一半進第二階段（questStep）
+  if (e.pack) f.pack = 1;                             // 一起上的頭目：共用帶頭權（ai.js packTok）
   f.ai = newAI(e.lv, (S.seed ^ Math.imul(S.f + 1, 0x9e3779b1) ^ Math.imul(slot + 1, 0x85ebca6b)) >>> 0, f.mini);
   S.p[slot] = f;
-  if (e.boss) { S.boss = slot; S.ev.push({ k: 'boss', s: slot }); }
+  if (e.boss && !(e.pack && S.boss >= 0 && S.p[S.boss]?.pack && S.p[S.boss].gone !== 2)) { S.boss = slot; S.ev.push({ k: 'boss', s: slot, name: e.pack ? QUESTS[S.quest].bossName : '', say: QUESTS[S.quest].bossSay || '' }); }   // 一起上的只報第一個
   S.ev.push({ k: 'spawn', s: slot });
 }

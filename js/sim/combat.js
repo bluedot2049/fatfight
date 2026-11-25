@@ -13,6 +13,7 @@ const box = (f, b) => {
   const xa = f.x + f.face * b[0], xb = f.x + f.face * b[2];
   return [Math.min(xa, xb), f.y + b[1], Math.max(xa, xb), f.y + b[3]];
 };
+const ARMOR_FALL = 40;     // 打不動的角色：倒值比這小的普通拳打不出硬直
 const overlap = (a, b) => a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
 
 // 受擊框（相對座標）
@@ -21,6 +22,7 @@ export function hurtBoxes(f) {
   if (isUnder(f)) return [];
   const C = CHARS[f.ch], m = moveOf(f);
   if (m && m.hurt) return [m.hurt];
+  if (m && m.sweep && m.sweep.hurt) return [[-C.w, 0, Math.max(C.w, hitBoxes(m, m.hits[0], f.t, f.sf)[0][2]), C.hc]];   // 長長長臘腸：拉長的整條都挨得到
   if (f.act === 'fall') return [[-C.w, 100, C.w, (C.h * 0.6) | 0]];
   if (f.air) return [[-C.w, 0, C.w, (C.h * 0.85) | 0]];
   if (f.cr) return [[-C.w, 0, C.w, C.hc]];
@@ -44,6 +46,8 @@ function guards(d, fromX) {
 
 function hittable(d) {
   if (strikeInv(d)) return false;
+  if (d.act === 'grabbed') return false;                // 被抓著的人只有抓他的人打得到（抓著打、丟是直接扣血，不走這裡）：旁邊的拳、飛過來的箭和東西補上來，
+                                                        // 會變成「頭暈 → 被抓 → 被打飛 → 躺」超過 3 秒不能動
   if (d.act === 'fall' && d.jug >= 3) return false;     // 在空中最多再被追打三下
   if (d.act === 'fall' && d.bnc) return false;          // 彈過地的打不到（不然彈起來又被打飛、一直下不來）
   return true;
@@ -130,7 +134,14 @@ function applyHit(S, a, d, h, kind, fromX, isProj, m = null) {
     return;
   }
   a.mp = Math.min(MP, a.mp + gain);
-  if (d.hold >= 0) release(S, d);                        // 被抓的或在抓人的被打，手就鬆了
+  if (d.hold >= 0) release(S, d);
+  // 打不動（機器人，角色表 armor）：站得好好的時候，輕的普通拳只扣血、不硬直、不累積倒值。重的、必殺、丟過來的東西照樣打得動
+  if (CHARS[d.ch].armor && kind === 'n' && !isProj && !h.kd && h.fall < ARMOR_FALL && !d.air && d.act !== 'hit' && d.act !== 'dizzy' && d.act !== 'fall' && d.hp > h.dmg) {
+    d.hp -= h.dmg; d.lh = a.i; d.lhT = S.f; d.lhN = d.H.n;
+    d.stop = a.stop = h.stop; a.con = 1;
+    S.ev.push({ k: 'hit', s: a.i, d: d.i, x: ex, y: ey, z: ez, big: 0, dmg: h.dmg, combo: 1, kind, stop: h.stop, armor: 1 });
+    return;
+  }                        // 被抓的或在抓人的被打，手就鬆了
   // 被圍：不同的人接著打你，倒值只會讓你倒地、不會頭暈
   const gang = d.lh >= 0 && d.lh !== a.i && S.f - d.lhT < GANG_T;
   d.lh = a.i; d.lhT = S.f; d.lhN = d.H.n;
@@ -144,7 +155,7 @@ function applyHit(S, a, d, h, kind, fromX, isProj, m = null) {
   if (h.carry && d.hp > 0) {
     // 往上衝的必殺：跟著出手的人一起往上（速度對齊，下一下才接得到）
     launch(d, dir, Math.abs(a.vx), Math.max(a.vy + 6, 30), a);
-  } else if (d.air || h.kd || d.fallv >= KNOCK || d.hp <= 0) {
+  } else if (d.air || d.y > 0 || h.kd || d.fallv >= KNOCK || d.hp <= 0) {      // d.y > 0：會飛的浮在空中（貓頭鷹），打到就掉下來
     launch(d, dir, h.dvx, h.dvy, a);
     d.jug++;
     if (h.fire) d.burn = 1;
@@ -226,7 +237,7 @@ export function resolveHits(S, booms = []) {
     const m = moveOf(a);
     if (!m) continue;
     for (const [i, h] of activeHits(a)) {
-      const hbs = hitBoxes(m, h, a.t).map((b) => box(a, b)), zr = h.zr || Z_REACH, az = a.z + (m.aim ? a.az : 0);
+      const hbs = hitBoxes(m, h, a.t, a.sf).map((b) => box(a, b)), zr = h.zr || Z_REACH, az = a.z + (m.aim ? a.az : 0);
       for (const hb of hbs) atk.push([a, hb]);
       for (const d of S.p) {
         if (d.team === a.team || !hittable(d)) continue;
@@ -260,7 +271,7 @@ export function resolveHits(S, booms = []) {
   for (let i = 0; i < pr.length; i++) {
     for (let j = i + 1; j < pr.length; j++) {
       const a = pr[i], b = pr[j];
-      if (a.team !== b.team && a.life > 0 && b.life > 0 && !a.wt && !b.wt && Math.abs(a.x - b.x) < (a.w + b.w) && Math.abs(a.y - b.y) < (a.h + b.h) && Math.abs(a.z - b.z) < Z_REACH) {
+      if (a.team !== b.team && a.life > 0 && b.life > 0 && !a.wt && !b.wt && !a.pierce && !b.pierce && Math.abs(a.x - b.x) < (a.w + b.w) && Math.abs(a.y - b.y) < (a.h + b.h) && Math.abs(a.z - b.z) < Z_REACH) {
         a.life = b.life = 0;
         S.ev.push({ k: 'clash', x: (a.x + b.x) >> 1, y: (a.y + b.y) >> 1, z: a.z });
       }
@@ -272,7 +283,13 @@ export function resolveHits(S, booms = []) {
     const qb = [q.x - q.w, q.y - q.h, q.x + q.w, q.y + q.h];
     for (const d of S.p) {
       if (d.team === q.team || !hittable(d) || Math.abs(d.z - q.z) > Z_REACH) continue;
+      if (q.pierce && q.hl.includes(d.i)) continue;
       if (!hurtBoxes(d).some((b) => overlap(qb, box(d, b)))) continue;
+      if (q.pierce) {                                    // 聲波：穿過去，每個人打一次
+        q.hl.push(d.i);
+        applyHit(S, S.p[q.o], d, { dmg: q.dmg, fall: q.fall, bdef: 30, hs: 19, stop: 5, dvx: q.dvx ?? 16, dvy: q.dvy ?? 50, kd: q.kd ?? 0, y: q.y }, 'sp', q.x - q.vx, true);
+        continue;
+      }
       q.life = 0;
       // 集滿的大泡泡：一定打倒、飛得遠、頓得重
       const h = q.big ? { dmg: q.dmg, fall: 80, bdef: 60, hs: 24, stop: 14, dvx: 40, dvy: 85, kd: 1, y: q.y }

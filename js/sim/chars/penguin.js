@@ -55,7 +55,7 @@ const SU = [
 ];
 
 export default {
-  id: 'penguin', name: '企鵝', full: '冷著臉的白企鵝', color: '#ff8a4a',
+  id: 'penguin', name: '企鵝', full: '企鵝', color: '#ff8a4a',
   blurb: '吐火、火球封路、火柱打在腳下', stat: [3, 5, 2],
   pal: ['#ff6a2a', '#5a1608'], card: { attr: '火', type: '冷面法師', lv: 5, art: 'fire' },
   voice: { f0: 100, size: 1.0, mora: 0.13 },

@@ -12,6 +12,7 @@ import { cmdHtml, withKeys } from './menu.js';
 import { gt, gtSet } from './gt.js';
 import { setPal, seal, ROMAN, studs } from './arcane.js';
 import { portraitURL } from '../view/portrait.js';
+import { frame } from './ornate.js';
 
 const $ = (s, el = document) => el.querySelector(s);
 const N = ['一', '二', '三', '四', '五'];
@@ -20,10 +21,10 @@ export class Hud {
   constructor(root) {
     this.root = root;
     const side = (i) => `<div class="pp p${i}">
-        <div class="plate">${studs()}</div>
+        <div class="plate">${frame(620, 98, { R: 13, cn: [0, 1, 1, 0], inner: 6, cls: 'plate' })}</div>
         <div class="medal"><i class="img"></i></div><span class="tag">${i + 1}P</span>
         <div class="nm"><b></b></div>
-        <div class="hp"><i class="trail"></i><i class="fill"></i></div>
+        <div class="hp"><i class="trail"></i><i class="fill"></i></div><i class="hptip"></i>
         <div class="mp">${'<i></i>'.repeat(10)}</div>
         <div class="sp">${seal('超')}</div>
         <div class="wins"><b></b><b></b></div>
@@ -68,7 +69,7 @@ export class Hud {
   // 開場先要一次會用到的字和頭像：思源宋體是分包下載的，招式名第一次出現才抓的話會頓一下、字還會跳
   warm() {
     const names = Object.values(CHARS).flatMap((c) => [c.name, c.full, c.blurb || '', c.card?.type || '', c.card?.attr || '', ...c.specials.map((s) => s.name), ...c.supers.map((s) => s.name)]).join('');
-    const text = names + '連擊傷害第一二三四五回合開打勝平手破防超必殺練習木樁選角色好了等對方力距速定發動關海底沉船前進接關按繼續分數歸零頭目出局過結束電腦';
+    const text = names + Object.values(QUESTS).map((q) => q.name + (q.bossName || '') + (q.bossSay || '') + (q.rageName || '')).join('') + '連擊傷害第一二三四五回合開打勝平手破防超必殺練習木樁選角色好了等對方力距速定發動關海底沉船前進接關按繼續分數歸零頭目出局過結束電腦';
     try {
       document.fonts.load('900 40px "Noto Serif TC"', text);
       document.fonts.load('700 40px "Noto Serif TC"', text);
@@ -190,26 +191,29 @@ export class Hud {
       if (sc !== e.sc) { e.sc = sc; e.score.textContent = sc.toLocaleString('en-US'); }
     });
     const boss = S.boss >= 0 ? S.p[S.boss] : null, bel = $('.boss', this.root);
-    const bon = !!boss && boss.gone !== 2;
+    // 一起上的頭目（營火三冒險者）：一條血條算三個人加起來的，名字照關卡表的 bossName
+    const pack = boss && boss.pack ? S.p.filter((f) => f.pack && f.team === boss.team) : null;
+    const bmax = pack ? pack.reduce((a, f) => a + f.mhp, 0) : boss ? boss.mhp : 1, bhp = pack ? pack.reduce((a, f) => a + Math.max(0, f.hp), 0) : boss ? Math.max(0, boss.hp) : 0;
+    const bon = !!boss && (pack ? pack.some((f) => f.gone !== 2) : boss.gone !== 2);
     if (bon !== q.bon) {
       q.bon = bon; bel.classList.toggle('on', bon);
-      if (bon) { setPal(bel, boss.ch); $('.bn b', bel).textContent = CHARS[boss.ch].full; q.btr = boss.mhp; }
+      if (bon) { setPal(bel, boss.ch); $('.bn b', bel).textContent = (pack && QUESTS[S.quest]?.bossName) || CHARS[boss.ch].full; q.btr = bmax; }
     }
     if (bon) {
-      const hp = Math.max(0, boss.hp);
-      q.btr = hp < q.btr ? Math.max(hp, q.btr - boss.mhp * dt * (boss.act === 'hit' || boss.act === 'fall' ? 0.05 : 0.5)) : hp;
-      $('.fill', bel).style.width = `${hp / boss.mhp * 100}%`;
-      $('.trail', bel).style.width = `${q.btr / boss.mhp * 100}%`;
+      const hp = bhp, hurt = (pack || [boss]).some((f) => f.act === 'hit' || f.act === 'fall');
+      q.btr = hp < q.btr ? Math.max(hp, q.btr - bmax * dt * (hurt ? 0.05 : 0.5)) : hp;
+      $('.fill', bel).style.width = `${hp / bmax * 100}%`;
+      $('.trail', bel).style.width = `${q.btr / bmax * 100}%`;
     }
     // 敵人頭上：小血條跟著人走（頭目用下面那條）
     let n = 0;
     if (this.view) for (const f of S.p) {
-      if (f.pl >= 0 || f.hp <= 0 || f.i === S.boss || n >= this.ebars.length) continue;
+      if (f.pl >= 0 || f.hp <= 0 || (f.i === S.boss && !f.pack) || n >= this.ebars.length) continue;   // 一起上的頭目各自頭上也有一條，看得出先打誰
       const b = this.ebars[n++];
       const [x, y] = this.view.toScreen(f.x / 1000, (f.y + CHARS[f.ch].h) / 1000 + 0.18, f.z / 1000);
       b.style.transform = `translate(${x | 0}px, ${y | 0}px)`;
       b.firstChild.style.width = `${Math.max(0, f.hp) / f.mhp * 100}%`;
-      b.classList.add('on');
+      b.classList.add('on'); b.classList.toggle('elite', !!f.elite);
     }
     for (; n < this.ebars.length; n++) this.ebars[n].classList.remove('on');
     $('.goarrow', this.root).classList.toggle('on', !!S.go && S.ph === 'fight');
@@ -254,7 +258,7 @@ export class Hud {
     const sideOf = (s) => { const k = this.players(S).indexOf(S.p[s]); return k >= 0 ? k : 1; };   // 不是玩家的（闖關的敵人）算右邊
     switch (e.k) {
       case 'stage': this.announce(`第${N[e.n - 1] || e.n}關`, 2.2, 'round', e.name); break;
-      case 'boss': this.callout(1, CHARS[S.p[e.s].ch].full, '頭目'); break;
+      case 'boss': this.callout(1, e.name || CHARS[S.p[e.s].ch].full, e.say || '頭目'); break;      // 關卡表的 bossSay：頭目進場說的一句話
       case 'clear': this.announce('過關', 3.5, 'go'); this.flash(0.4); break;
       case 'out': if (this.players(S).filter(Boolean).length > 1) this.callout(this.players(S).indexOf(S.p[e.s]) === 1 ? 1 : 0, `按 ${btnName('A')} 接關`, '出局'); break;
       case 'round': if (!S.opt.train) this.announce(`第${N[e.n - 1] || e.n}回合`, 1.5, 'round', `ROUND ${ROMAN[e.n - 1] || e.n}`); else this.announce('練習', 1.2); break;

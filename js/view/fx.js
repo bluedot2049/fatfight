@@ -4,6 +4,7 @@
 
 import * as THREE from 'three';
 import { kit } from './kit.js';
+import { Batch } from './batch.js';
 
 // 刷子邊的圓：從中心往外一筆一筆刷，邊緣參差，照影片的氣焰
 function brushTex(spiky) {
@@ -148,12 +149,30 @@ function boltTex(seed) {
 
 const TEX = {};
 const PLANE = new THREE.PlaneGeometry(1, 1);
-const FIRE = ['#fff0b0', '#ffa236', '#d8341a'].map((c) => new THREE.Color(c));   // 火的三段顏色：芯、焰、尾
 const sprite = (tex, color, opacity = 1) => new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, color, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false }));
 
+// 實心圓（煙塵）、整張白（地上的裂口）：跟其他小圖疊在一起給 batch 用
+function fillCanvas(round) {
+  const c = document.createElement('canvas');
+  c.width = c.height = 256;
+  const g = c.getContext('2d');
+  g.fillStyle = '#fff';
+  if (round) { g.beginPath(); g.arc(128, 128, 127, 0, Math.PI * 2); g.fill(); } else g.fillRect(0, 0, 256, 256);
+  return c;
+}
+// 粒子用第幾張圖（照 FX 建構時疊的順序）
+const T = { aura: 0, soft: 1, star: 2, ring: 3, streak: 4, seam: 5, wave: 6, rays: 7, bolt: 8, disc: 14, white: 15 };
+const WHITE = '#ffffff';
+// 火的三段顏色：芯、焰、尾。中間的顏色照原本的算法在線性空間裡混，再換回畫面上的顏色
+const FIRE = ['#fff0b0', '#ffa236', '#d8341a'].map((c) => new THREE.Color(c));
+const enc = (v) => (v <= 0.0031308 ? v * 12.92 : 1.055 * Math.pow(v, 1 / 2.4) - 0.055);
+function fireColor(o, a, b, t) {
+  o.r = enc(a.r + (b.r - a.r) * t); o.g = enc(a.g + (b.g - a.g) * t); o.b = enc(a.b + (b.b - a.b) * t);
+}
+
+// 每一種特效都是「放幾顆粒子、每顆照活到幾成（k）改大小位置透明度」；畫交給 batch.js 一次畫完
 export class FX {
   constructor(scene) {
-    this.scene = scene;
     TEX.aura = TEX.aura || brushTex(true);
     TEX.soft = TEX.soft || brushTex(false);
     TEX.star = TEX.star || starTex();
@@ -163,57 +182,48 @@ export class FX {
     TEX.wave = TEX.wave || waveTex();
     TEX.rays = TEX.rays || raysTex();
     TEX.bolts = TEX.bolts || [1, 2, 3, 4, 5, 6].map(boltTex);
-    this.list = [];
-    this.dustMat = new THREE.MeshBasicMaterial({ color: '#5a4b3e', transparent: true, depthWrite: false });
-    this.dustGeo = new THREE.SphereGeometry(1, 8, 6);
+    const img = (t) => t.image;
+    this.b = new Batch(scene, [TEX.aura, TEX.soft, TEX.star, TEX.ring, TEX.streak, TEX.seam, TEX.wave, TEX.rays, ...TEX.bolts].map(img).concat(fillCanvas(true), fillCanvas(false)));
   }
-  add(obj, life, upd) { this.scene.add(obj); this.list.push({ obj, life, t: 0, upd }); }
+  // view.warm 會先把清單換成空的、畫一次、再換回來
+  get list() { return this.b.live; }
+  set list(v) { this.b.live = v; }
+  // 朝鏡頭的一顆（原本的 Sprite）
+  sp(tex, color, x, y, z, life, upd) { return this.b.add(tex, color, x, y, z, life, upd); }
+  // 躺在地板上的一片（原本轉平的平面）
+  flat(tex, color, x, y, z, life, upd) { const o = this.b.add(tex, color, x, y, z, life, upd); o.gnd = 1; return o; }
 
   // 打中：白光一閃＋一圈色環。big：重攻擊、超必殺
   spark(x, y, big, color, z = 0) {
-    const s = sprite(TEX.star, '#ffffff');
-    s.position.set(x, y, z + 0.4);
-    s.material.rotation = Math.random() * 6.28;
     const S0 = big ? 1.3 : 0.75;
-    this.add(s, big ? 0.22 : 0.15, (o, k) => { o.scale.setScalar(S0 * (0.6 + k * 0.8)); o.material.opacity = 1 - k; });
-    const r = sprite(TEX.ring, color);
-    r.position.set(x, y, z + 0.35);
-    this.add(r, 0.25, (o, k) => { o.scale.setScalar((big ? 1.6 : 0.9) * (0.3 + k)); o.material.opacity = (1 - k) * 0.9; });
+    this.sp(T.star, WHITE, x, y, z + 0.4, big ? 0.22 : 0.15, (o, k) => { o.sx = o.sy = S0 * (0.6 + k * 0.8); o.a = 1 - k; }).rot = Math.random() * 6.28;
+    this.sp(T.ring, color, x, y, z + 0.35, 0.25, (o, k) => { o.sx = o.sy = (big ? 1.6 : 0.9) * (0.3 + k); o.a = (1 - k) * 0.9; });
     if (big) for (let i = 0; i < 6; i++) this.speck(x, y, color, 3.5, z);
   }
   // 刀光：幾道交叉的光從打中的點拉長再變細
   slash(x, y, color, big, z = 0) {
     const n = big ? 4 : 2, base = Math.random() * Math.PI;
     for (let i = 0; i < n; i++) {
-      const s = sprite(TEX.streak, i % 2 ? color : '#ffffff');
-      s.position.set(x, y, z + 0.42);
-      s.material.rotation = base + i * (Math.PI / n) + (Math.random() - 0.5) * 0.3;
+      const rot = base + i * (Math.PI / n) + (Math.random() - 0.5) * 0.3;
       const len = (big ? 2.8 : 1.5) * (0.7 + Math.random() * 0.6), th = big ? 0.2 : 0.11;
-      this.add(s, big ? 0.22 : 0.14, (o, k) => { o.scale.set(len * (0.25 + k * 0.9), th * (1 - k), 1); o.material.opacity = 1 - k * k; });
+      this.sp(T.streak, i % 2 ? color : WHITE, x, y, z + 0.42, big ? 0.22 : 0.14, (o, k) => { o.sx = len * (0.25 + k * 0.9); o.sy = th * (1 - k); o.a = 1 - k * k; }).rot = rot;
     }
   }
   // 一團光亮一下
   glow(x, y, color, size = 1.5, z = 0, life = 0.18) {
-    const s = sprite(TEX.soft, color, 0.9);
-    s.position.set(x, y, z + 0.3);
-    this.add(s, life, (o, k) => { o.scale.setScalar(size * (0.7 + k * 0.5)); o.material.opacity = 0.9 * (1 - k); });
+    this.sp(T.soft, color, x, y, z + 0.3, life, (o, k) => { o.sx = o.sy = size * (0.7 + k * 0.5); o.a = 0.9 * (1 - k); });
   }
   // 碎片：往外噴、會往下掉
-  shards(x, y, color, n = 8, sp = 4, z = 0) { for (let i = 0; i < n; i++) this.speck(x, y, i % 3 ? color : '#ffffff', sp, z, 9, 1.6); }
+  shards(x, y, color, n = 8, sp = 4, z = 0) { for (let i = 0; i < n; i++) this.speck(x, y, i % 3 ? color : WHITE, sp, z, 9, 1.6); }
   // 地上的衝擊圈：貼著地板往外擴
   groundRing(x, z, color, size = 2, life = 0.4) {
-    const m = new THREE.Mesh(PLANE, new THREE.MeshBasicMaterial({ map: TEX.ring, color, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
-    m.rotation.x = -Math.PI / 2;
-    m.position.set(x, 0.02, z);
-    this.add(m, life, (o, k) => { const s = size * (0.15 + 0.85 * (1 - (1 - k) * (1 - k))); o.scale.set(s, s, 1); o.material.opacity = (1 - k) * 0.85; });
+    this.flat(T.ring, color, x, 0.02, z, life, (o, k) => { o.sx = o.sy = size * (0.15 + 0.85 * (1 - (1 - k) * (1 - k))); o.a = (1 - k) * 0.85; });
   }
   // 光柱：從腳下往上衝
   pillar(x, z, color, h = 4.5) {
     for (let i = 0; i < 3; i++) {
-      const s = sprite(TEX.streak, i ? color : '#ffffff');
-      s.material.rotation = Math.PI / 2;
       const off = (i - 1) * 0.28, w = i ? 0.7 : 1.1;
-      this.add(s, 0.45 + i * 0.08, (o, k) => { const hh = h * (0.3 + 0.9 * k); o.position.set(x + off, hh * 0.45, z - 0.1); o.scale.set(hh, w * (1 - k), 1); o.material.opacity = 1 - k * k; });
+      this.sp(T.streak, i ? color : WHITE, x, 0, z, 0.45 + i * 0.08, (o, k) => { const hh = h * (0.3 + 0.9 * k); o.x = x + off; o.y = hh * 0.45; o.z = z - 0.1; o.sx = hh; o.sy = w * (1 - k); o.a = 1 - k * k; }).rot = Math.PI / 2;
     }
     for (let i = 0; i < 16; i++) this.speck(x + (Math.random() - 0.5) * 0.8, 0.2 + Math.random() * 0.6, color, 3.5, z, -5, 1.4);
     this.motes(x, 0.4, color, 14, z, 1.2);
@@ -221,118 +231,90 @@ export class FX {
   }
   // 地上的衝擊波：貼地往外推一圈光，裡面薄薄一層（取代魔法陣）
   wave(x, z, color, size = 3, life = 0.5) {
-    for (const [c, sz, l] of [[color, size, life], ['#ffffff', size * 0.62, life * 0.7]]) {
-      const m = new THREE.Mesh(PLANE, new THREE.MeshBasicMaterial({ map: TEX.wave, color: c, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
-      m.rotation.x = -Math.PI / 2;
-      m.position.set(x, 0.03, z);
-      this.add(m, l, (o, k) => { const e = 1 - (1 - k) * (1 - k) * (1 - k), s = sz * (0.2 + 0.8 * e); o.scale.set(s, s, 1); o.material.opacity = (1 - k) * (1 - k); });
+    for (const [c, sz, l] of [[color, size, life], [WHITE, size * 0.62, life * 0.7]]) {
+      this.flat(T.wave, c, x, 0.03, z, l, (o, k) => { const e = 1 - (1 - k) * (1 - k) * (1 - k); o.sx = o.sy = sz * (0.2 + 0.8 * e); o.a = (1 - k) * (1 - k); });
     }
   }
   // 空中的衝擊波：朝鏡頭的一圈光往外擴，外緣最亮
   shock(x, y, color, size = 2, z = 0, life = 0.3) {
-    const s = sprite(TEX.wave, color);
-    s.position.set(x, y, z + 0.36);
-    this.add(s, life, (o, k) => { const e = 1 - (1 - k) * (1 - k); o.scale.setScalar(size * (0.15 + 0.85 * e)); o.material.opacity = 1 - k; });
+    this.sp(T.wave, color, x, y, z + 0.36, life, (o, k) => { const e = 1 - (1 - k) * (1 - k); o.sx = o.sy = size * (0.15 + 0.85 * e); o.a = 1 - k; });
   }
   // 光芒炸開：細光往外射、轉一點點
   rays(x, y, color, size = 2.5, z = 0, life = 0.28) {
-    const s = sprite(TEX.rays, color);
-    s.position.set(x, y, z + 0.38);
-    s.material.rotation = Math.random() * 6.28;
-    this.add(s, life, (o, k) => { o.scale.setScalar(size * (0.5 + k * 0.7)); o.material.opacity = k < 0.2 ? 1 : (1 - k) / 0.8; o.material.rotation += 0.01; });
+    this.sp(T.rays, color, x, y, z + 0.38, life, (o, k) => { o.sx = o.sy = size * (0.5 + k * 0.7); o.a = k < 0.2 ? 1 : (1 - k) / 0.8; o.rot += 0.01; }).rot = Math.random() * 6.28;
   }
   // 橫向閃光：一條很扁很長的光從那一點左右拉開（念力爆開那一下）
   flare(x, y, color, len = 3, z = 0, life = 0.22) {
-    for (const [c, w, l] of [[color, 0.16, len], ['#ffffff', 0.06, len * 0.7]]) {
-      const s = sprite(TEX.streak, c);
-      s.position.set(x, y, z + 0.44);
-      this.add(s, life, (o, k) => { o.scale.set(l * (0.3 + 0.7 * Math.sqrt(k)), w * (1 - k), 1); o.material.opacity = 1 - k; });
+    for (const [c, w, l] of [[color, 0.16, len], [WHITE, 0.06, len * 0.7]]) {
+      this.sp(T.streak, c, x, y, z + 0.44, life, (o, k) => { o.sx = l * (0.3 + 0.7 * Math.sqrt(k)); o.sy = w * (1 - k); o.a = 1 - k; });
     }
   }
   // 電弧：從那一點往外劈幾道，一閃一閃
   bolts(x, y, color, n = 3, len = 1.2, z = 0, life = 0.16) {
     for (let i = 0; i < n; i++) {
-      const s = sprite(TEX.bolts[(Math.random() * TEX.bolts.length) | 0], i % 2 ? '#ffffff' : color);
+      const tex = T.bolt + ((Math.random() * 6) | 0);
       const a = Math.random() * Math.PI * 2, l = len * (0.6 + Math.random() * 0.6);
-      s.material.rotation = a;
-      s.center.set(0, 0.5);                 // 從那一點往外長
-      s.position.set(x, y, z + 0.43);
       const ph = Math.random() * 6;
-      this.add(s, life * (0.7 + Math.random() * 0.6), (o, k) => { o.scale.set(l * Math.min(1, k * 4), l * 0.25, 1); o.material.opacity = (1 - k) * (0.55 + 0.45 * Math.sin(ph + k * 40)); });
+      const o = this.sp(tex, i % 2 ? WHITE : color, x, y, z + 0.43, life * (0.7 + Math.random() * 0.6), (o, k) => { o.sx = l * Math.min(1, k * 4); o.sy = l * 0.25; o.a = (1 - k) * (0.55 + 0.45 * Math.sin(ph + k * 40)); });
+      o.rot = a; o.anc = 1;                 // 從那一點往外長
     }
   }
   // 能量粒：從那一點散開往上飄的小光點（取代符文）
   motes(x, y, color, n = 4, z = 0, spread = 0.6) {
     for (let i = 0; i < n; i++) {
-      const s = sprite(TEX.soft, i % 3 ? color : '#ffffff');
-      s.position.set(x + (Math.random() - 0.5) * spread, y + (Math.random() - 0.5) * spread * 0.6, z + 0.35);
+      const px = x + (Math.random() - 0.5) * spread, py = y + (Math.random() - 0.5) * spread * 0.6;
       const vx = (Math.random() - 0.5) * 1.0, vy = 0.9 + Math.random() * 1.6, sz = 0.07 + Math.random() * 0.09, life = 0.5 + Math.random() * 0.4;
-      this.add(s, life, (o, k, dt) => { o.position.x += vx * dt; o.position.y += vy * dt; o.scale.setScalar(sz * (k < 0.15 ? k / 0.15 : 1 - (k - 0.15) * 0.8)); o.material.opacity = k < 0.5 ? 1 : (1 - k) * 2; });
+      this.sp(T.soft, i % 3 ? color : WHITE, px, py, z + 0.35, life, (o, k, dt) => { o.x += vx * dt; o.y += vy * dt; o.sx = o.sy = sz * (k < 0.15 ? k / 0.15 : 1 - (k - 0.15) * 0.8); o.a = k < 0.5 ? 1 : (1 - k) * 2; });
     }
   }
   // 集氣：一圈光點從外面往中間吸進來，最後白芯亮一下
   implode(x, y, color, r = 1.4, n = 14, z = 0, life = 0.4) {
     for (let i = 0; i < n; i++) {
-      const s = sprite(TEX.soft, i % 3 ? color : '#ffffff');
       const a = Math.random() * Math.PI * 2, rr = r * (0.7 + Math.random() * 0.5), sz = 0.08 + Math.random() * 0.08;
-      this.add(s, life * (0.75 + Math.random() * 0.25), (o, k) => {
+      this.sp(T.soft, i % 3 ? color : WHITE, x, y, z + 0.36, life * (0.75 + Math.random() * 0.25), (o, k) => {
         const d = rr * (1 - k * k);
-        o.position.set(x + Math.cos(a) * d, y + Math.sin(a) * d * 0.8, z + 0.36);
-        o.scale.set(sz * (1 + k * 3), sz, 1); o.material.rotation = a; o.material.opacity = Math.min(1, k * 3);
+        o.x = x + Math.cos(a) * d; o.y = y + Math.sin(a) * d * 0.8;
+        o.sx = sz * (1 + k * 3); o.sy = sz; o.rot = a; o.a = Math.min(1, k * 3);
       });
     }
-    const c = sprite(TEX.soft, '#ffffff');
-    c.position.set(x, y, z + 0.37);
-    this.add(c, life, (o, k) => { o.scale.setScalar(0.2 + k * k * r * 0.9); o.material.opacity = k * k; });
+    this.sp(T.soft, WHITE, x, y, z + 0.37, life, (o, k) => { o.sx = o.sy = 0.2 + k * k * r * 0.9; o.a = k * k; });
   }
   // 泡泡破掉：一圈＋水滴
   pop(x, y, color, z = 0) {
-    const r = sprite(TEX.ring, color);
-    r.position.set(x, y, z + 0.35);
-    this.add(r, 0.28, (o, k) => { o.scale.setScalar(0.4 + k * 1.1); o.material.opacity = (1 - k) * 0.9; });
-    this.glow(x, y, '#ffffff', 0.9, z, 0.12);
+    this.sp(T.ring, color, x, y, z + 0.35, 0.28, (o, k) => { o.sx = o.sy = 0.4 + k * 1.1; o.a = (1 - k) * 0.9; });
+    this.glow(x, y, WHITE, 0.9, z, 0.12);
     this.shards(x, y, color, 10, 3, z);
   }
   // 殘影：往後拉的一道光
   trail(x, y, color, len = 1.2, z = 0, th = 0.16) {
-    const s = sprite(TEX.streak, color, 0.7);
-    s.position.set(x, y, z - 0.05);
-    this.add(s, 0.22, (o, k) => { o.scale.set(len * (1 - k * 0.3), th * (1 - k), 1); o.material.opacity = 0.7 * (1 - k); });
+    this.sp(T.streak, color, x, y, z - 0.05, 0.22, (o, k) => { o.sx = len * (1 - k * 0.3); o.sy = th * (1 - k); o.a = 0.7 * (1 - k); });
   }
   // 擋住：念力護罩，一面扁扁的光殼閃一下、外緣亮，中間一點白
   block(x, y, z = 0, color = '#bfe6ff') {
-    const s = sprite(TEX.star, '#ffffff');
-    s.position.set(x, y, z + 0.4);
-    this.add(s, 0.1, (o, k) => { o.scale.setScalar(0.45 + k * 0.3); o.material.opacity = 1 - k; });
-    const w = sprite(TEX.wave, color);
-    w.position.set(x, y, z + 0.38);
-    this.add(w, 0.22, (o, k) => { o.scale.set(0.55 + k * 0.15, 1.1 + k * 0.3, 1); o.material.opacity = (1 - k) * 0.95; });
+    this.sp(T.star, WHITE, x, y, z + 0.4, 0.1, (o, k) => { o.sx = o.sy = 0.45 + k * 0.3; o.a = 1 - k; });
+    this.sp(T.wave, color, x, y, z + 0.38, 0.22, (o, k) => { o.sx = 0.55 + k * 0.15; o.sy = 1.1 + k * 0.3; o.a = (1 - k) * 0.95; });
     for (let i = 0; i < 4; i++) this.speck(x, y, color, 2.5, z);
   }
   // 小亮點往外噴（影片裡氣焰旁邊的水花點）
   // grav：往下掉的加速度（負的就是往上飄）；big：放大幾倍
   speck(x, y, color, sp = 1.2, z = 0, grav = 0, big = 1) {
-    const s = sprite(TEX.soft, color);
-    s.position.set(x, y, z + 0.3);
     const a = Math.random() * 6.28, v = sp * (0.4 + Math.random() * 0.6), sz = (0.05 + Math.random() * 0.06) * big;
     const vx = Math.cos(a) * v;
     let vy = Math.sin(a) * v;
-    this.add(s, 0.35 + Math.random() * 0.3, (o, k, dt) => { vy -= grav * dt; o.position.x += vx * dt; o.position.y = Math.max(0.02, o.position.y + vy * dt); o.scale.setScalar(sz * (1 - k)); o.material.opacity = 1 - k; });
+    this.sp(T.soft, color, x, y, z + 0.3, 0.35 + Math.random() * 0.3, (o, k, dt) => { vy -= grav * dt; o.x += vx * dt; o.y = Math.max(0.02, o.y + vy * dt); o.sx = o.sy = sz * (1 - k); o.a = 1 - k; });
   }
   // 火（企鵝）：一團火從亮黃變橘紅再淡掉，邊飄邊往上竄、先脹後縮。vx vy 每秒多少公尺
   flame(x, y, z = 0, size = 0.4, vx = 0, vy = 0.8, life = 0.38) {
-    const s = sprite(TEX.soft, '#fff0b0');
-    s.position.set(x, y, z + 0.32);
-    s.material.rotation = Math.random() * 6.28;
+    const rot = Math.random() * 6.28;
     const sz = size * (0.75 + Math.random() * 0.5), L = life * (0.8 + Math.random() * 0.4);
     let ux = vx, uy = vy;
-    this.add(s, L, (o, k, dt) => {
+    this.sp(T.soft, '#fff0b0', x, y, z + 0.32, L, (o, k, dt) => {
       uy += 2.2 * dt; ux *= 1 - 2.5 * dt;
-      o.position.x += ux * dt; o.position.y += uy * dt;
-      o.material.color.copy(k < 0.3 ? FIRE[0].clone().lerp(FIRE[1], k / 0.3) : FIRE[1].clone().lerp(FIRE[2], (k - 0.3) / 0.7));
-      o.scale.setScalar(sz * (k < 0.25 ? 0.5 + k * 2 : 1 - (k - 0.25) * 0.9));
-      o.material.opacity = k < 0.6 ? 0.95 : 0.95 * (1 - k) / 0.4;
-    });
+      o.x += ux * dt; o.y += uy * dt;
+      if (k < 0.3) fireColor(o, FIRE[0], FIRE[1], k / 0.3); else fireColor(o, FIRE[1], FIRE[2], (k - 0.3) / 0.7);
+      o.sx = o.sy = sz * (k < 0.25 ? 0.5 + k * 2 : 1 - (k - 0.25) * 0.9);
+      o.a = k < 0.6 ? 0.95 : 0.95 * (1 - k) / 0.4;
+    }).rot = rot;
   }
   // 火星：小亮點往上飄
   embers(x, y, z = 0, n = 2, spread = 0.3) { for (let i = 0; i < n; i++) this.speck(x + (Math.random() - 0.5) * spread, y, Math.random() < 0.5 ? '#ffd27a' : '#ff7a2a', 1.4, z, -2.5); }
@@ -340,16 +322,13 @@ export class FX {
   smoke(x, y, z = 0, n = 4) { this.dust(x, y, n, '#6a5a52', z); }
   dust(x, y = 0, n = 4, color, z = 0) {
     for (let i = 0; i < n; i++) {
-      const m = new THREE.Mesh(this.dustGeo, color ? new THREE.MeshBasicMaterial({ color, transparent: true, depthWrite: false }) : this.dustMat.clone());
-      m.position.set(x + (Math.random() - 0.5) * 0.4, y + 0.05, z + (Math.random() - 0.5) * 0.4);
+      const px = x + (Math.random() - 0.5) * 0.4, pz = z + (Math.random() - 0.5) * 0.4;
       const vx = (Math.random() - 0.5) * 1.2, vy = 0.3 + Math.random() * 0.5, sz = 0.06 + Math.random() * 0.08;
-      this.add(m, 0.5, (o, k, dt) => { o.position.x += vx * dt; o.position.y += vy * dt; o.scale.setScalar(sz * (0.6 + k)); o.material.opacity = 0.8 * (1 - k); });
+      this.sp(T.disc, color || '#5a4b3e', px, y + 0.05, pz, 0.5, (o, k, dt) => { o.x += vx * dt; o.y += vy * dt; o.sx = o.sy = sz * (0.6 + k) * 2; o.a = 0.8 * (1 - k); }).mode = 1;
     }
   }
   burst(x, y, color, size = 3, z = 0) {
-    const s = sprite(TEX.aura, color);
-    s.position.set(x, y, z - 0.2);
-    this.add(s, 0.5, (o, k) => { o.scale.setScalar(size * (0.4 + k * 0.9)); o.material.opacity = (1 - k) * 0.9; o.material.rotation += 0.05; });
+    this.sp(T.aura, color, x, y, z - 0.2, 0.5, (o, k) => { o.sx = o.sy = size * (0.4 + k * 0.9); o.a = (1 - k) * 0.9; o.rot += 0.05; });
     for (let i = 0; i < 14; i++) this.speck(x, y, color, 4, z);
   }
 
@@ -361,32 +340,15 @@ export class FX {
     const mx = (x0 + x1) / 2 + nx * j, mz = (z0 + z1) / 2 + nz * j;   // 中間折一下，連起來才像裂開不像畫線
     for (const [ax, az, bx, bz] of [[x0, z0, mx, mz], [mx, mz, x1, z1]]) {
       const l = Math.hypot(bx - ax, bz - az) + 0.04, a = Math.atan2(-(bz - az), bx - ax), cx = (ax + bx) / 2, cz = (az + bz) / 2;
-      const gash = new THREE.Mesh(PLANE, new THREE.MeshBasicMaterial({ color: '#1e1008', transparent: true, opacity: 0.9, depthWrite: false }));
-      gash.rotation.set(-Math.PI / 2, 0, a);
-      gash.position.set(cx, 0.01, cz);
       const w = (0.07 + Math.random() * 0.07) * wide;
-      this.add(gash, 1.2, (o, k) => { o.scale.set(l, w * (k < 0.08 ? k / 0.08 : 1 - k * 0.4), 1); o.material.opacity = k < 0.6 ? 0.9 : 0.9 * (1 - k) / 0.4; });
-      const g = new THREE.Mesh(PLANE, new THREE.MeshBasicMaterial({ map: TEX.seam, color, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
-      g.rotation.set(-Math.PI / 2, 0, a);
-      g.position.set(cx, 0.016, cz);
+      const gash = this.flat(T.white, '#1e1008', cx, 0.01, cz, 1.2, (o, k) => { o.sx = l; o.sy = w * (k < 0.08 ? k / 0.08 : 1 - k * 0.4); o.a = k < 0.6 ? 0.9 : 0.9 * (1 - k) / 0.4; });
+      gash.rot = a; gash.mode = 1;
       const ph = Math.random() * 6, gw = (0.22 + Math.random() * 0.1) * wide;
-      this.add(g, 0.55 + Math.random() * 0.25, (o, k) => { o.scale.set(l, gw * (1 - k * 0.5), 1); o.material.opacity = Math.min(1, (1 - k) * 1.6) * (0.65 + 0.35 * Math.sin(ph + k * 35)); });
+      this.flat(T.seam, color, cx, 0.016, cz, 0.55 + Math.random() * 0.25, (o, k) => { o.sx = l; o.sy = gw * (1 - k * 0.5); o.a = Math.min(1, (1 - k) * 1.6) * (0.65 + 0.35 * Math.sin(ph + k * 35)); }).rot = a;
     }
   }
 
-  update(dt) {
-    for (let i = this.list.length - 1; i >= 0; i--) {
-      const e = this.list[i];
-      e.t += dt;
-      const k = Math.min(1, e.t / e.life);
-      e.upd(e.obj, k, dt);
-      if (k >= 1) {
-        this.scene.remove(e.obj);
-        if (e.obj.material && e.obj.material !== this.dustMat) e.obj.material.dispose?.();
-        this.list.splice(i, 1);
-      }
-    }
-  }
+  update(dt) { this.b.update(dt); }
 }
 
 // 頭暈時頭上轉的星星
@@ -456,6 +418,15 @@ export function ringMesh(color) {
   const m = new THREE.Mesh(PLANE, new THREE.MeshBasicMaterial({ map: TEX.ring || (TEX.ring = ringTex()), color, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
   m.rotation.x = -Math.PI / 2;
   return m;
+}
+// 聲波：三圈扁扁的光環一圈比一圈淡（臘腸狗汪汪），view 照方向擺
+export function soundMesh() {
+  const g = new THREE.Group();
+  for (let i = 0; i < 3; i++) {
+    const s = sprite(TEX.wave || (TEX.wave = waveTex()), i ? '#ffe9a0' : '#fffbe8', 0.9 - i * 0.25);
+    g.add(s);
+  }
+  return g;
 }
 // 火球：一團亮芯＋外面一圈火光（都是貼圖，沒有描邊）
 export function fireballMesh() {

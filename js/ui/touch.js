@@ -5,6 +5,7 @@
 // 樣式在 css/touch.css。另外管「請橫拿」那張卡、左上角的返回、上緣的暫停鈕。
 
 import { UP, DOWN, LEFT, RIGHT, BA, BJ, BD, BS } from '../sim/const.js';
+import { button } from './ornate.js';
 import { device } from './keys.js';
 import { setPal } from './arcane.js';
 
@@ -41,7 +42,7 @@ export class Touch {
       <i class="tj DJ"></i><i class="tj DS"></i><i class="tj SA"></i><i class="tj AJ"></i>
       <button class="tpause" aria-label="暫停"><i></i><i></i></button>
     </div>`);
-    this.backBtn = add('<button id="tback" hidden>返回</button>');
+    this.backBtn = add(`<button id="tback" hidden>${button(96, 40, 'sub')}<span>返回</span></button>`);
     this.turn = add(`<div id="turn"><div><i class="ph"></i><b>請橫拿</b><button ${canFull() ? '' : 'hidden'}>全螢幕</button></div></div>`);
     const $ = (s) => this.root.querySelector(s);
     this.stickEl = $('.stick'); this.knob = $('.knob'); this.base = $('.base');

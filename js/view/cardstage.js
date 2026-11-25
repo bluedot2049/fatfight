@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { BUILD } from './models.js';
 import { poseOf, applyPose, ZERO } from './poses.js';
 import { ROSTER } from '../sim/chars/index.js';
+import { InkLines } from './inkline.js';
 
 export const PPM = 0.62;   // 一公尺＝框高的幾倍（海牛 1.45 公尺剛好站滿框，舉手時才冒出去一點）
 const FEET = 0.95;         // 腳踩在框的幾成高
@@ -20,6 +21,7 @@ export class CardStage {
     this.r.outputColorSpace = THREE.SRGBColorSpace;
     this.r.setClearColor(0x000000, 0);
     this.r.autoClear = false;
+    this.ink = /[?&]noink/.test(location.search) ? null : new InkLines(this.r);   // 手疊在身上的內線（?noink 關掉對照）
     this.scene = new THREE.Scene();
     this.scene.add(new THREE.HemisphereLight('#f2f0ff', '#3a2a55', 1.8));
     const key = new THREE.DirectionalLight('#fff8ec', 2.0);
@@ -91,6 +93,7 @@ export class CardStage {
       this.r.setViewport(V.x, vy, V.w, V.h);
       this.r.setScissor(V.x, Math.max(0, H - (b.top + b.height)), V.w, b.top + b.height - Math.max(0, V.y));
       this.r.render(this.scene, this.cam);
+      if (this.ink) { const pr = this.r.getPixelRatio(); this.ink.draw(this.scene, this.cam, [V.x, vy, V.w, V.h].map((v) => Math.floor(v * pr))); }
     }
   }
 }

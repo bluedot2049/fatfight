@@ -47,6 +47,7 @@ function part(geo, color, x, y, z, s, o = {}) {
   if (o.line !== false) {
     const l = new THREE.Mesh(geo, outlineMat);
     l.scale.copy(m.scale);
+    l.userData.hull = true;                 // 描邊殼（inkline.js 找內線時不畫它）
     g.add(l);
   }
   g.position.set(x, y, z);
@@ -67,10 +68,44 @@ export function kit(parent) {
   };
 }
 
+// 兩層肉（使用者 2026-11-25：身體接成一層就好，頭不用改）：身體球和上身球同一個顏色的話——
+//   明暗改照「包住這兩顆的一顆大蛋」來算，兩顆交界就不會多一圈暗帶（原本每顆球各有自己的暗面，疊起來像三層肉）；
+//   這兩顆的描邊往後退一點深度，疊住的地方被前面那顆蓋掉，只剩外輪廓。
+// 形狀和關節都沒動，姿勢照舊彎；彎得多的時候交界自然會有一點摺。顏色不同（穿盔甲的）、沒有上身球的不處理。
+const backLine = outlineMat.clone();
+backLine.vertexShader = backLine.vertexShader.replace('gl_Position = projectionMatrix * mv;',
+  'gl_Position = projectionMatrix * mv; vec4 far = projectionMatrix * (mv + vec4(0.0, 0.0, -0.16, 0.0)); gl_Position.z = far.z / far.w * gl_Position.w;');
+const eggs = new Map();
+export function fuse(body, upper) {
+  const b = body.children[0], u = upper.children[0];
+  const plain = (g) => g && g.children.length === 2 && g.children[0].isMesh && g.children[0].geometry === SPHERE && !g.rotation.x && !g.rotation.y && !g.rotation.z;
+  if (!plain(b) || !plain(u) || b.children[0].material !== u.children[0].material) return;
+  const bm = b.children[0], um = u.children[0];
+  const cb = b.position, cu = upper.position.clone().add(u.position);
+  const bot = cb.y - bm.scale.y, top = cu.y + um.scale.y;
+  const C = new THREE.Vector3(0, (top + bot) / 2, (cb.z + cu.z) / 2);                                    // 大蛋的中心和三個半徑
+  const R = new THREE.Vector3(Math.max(bm.scale.x, um.scale.x), (top - bot) / 2, Math.max(bm.scale.z, um.scale.z));
+  for (const [m, c] of [[bm, cb], [um, cu]]) {
+    const key = [c.x, c.y, c.z, m.scale.x, m.scale.y, m.scale.z, C.y, C.z, R.x, R.y, R.z].map((v) => v.toFixed(3)).join();
+    if (!eggs.has(key)) {
+      const g = SPHERE.clone(), P = g.attributes.position, N = g.attributes.normal, n = new THREE.Vector3();
+      for (let i = 0; i < P.count; i++) {
+        n.set((c.x + P.getX(i) * m.scale.x - C.x) / (R.x * R.x), (c.y + P.getY(i) * m.scale.y - C.y) / (R.y * R.y), (c.z + P.getZ(i) * m.scale.z - C.z) / (R.z * R.z)).normalize();
+        n.multiply(m.scale).normalize();                // 網格自己有壓扁拉長，存的時候先乘回去，畫出來才是上面算的方向
+        N.setXYZ(i, n.x, n.y, n.z);
+      }
+      eggs.set(key, g);
+    }
+    m.geometry = eggs.get(key);
+    m.parent.children[1].material = backLine;
+  }
+}
+
 // 關節：一個空的 Group，零件掛在底下，轉它整串跟著動
 export function joint(parent, x, y, z) {
   const g = new THREE.Group();
   g.position.set(x, y, z);
+  g.userData.joint = true;                  // inkline.js 照關節分編號：不同關節疊在一起才畫內線
   parent.add(g);
   return g;
 }

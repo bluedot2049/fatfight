@@ -4,7 +4,10 @@
 // 模型朝 +z（臉朝前）、aN 是靠鏡頭那隻手（-x）；面向左邊時整隻鏡像（root.scale.x = -1），靠鏡頭的永遠是同一隻。
 
 import * as THREE from 'three';
-import { kit, joint, INK } from './kit.js';
+import { kit, joint, INK, fuse } from './kit.js';
+import { tagInk } from './inkline.js';
+import { FOREST } from './models-forest.js';
+import { MOON } from './models-moon.js';       // 第四關月球工廠的三隻（另一支檔）   // 第三關黑森林的六隻（另一支檔）
 
 function rig() {
   const root = new THREE.Group();
@@ -426,4 +429,38 @@ export function buildPenguin() {
   return { root, turn, J: { body, upper, head, aN, aF, tail, lN, lF }, tongue: null, door: { j: door, glow, leaves }, h: 1.55 };
 }
 
-export const BUILD = { manatee: buildManatee, marmot: buildMarmot, elephant: buildElephant, penguin: buildPenguin, sealion: buildSealion, hammer: buildHammer, squid: buildSquid, frog: buildFrog, mushroom: buildMushroom, moss: buildMoss, dwarf: buildDwarf };
+// 黃色臘腸狗（照資料夾裡的插圖 33.png）：橫的長身體、短腿、長嘴往下垂、大黑鼻子、垂耳、豆豆眼。
+// 前半身（胸、前腳、頭）在 upper，中間一截身體在 mid：長長長臘腸的時候 view 把 upper 往前推、mid 拉長（model.stretch）
+export function buildDog() {
+  const { root, turn, body } = rig();
+  const C = '#f6c93c', DARK = '#d9a62a', NOSE = '#141210', INSIDE = '#e6b232';
+  const k = kit(body);
+  k.ball(0.27, C, 0, 0.42, -0.3, { sx: 0.95, sy: 0.92, sz: 1.1 });                 // 屁股
+  const mid = joint(body, 0, 0.43, -0.04);
+  kit(mid).caps(0.235, 0.36, C, 0, 0, 0, { rx: Math.PI / 2, sx: 1.0 });            // 中間那截（拉長用）
+  const lN = joint(body, -0.13, 0.2, -0.34), lF = joint(body, 0.13, 0.2, -0.34);   // 後腳
+  for (const l of [lN, lF]) { const q = kit(l); q.caps(0.07, 0.1, C, 0, -0.06, 0); q.ball(0.075, DARK, 0, -0.16, 0.04, { sy: 0.55, sz: 1.3 }); }
+  const tail = joint(body, 0, 0.55, -0.55);
+  kit(tail).caps(0.04, 0.26, C, 0, 0.1, -0.06, { rx: -0.5 });
+  const upper = joint(body, 0, 0.43, 0.22);
+  kit(upper).ball(0.26, C, 0, 0.02, 0.04, { sx: 0.95, sy: 1.0, sz: 1.05 });       // 胸口
+  const aN = joint(upper, -0.13, -0.18, 0.12), aF = joint(upper, 0.13, -0.18, 0.12);   // 前腳（出拳用的就是前腳）
+  for (const a of [aN, aF]) { const q = kit(a); q.caps(0.07, 0.1, C, 0, -0.06, 0); q.ball(0.075, DARK, 0, -0.16, 0.05, { sy: 0.55, sz: 1.3 }); }
+  const head = joint(upper, 0, 0.26, 0.22);
+  const h = kit(head);
+  h.ball(0.2, C, 0, 0.04, 0.02, { sx: 0.95, sy: 0.95, sz: 1.05 });
+  h.caps(0.11, 0.26, C, 0, -0.12, 0.2, { rx: 2.25, sx: 0.9 });                      // 長嘴往前往下垂
+  h.ball(0.085, NOSE, 0, -0.27, 0.33, { sx: 1.15, sy: 0.85 });                      // 大黑鼻子
+  const ears = [-1, 1].map((s) => {
+    const e = joint(head, s * 0.17, 0.12, -0.02);
+    kit(e).ball(0.13, C, s * 0.03, -0.14, 0, { sx: 0.32, sy: 1.5, sz: 0.95, rz: s * 0.15 });
+    kit(e).ball(0.1, INSIDE, s * 0.0, -0.14, 0.01, { sx: 0.2, sy: 1.35, sz: 0.8, rz: s * 0.15, line: false });
+    return e;
+  });
+  for (const s of [-1, 1]) h.ball(0.018, INK, s * 0.08, 0.07, 0.19, { line: false });   // 豆豆眼
+  return { root, turn, J: { body, upper, head, aN, aF, tail, lN, lF }, tongue: null, ears, stretch: { upper, mid, z0: 0.22, m0: -0.04, len: 0.72 }, h: 1.0 };
+}
+
+const MAKE = { manatee: buildManatee, marmot: buildMarmot, elephant: buildElephant, penguin: buildPenguin, dog: buildDog, sealion: buildSealion, hammer: buildHammer, squid: buildSquid, frog: buildFrog, mushroom: buildMushroom, moss: buildMoss, dwarf: buildDwarf, ...FOREST, ...MOON };
+// 建好之後身體和上身接成一層（kit.js 的 fuse）；身體會拉長的（臘腸狗）不接。每個關節發一個內線編號（inkline.js）
+export const BUILD = Object.fromEntries(Object.entries(MAKE).map(([id, make]) => [id, () => { const m = make(); if (!m.stretch) fuse(m.J.body, m.J.upper); return tagInk(m); }]));

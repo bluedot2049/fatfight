@@ -201,7 +201,7 @@ function shing(t, p = 1) {
 }
 
 // ---------- 每隻角色一套：sp 必殺出手、cue 招式中途、super 超必殺（前 0.5 秒是定格蓄力）、hit 必殺打中加的那一層 ----------
-// 沒列在這裡的角色用下面 SND 的通用版
+// 灰牛、胖鼠在這張表，企鵝、黃狗和其他角色（闖關的雜兵、頭目）接在後面；真的沒列的才用下面 SND 的通用版
 const KIT = {
   // 海牛：深海。水壓、聲納、浪；重、慢、帥
   manatee: {
@@ -274,6 +274,312 @@ KIT.penguin = {
     if (su) tone(t, 0.3, 90, 40, 0.3);
   },
 };
+// 臘腸狗：汪、扒土、耳朵甩成螺旋槳、拉長的「噢——」；咬人是脆的一口
+KIT.dog = {
+  sp: {
+    bark(t) { woof(t, 1); },
+    tunnel(t) { for (let i = 0; i < 7; i++) noise(t + i * 0.05, 0.04, 700 + Math.random() * 500, 1.5, 0.22, 'bandpass'); tone(t, 0.3, 200, 120, 0.15, 'triangle'); },
+    bone(t) { for (let i = 0; i < 6; i++) noise(t + i * 0.07, 0.06, 1100 + Math.random() * 700, 1.2, 0.2, 'bandpass'); tone(t + 0.4, 0.2, 520, 780, 0.12, 'triangle'); },   // 扒土，挖到了叮一下
+    earspin(t) { for (let i = 0; i < 8; i++) noise(t + i * 0.045, 0.04, 380, 1.2, 0.25 - i * 0.02, 'bandpass', 900); tone(t, 0.35, 180, 540, 0.15, 'triangle'); },
+  },
+  super(t) {
+    woof(t, 0.8);
+    const r = t + 0.5;
+    via(lp(1800), () => { tone(r, 1.2, 420, 760, 0.35, 'sawtooth', 0.5); tone(r, 1.2, 423, 765, 0.15, 'square', 0.5); });   // 噢——（越拉越高）
+    noise(r, 0.9, 300, 1, 0.25, 'bandpass', 2400, 0.6);
+  },
+  hit(t, big, su) {
+    noise(t, 0.05, 3200, 1.5, 0.4); tone(t, 0.08, 380, 160, 0.3, 'square');   // 咬下去喀一聲
+    if (big) { tone(t, 0.25, 150, 50, 0.5); noise(t, 0.2, 600, 0.8, 0.3, 'lowpass'); }
+    if (su) noise(t + 0.03, 0.04, 4200, 1.5, 0.3);
+  },
+};
+// ---------- 其他角色各自一套（使用者 2026-11-25：聲音每隻都做）----------
+// 每隻一個聲音的性格，零件在最下面（號角、吠、呱、嗷、呼呼、噴氣、鏘、弓弦、鈴、伺服馬達、顫音、電）。
+// shot＝飛行道具出手那一聲（沒寫的用通用的泡泡聲）；雜兵沒有超必殺，super 用 mobSuper 墊著
+const mobSuper = (t) => { rumble(t, 0.5, 0.4, 100, 1); boom(t + 0.5, 0.8); };
+
+// 鼻象：號角、踏地、水。厚、慢、響
+KIT.elephant = {
+  sp: {
+    trunk(t) { noise(t, 0.16, 400, 1.3, 0.3, 'bandpass', 2600); trumpet(t + 0.04, 0.6, 260); },
+    stomp(t) { trumpet(t, 0.5, 180); tone(t + 0.2, 0.3, 90, 35, 0.7); rumble(t + 0.2, 0.5, 0.5, 110); },
+    spray(t) { noise(t, 0.12, 300, 1, 0.3, 'lowpass', 1400, 0.12); surf(t + 0.12, 0.5, 0.8); bloops(t + 0.15, 5, 320); },
+    uptrunk(t) { trumpet(t, 0.9, 300); noise(t, 0.2, 500, 1.2, 0.25, 'bandpass', 3200); },
+  },
+  super(t) {
+    trumpet(t, 1.1, 220); trumpet(t + 0.22, 0.8, 330);
+    rumble(t, 0.5, 0.5, 90, 1);
+    const r = t + 0.5;                                                         // 定格結束：一路踩過去
+    for (let i = 0; i < 6; i++) { tone(r + i * 0.13, 0.25, 85, 32, 0.8); noise(r + i * 0.13, 0.12, 300, 0.8, 0.4, 'lowpass'); }
+    rumble(r, 1.2, 0.6, 100); trumpet(r + 0.1, 0.7, 250);
+  },
+  hit(t, big, su) {
+    tone(t, 0.28, 130, 40, 0.6); noise(t, 0.16, 500, 0.8, 0.35, 'lowpass');
+    if (big) boom(t, 0.6);
+    if (su) trumpet(t, 0.3, 300);
+  },
+};
+// 海獅：嗷嗷叫、球彈來彈去、拍鰭。馬戲團
+KIT.sealion = {
+  sp: {
+    ballshot(t) { arf(t, 0.9); boing(t + 0.14, 200, 620, 0.9); },
+    slide(t) { arf(t, 0.7); noise(t + 0.06, 0.5, 260, 0.9, 0.35, 'lowpass', 900); bloops(t + 0.1, 4, 260); },
+    clap(t) { for (let i = 0; i < 3; i++) noise(t + i * 0.07, 0.03, 2600, 1.2, 0.4, 'highpass'); tone(t + 0.1, 0.25, 200, 760, 0.2, 'triangle'); },
+  },
+  super(t) {
+    arf(t, 1); arf(t + 0.2, 1.1);
+    rumble(t, 0.5, 0.4, 100, 1);
+    const r = t + 0.5;                                                         // 跳起來：先一聲長的往下掉，砸下去另外是 hit
+    tone(r, 0.5, 700, 180, 0.2, 'triangle'); boom(r + 0.4, 1); surf(r + 0.4, 0.9, 1); tone(r + 0.4, 1.0, 70, 25, 0.9);
+  },
+  hit(t, big, su) {
+    noise(t, 0.05, 2000, 1.2, 0.45); tone(t, 0.2, 210, 60, 0.5);
+    if (big) { boom(t, 0.5); bloops(t + 0.05, 3, 280); }
+    if (su) arf(t + 0.05, 0.6);
+  },
+  shot(t) { boing(t, 180, 520, 1); noise(t, 0.08, 900, 1.5, 0.2); },
+};
+// 錘頭：鐵錘的鏘、咬合的喀
+KIT.hammer = {
+  sp: {
+    bite(t) { via(lp(500), () => tone(t, 0.3, 95, 70, 0.3, 'sawtooth')); noise(t + 0.12, 0.03, 3200, 1.5, 0.5); noise(t + 0.2, 0.03, 3600, 1.5, 0.5); },
+    whirl(t) { for (let i = 0; i < 3; i++) noise(t + i * 0.16, 0.14, 380, 1.2, 0.3, 'bandpass', 1500); clink(t + 0.05, 0.5, 520); },
+    fin(t) { via(lp(1400), () => tone(t, 0.25, 150, 900, 0.22, 'sawtooth')); noise(t, 0.25, 600, 1, 0.25, 'bandpass', 2800); },
+  },
+  super: mobSuper,
+  hit(t, big) { clink(t, 0.8, 520); tone(t, 0.18, 180, 55, 0.5); if (big) boom(t, 0.4); },
+};
+// 鬚臉：黏、墨、鞭子
+KIT.squid = {
+  sp: {
+    ink(t) { noise(t, 0.2, 500, 1, 0.35, 'lowpass', 200); bloops(t, 5, 150); },
+    whip(t) { noise(t, 0.14, 600, 1.4, 0.3, 'bandpass', 4200); noise(t + 0.14, 0.02, 5200, 1, 0.55, 'highpass'); },
+    rise(t) { bloops(t, 8, 240); noise(t, 0.35, 900, 0.8, 0.2, 'bandpass', 2600, 0.2); },
+  },
+  super: mobSuper,
+  hit(t, big) { noise(t, 0.12, 900, 0.8, 0.4, 'lowpass', 250); tone(t, 0.2, 150, 70, 0.4); bloops(t + 0.03, 2, 180); if (big) boom(t, 0.35); },
+  shot(t) { noise(t, 0.14, 700, 1.2, 0.35, 'bandpass', 220); bloops(t + 0.03, 3, 160); },
+};
+// 青蛙：呱、舌頭咻、彈
+KIT.frog = {
+  sp: {
+    tongue(t) { noise(t, 0.08, 800, 1.5, 0.3, 'bandpass', 3800); tone(t, 0.09, 500, 1500, 0.2); noise(t + 0.1, 0.02, 4200, 1.2, 0.4, 'highpass'); },
+    leap(t) { ribbit(t, 1); boing(t + 0.18, 150, 480, 0.9); },
+    hop(t) { boing(t, 200, 760, 1); ribbit(t + 0.05, 0.6); },
+  },
+  super: mobSuper,
+  hit(t, big) { noise(t, 0.05, 1800, 1.4, 0.4); tone(t, 0.1, 620, 280, 0.3); if (big) tone(t, 0.25, 140, 50, 0.5); },
+};
+// 蘑菇：噗、孢子的沙沙、傘彈一下
+KIT.mushroom = {
+  sp: {
+    spore(t) { poof(t, 1); },
+    bounce(t) { boing(t, 160, 420, 0.9); boing(t + 0.18, 200, 520, 0.8); },
+    capup(t) { boing(t, 220, 800, 1); poof(t + 0.08, 0.6); },
+  },
+  super: mobSuper,
+  hit(t, big) { tone(t, 0.14, 240, 90, 0.45); poof(t, big ? 1 : 0.5); },
+  shot(t) { poof(t, 0.9); },
+};
+// 苔人：土、石頭、悶
+KIT.moss = {
+  sp: {
+    hurl(t) { via(lp(320), () => tone(t, 0.35, 72, 55, 0.4, 'sawtooth')); noise(t + 0.2, 0.2, 300, 1, 0.3, 'bandpass', 1200); },
+    roots(t) { crackle(t, 0.5, 22, 1100, 0.2); rumble(t, 0.5, 0.4, 160); },
+    heave(t) { rumble(t, 0.45, 0.5, 140); tone(t, 0.35, 60, 150, 0.4, 'sine', 0.1); },
+  },
+  super: mobSuper,
+  hit(t, big) { tone(t, 0.3, 130, 38, 0.6); noise(t, 0.16, 400, 0.8, 0.35, 'lowpass'); crackle(t, 0.15, 6, 1500, 0.18); if (big) boom(t, 0.6); },
+  shot(t) { noise(t, 0.2, 260, 1, 0.3, 'bandpass', 900); tone(t, 0.12, 110, 70, 0.3); },
+};
+// 矮人（地道的老礦工）：鎬子敲石頭的鏘、滾石、礦坑塌下來
+KIT.dwarf = {
+  sp: {
+    boulder(t) { clink(t, 1, 1320); rumble(t + 0.1, 0.6, 0.5, 200); },
+    drill(t) { clink(t, 0.7, 1320); drill(t + 0.06, 0.6, 0.9); },
+    uppick(t) { clink(t, 0.9, 1560); via(lp(1800), () => tone(t, 0.22, 160, 900, 0.2, 'sawtooth')); },
+  },
+  super(t) {
+    clink(t, 1, 1320); clink(t + 0.18, 1, 990);
+    rumble(t, 0.5, 0.5, 90, 1); crackle(t, 0.5, 20, 1300, 0.18, 0.5);
+    const r = t + 0.5;                                                         // 定格結束：整片塌下來
+    boom(r, 1); rumble(r, 1.4, 0.8, 130); crackle(r, 1.0, 44, 1500, 0.24);
+  },
+  hit(t, big, su) {
+    clink(t, 0.7, 1100); tone(t, 0.2, 170, 50, 0.5);
+    if (big) { boom(t, 0.5); crackle(t, 0.2, 10, 1600, 0.2); }
+    if (su) rumble(t, 0.5, 0.4, 120);
+  },
+  shot(t) { rumble(t, 0.4, 0.45, 220); crackle(t, 0.3, 8, 1300, 0.16); },
+};
+// 狐狸：尖尖的一聲嗷、風
+KIT.fox = {
+  sp: {
+    pounce(t) { yip(t, 1); noise(t + 0.08, 0.25, 500, 1.2, 0.25, 'bandpass', 2800); },
+    tailup(t) { noise(t, 0.2, 600, 1.2, 0.28, 'bandpass', 3600); yip(t + 0.06, 0.7); },
+  },
+  super: mobSuper,
+  hit(t, big) { noise(t, 0.05, 3800, 1, 0.4, 'highpass'); tone(t, 0.1, 520, 200, 0.3, 'triangle'); if (big) tone(t, 0.22, 150, 50, 0.45); },
+};
+// 貓頭鷹：呼——呼、翅膀拍、爪子刮
+KIT.owl = {
+  sp: {
+    feather(t) { flap(t, 2, 0.9); hoot(t + 0.05, 0.6); },
+    divebomb(t) { hoot(t, 0.8); tone(t + 0.2, 0.4, 1700, 480, 0.16); noise(t + 0.2, 0.4, 2400, 1, 0.2, 'bandpass', 500); },
+  },
+  super: mobSuper,
+  hit(t, big) { noise(t, 0.035, 4400, 1, 0.4, 'highpass'); noise(t + 0.05, 0.035, 4000, 1, 0.35, 'highpass'); tone(t, 0.14, 320, 140, 0.3); if (big) tone(t, 0.22, 140, 50, 0.45); },
+  shot(t) { noise(t, 0.1, 3000, 1.2, 0.22, 'highpass', 6000); tone(t, 0.1, 2000, 2800, 0.1); },
+};
+// 野豬：噴氣的齁、蹄子
+KIT.boar = {
+  sp: {
+    rampage(t) { snort(t, 1); for (let i = 0; i < 7; i++) noise(t + 0.3 + i * (0.09 - i * 0.006), 0.05, 280, 0.9, 0.4, 'lowpass'); },
+    trample(t) { snort(t, 0.8); tone(t + 0.22, 0.3, 90, 34, 0.7); rumble(t + 0.22, 0.5, 0.45, 120); },
+  },
+  super: mobSuper,
+  hit(t, big) { tone(t, 0.3, 150, 42, 0.6); noise(t, 0.14, 500, 0.8, 0.4, 'lowpass'); if (big) { boom(t, 0.55); snort(t + 0.05, 0.5); } },
+};
+// 矮人戰士：盾的咚、斧頭的鏘、號角
+KIT.warrior = {
+  sp: {
+    bash(t) { tone(t, 0.5, 150, 146, 0.4, 'triangle', 0.002); tone(t, 0.4, 226, 220, 0.2, 'triangle', 0.002); noise(t, 0.08, 500, 0.8, 0.4, 'lowpass'); noise(t + 0.1, 0.3, 400, 1.2, 0.2, 'bandpass', 1800); },
+    upaxe(t) { clink(t, 0.9, 880); via(lp(2000), () => tone(t, 0.22, 180, 1000, 0.2, 'sawtooth')); },
+  },
+  super(t) {
+    swell(t, 0.45, 0.8, [110, 165, 220], 0.08, 800);                           // 號角鼓起來
+    rumble(t, 0.5, 0.4, 100, 1);
+    const r = t + 0.5;                                                         // 定格結束：斧頭一圈一圈掃
+    for (let i = 0; i < 5; i++) { noise(r + i * 0.1, 0.09, 420, 1.2, 0.35, 'bandpass', 2200); clink(r + i * 0.1 + 0.04, 0.4, 760 + i * 60); }
+    boom(r + 0.5, 0.7);
+  },
+  hit(t, big, su) {
+    noise(t, 0.04, 3000, 1, 0.4, 'highpass'); tone(t, 0.12, 880, 700, 0.18, 'triangle', 0.002); tone(t, 0.2, 160, 50, 0.5);
+    if (big) boom(t, 0.5);
+    if (su) clink(t, 0.5, 990);
+  },
+};
+// 精靈弓箭手：弓弦的繃、箭的咻
+KIT.archer = {
+  sp: {
+    arrow(t) { twang(t + 0.1, 0.9); },
+    flip(t) { noise(t, 0.2, 500, 1.2, 0.25, 'bandpass', 3200); tone(t, 0.2, 300, 950, 0.14); },
+  },
+  super(t) {
+    crackle(t, 0.48, 12, 900, 0.2, 0.6);                                       // 弓拉滿：木頭吱吱響、越來越緊
+    tone(t, 0.05, 150, 320, 0.25, 'triangle', 0.45);
+    const r = t + 0.5;
+    twang(r, 1.4); tone(r, 0.9, 2600, 1100, 0.2); noise(r, 0.7, 3000, 0.8, 0.3, 'highpass', 7000);
+  },
+  hit(t, big, su) {
+    tone(t, 0.1, 300, 120, 0.4); noise(t, 0.04, 2500, 1.4, 0.35);
+    if (big) boom(t, 0.4);
+    if (su) tone(t, 0.3, 1800, 1790, 0.06, 'sine', 0.003);
+  },
+  shot(t) { noise(t, 0.12, 3200, 1.2, 0.25, 'highpass', 6500); tone(t, 0.12, 2600, 1800, 0.12); },
+};
+// 法師：鈴、低低的嗡、火
+KIT.mage = {
+  sp: {
+    orb(t) { chime(t, 660, 0.8); tone(t, 0.4, 110, 150, 0.25, 'sine', 0.12); },
+    pillar(t) { chime(t, 880, 0.8); tone(t + 0.05, 0.35, 200, 620, 0.14, 'triangle'); crackle(t + 0.1, 0.3, 8, 2600, 0.12); },
+    nova(t) { chime(t, 520, 0.9); noise(t + 0.12, 0.25, 700, 0.7, 0.4, 'lowpass'); boom(t + 0.12, 0.45); },
+  },
+  super(t) {
+    chime(t, 440, 0.8); chime(t + 0.15, 660, 0.8); chime(t + 0.3, 990, 0.9);   // 三聲往上
+    rumble(t, 0.5, 0.4, 100, 1);
+    const r = t + 0.5;                                                         // 定格結束：從天上掉下來、砸
+    tone(r, 0.55, 1500, 110, 0.25, 'triangle'); roar(r, 1.3, 1.1); boom(r + 0.55, 1); crackle(r + 0.55, 0.8, 30, 2400, 0.2);
+  },
+  hit(t, big, su) {
+    via(lp(2400), () => tone(t, 0.1, 900, 300, 0.36, 'square')); noise(t, 0.14, 1600, 0.8, 0.42, 'bandpass', 500); tone(t, 0.2, 180, 60, 0.4);
+    if (big) roar(t, 0.35, 0.5);
+    if (su) chime(t, 1320, 0.5);
+  },
+  shot(t) { tone(t, 0.22, 220, 460, 0.2); noise(t, 0.18, 800, 1.2, 0.2, 'bandpass', 1800); },
+};
+// 機器人：伺服馬達、嗶、鐵皮
+KIT.robot = {
+  sp: {
+    rocket(t) { beep(t, 1200); beep(t + 0.09, 1600); noise(t + 0.18, 0.3, 300, 1, 0.35, 'lowpass', 2200, 0.15); },
+    spin(t) { servo(t, 0.5, 200, 900, 1); for (let i = 0; i < 3; i++) noise(t + 0.1 + i * 0.13, 0.1, 420, 1.2, 0.28, 'bandpass', 1600); },
+    upjet(t) { noise(t, 0.3, 600, 0.8, 0.4, 'highpass', 5000, 0.1); servo(t, 0.3, 300, 1200, 0.8); },
+  },
+  super: mobSuper,
+  hit(t, big) { tone(t, 0.18, 440, 430, 0.2, 'triangle', 0.002); tone(t, 0.14, 587, 570, 0.12, 'triangle', 0.002); noise(t, 0.05, 2400, 1.2, 0.35); tone(t, 0.2, 150, 50, 0.45); if (big) { boom(t, 0.5); crackle(t, 0.15, 8, 3000, 0.2); } },
+  shot(t) { noise(t, 0.3, 400, 1, 0.35, 'bandpass', 2400); via(crush(3), () => tone(t, 0.3, 120, 260, 0.2, 'sawtooth')); },
+};
+// 海牛員工：安全哨、工具的叮、推車的輪子
+KIT.worker = {
+  sp: {
+    wrench(t) { tone(t, 0.14, 1760, 1700, 0.18, 'triangle', 0.002); noise(t + 0.05, 0.16, 500, 1.4, 0.22, 'bandpass', 2600); },
+    cart(t) { tone(t, 0.2, 2100, 2080, 0.14, 'sine', 0.01); noise(t, 0.2, 2100, 6, 0.12); crackle(t + 0.15, 0.5, 20, 900, 0.16); rumble(t + 0.15, 0.5, 0.3, 180); },
+    helmet(t) { tone(t, 0.1, 520, 300, 0.3); tone(t + 0.06, 0.2, 240, 760, 0.16, 'triangle'); },
+  },
+  super: mobSuper,
+  hit(t, big) { tone(t, 0.09, 520, 300, 0.3); noise(t, 0.05, 1800, 1.3, 0.35); if (big) tone(t, 0.22, 150, 50, 0.45); },
+  shot(t) { tone(t, 0.12, 1500, 1900, 0.14, 'triangle', 0.002); noise(t, 0.12, 600, 1.4, 0.2, 'bandpass', 2400); },
+};
+// 小灰人：顫音（兩個差一點點的正弦波，會晃）、電、飛碟的嗡
+KIT.alien = {
+  sp: {
+    psi(t) { theremin(t, 0.35, 500, 900, 0.9); zap(t + 0.2, 0.5); },
+    blink(t) { tone(t, 0.12, 2400, 200, 0.2); tone(t + 0.22, 0.12, 200, 2400, 0.2); sonar(t + 0.22, 1400, 0.4); },   // 咻——沒了，再咻一聲出現
+    grip(t) { theremin(t, 0.9, 300, 170, 0.8); rumble(t, 0.8, 0.3, 140); crackle(t, 0.8, 14, 3000, 0.1); },
+    barrier(t) { zap(t, 0.8); theremin(t + 0.1, 0.3, 700, 300, 0.8); boom(t + 0.14, 0.4); },
+  },
+  super(t) {
+    theremin(t, 0.48, 220, 880, 1); swell(t, 0.45, 0.8, [98, 147, 196], 0.06, 700);
+    const r = t + 0.5;                                                         // 定格結束：連震五下
+    for (let i = 0; i < 5; i++) { zap(r + i * 0.1, 0.8); tone(r + i * 0.1, 0.12, 70, 40, 0.6); }
+    theremin(r, 0.6, 900, 200, 0.7); boom(r + 0.48, 0.7);
+  },
+  hit(t, big, su) {
+    zap(t, 0.7); tone(t, 0.18, 260, 90, 0.4);
+    if (big) { theremin(t, 0.25, 600, 200, 0.6); boom(t, 0.4); }
+    if (su) sonar(t, 1900, 0.3);
+  },
+  shot(t) { theremin(t, 0.16, 1200, 400, 0.8); },
+};
+
+// ---------- 上面那些角色的零件 ----------
+// 號角（鼻象）：鋸齒加方波過低通，音高往上頂
+function trumpet(t, p = 1, f = 230) { via(lp(1600), () => { tone(t, 0.45, f, f * 1.5, 0.3 * p, 'sawtooth', 0.06); tone(t, 0.45, f * 1.01, f * 1.52, 0.14 * p, 'square', 0.06); }); }
+// 嗷（海獅）
+function arf(t, p = 1) { via(lp(1100), () => { tone(t, 0.12, 270, 170, 0.4 * p, 'square', 0.01); tone(t, 0.1, 540, 340, 0.1 * p, 'sawtooth', 0.01); }); }
+// 彈一下（球、傘、青蛙腿）
+function boing(t, f0, f1, p = 1) { tone(t, 0.2, f0, f1, 0.28 * p, 'sine', 0.005); tone(t, 0.16, f0 * 2, f1 * 2, 0.08 * p, 'triangle', 0.005); }
+// 呱（青蛙）：兩下短的
+function ribbit(t, p = 1) { via(lp(900), () => { tone(t, 0.07, 170, 250, 0.3 * p, 'square'); tone(t + 0.09, 0.1, 190, 300, 0.3 * p, 'square'); }); }
+// 噗（蘑菇的孢子）：悶的一口氣，後面一點沙沙
+function poof(t, p = 1) { noise(t, 0.16, 600, 0.8, 0.35 * p, 'lowpass', 200, 0.03); noise(t + 0.05, 0.35, 5200, 0.8, 0.07 * p, 'highpass'); }
+// 鏘（鎬子、鐵錘、斧頭）
+function clink(t, p = 1, f = 1320) { tone(t, 0.16, f, f * 0.98, 0.16 * p, 'triangle', 0.002); tone(t, 0.1, f * 1.5, f * 1.48, 0.08 * p, 'triangle', 0.002); noise(t, 0.02, 5000, 1, 0.3 * p, 'highpass'); }
+// 嗷（狐狸）：尖、短、往上再掉下來
+function yip(t, p = 1) { via(lp(2600), () => { tone(t, 0.08, 700, 1300, 0.22 * p, 'sawtooth', 0.01); tone(t + 0.08, 0.12, 1200, 600, 0.18 * p, 'sawtooth', 0.01); }); }
+// 呼——呼（貓頭鷹）
+function hoot(t, p = 1) { via(lp(900), () => { tone(t, 0.16, 420, 380, 0.3 * p, 'sine', 0.03); tone(t + 0.2, 0.24, 400, 330, 0.3 * p, 'sine', 0.03); }); }
+// 翅膀拍 n 下
+function flap(t, n, p = 1) { for (let i = 0; i < n; i++) noise(t + i * 0.09, 0.06, 500, 0.8, 0.3 * p, 'lowpass'); }
+// 齁（野豬噴氣）
+function snort(t, p = 1) { via(crush(3), () => { noise(t, 0.18, 220, 2, 0.4 * p); tone(t, 0.2, 95, 70, 0.3 * p, 'sawtooth'); }); }
+// 繃（弓弦）
+function twang(t, p = 1) { tone(t, 0.3, 190, 170, 0.3 * p, 'triangle', 0.002); tone(t, 0.08, 380, 350, 0.12 * p, 'triangle', 0.002); noise(t, 0.015, 4200, 1, 0.3 * p, 'highpass'); }
+// 鈴（法師）：一個音加五度和高八度偏一點
+function chime(t, f, p = 1) { tone(t, 0.5, f, f, 0.22 * p, 'sine', 0.003); tone(t, 0.35, f * 1.5, f * 1.5, 0.11 * p, 'sine', 0.003); tone(t, 0.25, f * 2.01, f * 2.01, 0.08 * p, 'sine', 0.003); }
+// 伺服馬達（機器人）
+function servo(t, dur, f0, f1, p = 1) { via(crush(4), () => { tone(t, dur, f0, f1, 0.14 * p, 'square', 0.02); tone(t, dur, f0 * 1.5, f1 * 1.5, 0.06 * p, 'sawtooth', 0.02); }); }
+function beep(t, f) { tone(t, 0.06, f, f, 0.14, 'square', 0.002); }
+// 顫音（小灰人）：兩個差一點點的正弦波
+function theremin(t, dur, f0, f1, p = 1) { tone(t, dur, f0, f1, 0.18 * p, 'sine', 0.03); tone(t, dur, f0 * 1.013, f1 * 1.013, 0.14 * p, 'sine', 0.03); }
+// 電一下（小灰人）
+function zap(t, p = 1) { via(crush(4), () => tone(t, 0.12, 1800, 200, 0.22 * p, 'sawtooth')); noise(t, 0.04, 4200, 1, 0.3 * p, 'highpass'); }
+// 汪：短的方波往下掉，前面一點氣音
+function woof(t, p = 1) {
+  via(lp(1400), () => { tone(t, 0.16, 330, 190, 0.45 * p, 'square', 0.01); tone(t, 0.14, 660, 380, 0.12 * p, 'sawtooth', 0.01); });
+  noise(t, 0.08, 900, 1.2, 0.25 * p, 'bandpass', 500);
+}
 // 火的呼聲：低頻雜訊鼓起來再退
 function roar(t, dur, p = 1) {
   noise(t, dur, 320, 0.5, 0.42 * p, 'lowpass', 1900, Math.min(0.15, dur * 0.25));
@@ -325,7 +631,8 @@ const SND = {
   // 火球落地、火柱衝上來
   pool() { const t = ctx.currentTime; roar(t, 0.45, 0.9); tone(t, 0.15, 140, 60, 0.35); crackle(t + 0.05, 0.4, 14, 2600, 0.18); },
   pillar() { const t = ctx.currentTime; tone(t, 0.2, 90, 35, 0.6); roar(t, 0.7, 1.3); noise(t, 0.4, 400, 0.8, 0.3, 'bandpass', 2400); crackle(t + 0.05, 0.5, 22, 3000, 0.2); },
-  bubble() { const t = ctx.currentTime; tone(t, 0.12, 300, 900, 0.3); tone(t + 0.05, 0.1, 500, 1200, 0.2); noise(t, 0.1, 1800, 2, 0.15, 'bandpass', 700); tone(t, 0.25, 120, 45, 0.5); bloops(t + 0.04, 4, 380); },
+  bubble({ ch } = {}) { const t = ctx.currentTime; if (KIT[ch]?.shot) return KIT[ch].shot(t);   // 角色自己的飛行道具聲（箭、石頭、飛拳…）；沒寫的是泡泡
+    tone(t, 0.12, 300, 900, 0.3); tone(t + 0.05, 0.1, 500, 1200, 0.2); noise(t, 0.1, 1800, 2, 0.15, 'bandpass', 700); tone(t, 0.25, 120, 45, 0.5); bloops(t + 0.04, 4, 380); },
   // 集氣：低音往上爬；集滿亮一聲
   charge() { const t = ctx.currentTime; tone(t, 0.75, 90, 420, 0.35, 'sine', 0.1); noise(t, 0.7, 300, 1, 0.2, 'bandpass', 1400, 0.3); bloops(t + 0.1, 6, 300); },
   chargeMax() { const t = ctx.currentTime; tone(t, 0.4, 1320, 1320, 0.14, 'triangle', 0.003); tone(t, 0.4, 1980, 1980, 0.08, 'sine', 0.003); noise(t, 0.05, 5000, 1, 0.25, 'highpass'); },
@@ -365,6 +672,8 @@ const SND = {
   // 爆氣：往內吸一下再一聲悶爆往外推
   burst() { const t = ctx.currentTime; tone(t, 0.12, 300, 900, 0.18, 'sawtooth'); boom(t + 0.08, 0.6); noise(t + 0.08, 0.5, 900, 0.6, 0.4, 'bandpass', 250); tone(t + 0.08, 0.5, 660, 880, 0.08, 'triangle'); },
   // 雜兵出手前的預告：短短一聲低的「嗯」（不搶戲，聽得出有人要打過來）
+  // 打在打不動的身上（機器人）：悶悶的一聲鐵皮，跟格檔的「叮」分得開
+  clank() { const t = ctx.currentTime; noise(t, 0.05, 1800, 3, 0.35); tone(t, 0.16, 310, 290, 0.22, 'square', 0.002); tone(t, 0.1, 620, 560, 0.1, 'triangle', 0.002); },
   tell() { const t = ctx.currentTime; tone(t, 0.12, 180, 240, 0.12, 'square', 0.004); noise(t, 0.06, 1400, 2, 0.06); },
   guard() { const t = ctx.currentTime; noise(t, 0.03, 2200, 2, 0.12); tone(t, 0.04, 520, 480, 0.06, 'square'); },
   grab() { const t = ctx.currentTime; noise(t, 0.07, 1200, 2, 0.4); tone(t, 0.08, 200, 120, 0.25); },
@@ -431,7 +740,7 @@ export function sfxEvent(e, pan = 0, S = null) {
     case 'tell': play('tell', e, pan); break;
     case 'wake': play('roll', e, pan); break;
     case 'sp': play('whoosh', { ...e, ch }, pan); play('voice', { ch, id: e.id, who: e.s }, pan * 0.6); break;
-    case 'proj': if (!e.lob && !e.aim) play(e.gr ? 'crack' : 'bubble', e, pan); break;   // 企鵝的火球、火焰爆擊出手那聲在 KIT 的 sp 裡
+    case 'proj': if (!e.lob && !e.aim && !e.pierce) play(e.gr ? 'crack' : 'bubble', { ...e, ch }, pan); break;   // 企鵝的火球、火焰爆擊出手那聲在 KIT 的 sp 裡
     case 'pool': play('pool', e, pan); break;
     case 'pillar': play('pillar', e, pan); break;
     case 'erupt': play('erupt', e, pan); break;

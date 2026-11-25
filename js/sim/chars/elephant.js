@@ -51,7 +51,7 @@ const SU = [
 ];
 
 export default {
-  id: 'elephant', name: '小象', full: '長鼻子的小象', color: '#f2a6c0',
+  id: 'elephant', name: '鼻象', full: '鼻象', color: '#f2a6c0',
   blurb: '鼻子捲人往後甩、踩地震', stat: [5, 3, 2],
   pal: ['#e88aa8', '#4a1430'], card: { attr: '岩', type: '長鼻之力', lv: 5, art: 'rose' },
   voice: { f0: 120, size: 0.95, mora: 0.11 },

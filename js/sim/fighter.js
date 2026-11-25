@@ -4,14 +4,17 @@
 
 import { MP, MP_REGEN, HP, GRAV, Z_NEAR, Z_FAR, SPEED, SLOW, AIR_STEER, BOUNCE_V, WALL_V, WAKE_IV, DOWN_T, DOWN_QUICK, LEFT, RIGHT, BA, BJ, BD, BS } from './const.js';
 import { CHARS, MOVES } from './chars/index.js';
+import { sweepFront } from './moves.js';
 import { newHistory, record, pressed, pressedBoth, consume, consumeCommand, command, tapTwice, useTap, holding, dirX, dirZ } from './input.js';
 import { ITEMS, WEAR_SWING } from './items.js';
-import { heldItem, pickTry, itemAct, keepSipping, dropItem, wear } from './item.js';
+import { heldItem, pickTry, itemAct, keepSipping, dropItem, wear, spawnItem, flingItem } from './item.js';
 
 export const FREE = new Set(['stand', 'walk', 'crouch']);
 const GRAB_TIME = 85;           // 抓住最多幾幀，時間到對方掙脫
+const REL_IV = 22;              // 被抓的人掙脫（或對方鬆手）後幾幀打不到：硬直 9 幀＋能擋、能走開的 13 幀
 export const GUARD_MIN = 4;     // 按一下防至少擋幾幀才放得開
 const CHAIN_BUF = 10;           // 打到人之後接下一拳：這麼久以前按的攻也算（含頓格，連打才不會掉拳）
+const HOVER = new Set(['stand', 'walk', 'run', 'brake', 'guard', 'crouch']), FLY_UP = 28;   // 會飛的：哪些狀態會浮回去、每幀升多少
 const MASH_DIZZY = 4, MASH_GRAB = 7;   // 頭暈、被抓的時候每按一下（任何鍵，剛按下的才算）早幾幀掙脫
 
 export function newFighter(ch, i, team, x, face) {
@@ -30,12 +33,13 @@ export function newFighter(ch, i, team, x, face) {
     hold: -1, grabT: 0,           // 抓著誰（或被誰抓著）、還能抓多久
     ext: 0, chg: 0, hang: 0,      // 這招連按加了幾段、集氣幾幀、頂點還停幾幀（-1 停過了）
     by: -1, bh: 0, bnc: 0,        // 被打飛：誰打的（撞到人算他的）、撞過誰（位元）、彈過地了沒
-    burn: 0, az: 0,               // 著火（被火打倒飛出去那段，落地就熄）；出招往前後擺的偏移（企鵝吐火）
+    burn: 0, az: 0, sf: 0,        // 著火（被火打倒飛出去那段，落地就熄）；出招往前後擺的偏移（企鵝吐火）；拉長的招咬到人時前緣停在哪（臘腸狗）
     item: -1, ik: 0,              // 手上拿的東西（S.it 的 id）、哪一類（1 輕武器 2 重物 3 吃的）
     lh: -1, lhT: -9999, lhN: 0,   // 最後打到我的是誰、在第幾幀（被圍不頭暈）、那時候我的按鍵紀錄到第幾格（爆氣要在這之後按）
     jdu: 0,                       // 拿去格檔過的那下防（按鍵紀錄的幀號），同一下不再算
     wk: 0,                        // 躺著先按好怎麼起來：1 起身攻擊
     dz: 0,                        // 這套連打裡暈過了（回到能動之前不再暈，打到倒值滿就倒地）
+    packI: -1, packF: -9999,      // 闖關：一起上的頭目（營火三冒險者）現在誰帶頭打我、從第幾幀起（ai.js packTok）
     tokF: -9999,                  // 闖關：敵人上一次拿到打我的攻擊權是第幾幀（ai.js 輪流上）
     H: newHistory(),
   };
@@ -53,14 +57,14 @@ export function strikeInv(f) {
 
 export function setAct(f, act) { f.act = act; f.t = -1; }
 export function toFree(f) {
-  f.mv = ''; f.con = 0; f.hitList = []; f.air = 0; f.y = 0; f.vy = 0; f.vx = 0; f.vz = 0; f.airAtk = 0; f.dash = 0; f.combo = 0; f.cr = 0; f.dz = 0; f.burn = 0;
+  f.mv = ''; f.con = 0; f.hitList = []; f.air = 0; f.y = CHARS[f.ch].fly ? f.y : 0; f.vy = 0; f.vx = 0; f.vz = 0; f.airAtk = 0; f.dash = 0; f.combo = 0; f.cr = 0; f.dz = 0; f.burn = 0;
   setAct(f, 'stand');
 }
 
 export function startMove(S, f, m) {
   setAct(f, 'atk');
   f.mv = m.id; f.hitList = []; f.con = 0; f.lag = m.land || 4; f.cr = m.cr ? 1 : 0;
-  f.ext = 0; f.chg = 0; f.hang = 0; f.az = 0;
+  f.ext = 0; f.chg = 0; f.hang = 0; f.az = 0; f.sf = 0;
   f.mp -= m.mp;
   if (m.flash) { S.freeze = 30; S.fwho = f.i; S.ev.push({ k: 'super', s: f.i, id: m.id }); }
   else if (m.kind === 'sp') S.ev.push({ k: 'sp', s: f.i, id: m.id });
@@ -76,6 +80,7 @@ function trySpecial(S, f) {
     if (s.d !== c.d || s.btn !== btn) continue;
     if (f.mp < s.m.mp) return false;
     if (s.m.proj && S.pr.some((q) => q.o === f.i && q.mv === s.m.id)) return false;   // 同一招一次只能有一顆（泡泡、地裂、火球）
+    if (s.m.spawn && S.it.some((q) => q.own === f.i)) return false;                    // 自己放的東西（骨頭）還在就不能再放
     if (c.d === 'f') f.face = c.x;
     consumeCommand(f.H, c);
     if (f.item >= 0) dropItem(S, f, 0);                                    // 放必殺：手上的東西掉在腳邊
@@ -318,7 +323,8 @@ function release(S, f) {
   f.hold = -1;
   if (o && o.hold === f.i) {
     o.hold = -1;
-    if (o.act === 'grabbed') { setAct(o, 'hit'); o.stun = 9; o.fallv = 0; o.slide = 400; o.sdir = f.face; }
+    // 鬆手後 REL_IV 幀打不到：以前抓的人先能動，9 幀硬直一結束剛好接下一套（頭暈 → 抓 → 再一套 → 追打，3 秒以上不能動）
+    if (o.act === 'grabbed') { setAct(o, 'hit'); o.stun = 9; o.fallv = 0; o.slide = 400; o.sdir = f.face; o.iv = Math.max(o.iv, REL_IV); }
   }
 }
 
@@ -383,6 +389,12 @@ export function advance(S, f) {
     case 'atk': atkStep(S, f, C); break;
   }
 
+  // 會飛的（貓頭鷹）：能動的時候浮回自己的高度；俯衝的招照 fy 一幀一幀往下、往上
+  if (C.fly && !f.air) {
+    const m = f.act === 'atk' ? MOVES[f.ch][f.mv] : null;
+    if (m) { if (m.fy && f.stop <= 0) f.y = Math.max(0, Math.min(C.fly, f.y + sched(m.fy, f.t))); }
+    else if (HOVER.has(f.act)) f.y = Math.min(C.fly, f.y + FLY_UP);
+  }
   // 往上衝的必殺到頂點停一下
   const hang = f.act === 'atk' && f.hang > 0;
   if (hang) { f.vx = 0; f.vz = 0; if (--f.hang === 0) f.hang = -1; }
@@ -399,7 +411,7 @@ function wakeUp(S, f) {
   const dx = dirX(f.H);
   if (f.t < DOWN_QUICK || (!f.wk && !dx && f.t < DOWN_T)) return;
   f.fallv = 0; f.jug = 0; f.bdef = 0;
-  if (f.wk) { f.wk = 0; toFree(f); startMove(S, f, MOVES[f.ch].wake); S.ev.push({ k: 'wake', s: f.i }); return; }
+  if (f.wk) { f.wk = 0; toFree(f); startMove(S, f, MOVES[f.ch].wake); f.iv = 2; S.ev.push({ k: 'wake', s: f.i }); return; }   // 跟翻滾一樣補兩幀：第 0 幀還沒無敵，滾過來的石頭剛好再打倒一次（可以連三次）
   if (dx) { toFree(f); f.face = dx; startMove(S, f, MOVES[f.ch].roll); f.iv = 2; return; }   // 翻滾第 0 幀還沒無敵，補兩幀
   setAct(f, 'getup');
 }
@@ -449,6 +461,17 @@ function atkStep(S, f, C) {
   }
   if (m.hang && f.air && f.hang === 0 && f.vy <= 0) f.hang = m.hang;
   if (m.it && f.t === m.it.at) itemAct(S, f, m);
+  if (m.flip === f.t) f.face = -f.face;              // 鑽過去之後回頭
+  // 長長長臘腸咬到人：頭跟著咬到的那個（被咬退一點也咬得到下一口）
+  if (m.sweep && m.sweep.head && f.con && f.hitList.length) {
+    const o = S.p[f.hitList[f.hitList.length - 1] & 15];
+    const want = (o.x - f.x) * f.face - CHARS[o.ch].w + 250;
+    f.sf = Math.max(1, Math.min(sweepFront(m.sweep, m.hits[0].box[2], f.t), want));
+  }
+  if (m.spawn && f.t === m.spawn.at) {
+    const x = Math.max(S.lo + 300, Math.min(S.hi - 300, f.x + f.face * m.spawn.x));
+    spawnItem(S, m.spawn.k, x, f.z).own = f.i;
+  }
   if (m.wpn && !f.con && f.t === m.hits[m.hits.length - 1].on[1] + 1) wear(S, f, WEAR_SWING);   // 武器揮空也磨
   if (!f.air) {
     f.vx = m.vx && !(m.stick && f.con) ? sched(m.vx, f.t) * f.face : 0;
@@ -477,6 +500,7 @@ function atkStep(S, f, C) {
     q.mv = m.id;
     if (p.fire) q.fire = 1;
     if (p.gr) { q.gr = 1; q.bt = 0; q.hl = []; }
+    if (p.pierce) { q.pierce = 1; q.hl = []; }
     if (p.lob) { q.lob = 1; q.vy = p.lob.vy; q.g = p.lob.g; q.bt = 0; q.hl = []; }
     if (p.aim) {
       // 打在敵人腳下：r 以內最近的（左右前後加起來算），沒有就落在身前
@@ -491,7 +515,7 @@ function atkStep(S, f, C) {
       q.y = 0; q.vx = 0; q.aim = 1; q.wt = p.aim.wait; q.bt = 0; q.hl = []; q.life = p.aim.wait + 1;
     }
     S.pr.push(q);
-    S.ev.push({ k: 'proj', s: f.i, n: f.ext, big, gr: p.gr ? 1 : 0, lob: p.lob ? 1 : 0, aim: p.aim ? 1 : 0, x: q.x, z: q.z });
+    S.ev.push({ k: 'proj', s: f.i, n: f.ext, big, gr: p.gr ? 1 : 0, lob: p.lob ? 1 : 0, aim: p.aim ? 1 : 0, pierce: p.pierce ? 1 : 0, x: q.x, z: q.z });
     f.chg = 0;
   }
   // 地裂：手按著地，按上下轉彎、再按攻當場炸
@@ -509,6 +533,36 @@ function atkStep(S, f, C) {
     }
   }
   if (m.quake && m.quake.includes(f.t)) S.ev.push({ k: 'quake', s: f.i, x: f.x, z: f.z, t: f.t });
+  // 瞬移、念力丟（小灰人）：都找最近的敵人（左右前後加起來算）
+  if ((m.warp && f.t === m.warp.at) || (m.tk && f.t === m.tk.at)) {
+    let o = null, bd = 1e9;
+    for (const e of S.p) {
+      if (e.team === f.team || e.hp <= 0 || e.gone) continue;
+      const d = Math.abs(e.x - f.x) + Math.abs(e.z - f.z);
+      if (d < bd) { bd = d; o = e; }
+    }
+    if (o && m.warp && bd <= m.warp.r) {                 // 出現在對方背後、面向他
+      S.ev.push({ k: 'warp', s: f.i, x: f.x, z: f.z });
+      f.x = Math.max(S.lo + C.w, Math.min(S.hi - C.w, o.x - o.face * m.warp.d)); f.z = o.z;
+      f.face = o.x >= f.x ? 1 : -1;
+      S.ev.push({ k: 'warp', s: f.i, x: f.x, z: f.z });
+    }
+    if (o && m.tk) {                                     // 最近的一個地上的東西砸過去
+      let q = null, qd = m.tk.r + 1;
+      for (const e of S.it) {
+        if (e.hold >= 0 || e.y > 0 || e.harm) continue;
+        const d = Math.abs(e.x - f.x) + Math.abs(e.z - f.z);
+        if (d < qd && Math.abs(e.x - o.x) > 500) { qd = d; q = e; }
+      }
+      if (q) flingItem(S, f, q, o);
+    }
+  }
+  // 衝撞沒打到人、一路衝到場邊：撞牆，自己頭暈（可以被抓）
+  if (m.crash && !f.con && f.t >= m.crash[0] && f.t <= m.crash[1] && (f.x <= S.lo + C.w || f.x >= S.hi - C.w)) {
+    f.mv = ''; f.hitList = []; setAct(f, 'dizzy'); f.dz = 1; f.vx = 0; f.vz = 0;
+    S.ev.push({ k: 'quake', s: f.i, x: f.x, z: f.z, t: 0 }, { k: 'dizzy', s: f.i });
+    return;
+  }
   // 指令投抓到之後：先把人捲到身前，到 at 幀丟出去（back 往背後甩）
   if (m.grip) {
     const o = f.hold >= 0 ? S.p[f.hold] : null, G = m.grip;

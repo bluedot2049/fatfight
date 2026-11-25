@@ -8,13 +8,14 @@ const KEEP = 16;
 const ORDER = [UP, DOWN, LEFT, RIGHT, BS, BD, BA, BJ];   // 同一幀一起按下的話，方向先、蹲防第二、攻跳最後
 const CMD = 8;                                           // used 的第 8 格：最後一次拿去出必殺的那下防
 
-export function newHistory() { return { prev: 0, n: 0, k: [], t: [], used: [0, 0, 0, 0, 0, 0, 0, 0, 0] }; }
+export function newHistory() { return { prev: 0, n: 0, k: [], t: [], used: [0, 0, 0, 0, 0, 0, 0, 0, 0], gd: 0 }; }
 const slot = (bit) => 31 - Math.clz32(bit);           // 位元 → 0–7
 
 export function record(H, bits) {
   H.n++;
   const press = bits & ~H.prev;
   H.prev = bits;
+  if (press & BD) H.gd = bits & (UP | DOWN | LEFT | RIGHT | BS);   // 按下防那一刻按著哪些方向（和蹲），給「按著方向出必殺」用
   for (const b of ORDER) {
     if (!(press & b)) continue;
     H.k.push(b); H.t.push(H.n);
@@ -54,7 +55,9 @@ export function pressedBoth(H, b1, b2, buf = 4) {
 }
 
 // 出招指令：防 → 方向 → 攻或跳，每一步之間 18 幀內。回傳 { d: 'f' 左右／'u' 上／'d' 下, x: 往哪邊（左右時）, btn: BA／BJ, i: 按鍵那格 }
-const GAP = 18;
+// 也可以先按著方向（使用者 2026-11-25：鍵盤走路中常出不來）：按著一個方向 → 防 → 攻或跳，防和攻隔 HELD_MIN～HELD_GAP 幀，
+//   方向從按防到按攻一直按著、只按一個方向、沒按蹲。隔太近是兩鍵同按（翻滾、丟東西），隔太久是擋完再出拳，都不算。
+const GAP = 18, HELD_MIN = 3, HELD_GAP = 10;
 export function command(H) {
   for (const btn of [BA, BJ]) {
     const bi = pressed(H, btn);
@@ -64,18 +67,35 @@ export function command(H) {
       if (H.t[bi] - H.t[i] > GAP) break;
       if (H.k[i] & (UP | DOWN | LEFT | RIGHT)) { di = i; break; }
     }
-    if (di < 0) continue;
     let gi = -1;
-    for (let i = di - 1; i >= 0; i--) {
+    for (let i = di - 1; di >= 0 && i >= 0; i--) {
       if (H.t[di] - H.t[i] > GAP) break;
       if (H.k[i] === BD) { gi = i; break; }
     }
-    if (gi < 0 || H.t[gi] <= H.used[CMD]) continue;    // 防那一下拿去防禦沒關係，拿去出過必殺就不行
+    if (gi < 0 || H.t[gi] <= H.used[CMD]) {            // 防那一下拿去防禦沒關係，拿去出過必殺就不行
+      const c = held(H, btn, bi);                       // 方向在防之前就按著了
+      if (c) return c;
+      continue;
+    }
     const k = H.k[di];
     const d = k === UP ? 'u' : k === DOWN ? 'd' : 'f';
     return { d, x: k === RIGHT ? 1 : k === LEFT ? -1 : 0, btn, i: bi, gi };
   }
   return null;
+}
+
+function held(H, btn, bi) {
+  let gi = -1;
+  for (let i = bi - 1; i >= 0; i--) if (H.k[i] === BD) { gi = i; break; }
+  if (gi < 0 || H.t[gi] <= H.used[CMD]) return null;
+  const gap = H.t[bi] - H.t[gi];
+  if (gap < HELD_MIN || gap > HELD_GAP) return null;
+  for (let i = gi + 1; i < bi; i++) if (H.k[i] === BD) return null;
+  const d = H.gd;
+  if (d !== (H.prev & (UP | DOWN | LEFT | RIGHT | BS))) return null;   // 一直按著同樣的方向、沒按蹲
+  const x = d === RIGHT ? 1 : d === LEFT ? -1 : 0;
+  if (!x && d !== UP && d !== DOWN) return null;                     // 斜的、沒按方向、按著蹲：不算
+  return { d: x ? 'f' : d === UP ? 'u' : 'd', x, btn, i: bi, gi };
 }
 
 // 連按兩下同一個方向（跑步）：這幀剛按下，14 幀內前面也按過一次，中間沒按別的左右

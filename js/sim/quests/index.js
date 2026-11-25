@@ -4,6 +4,8 @@
 
 import sea from './sea.js';
 import tunnel from './tunnel.js';
+import forest from './forest.js';
+import moon from './moon.js';
 
-export const QUESTS = { sea, tunnel };
-export const ORDER = ['sea', 'tunnel'];
+export const QUESTS = { sea, tunnel, forest, moon };
+export const ORDER = ['sea', 'tunnel', 'forest', 'moon'];

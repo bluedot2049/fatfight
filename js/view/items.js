@@ -55,6 +55,10 @@ const LOOK = {
   },
   boulder(k) { k.ball(0.32, '#7d7468', 0, 0.28, 0, { sx: 1.12, sy: 0.88 }); k.ball(0.14, '#6a6258', 0.18, 0.42, 0.1, { line: false }); },
   redpot(k) { flask(k, '#d8443a'); },
+  bone(k) {                                            // 臘腸狗埋的骨頭：一根橫的，兩頭各兩顆
+    k.caps(0.07, 0.36, '#f4ecd8', 0, 0.1, 0, { rz: Math.PI / 2 });
+    for (const s of [-1, 1]) for (const d of [-1, 1]) k.ball(0.08, '#f4ecd8', s * 0.27, 0.1 + d * 0.05, 0);
+  },
   bluepot(k) { flask(k, '#3a7ad8'); },
   seaweed(k) {
     k.caps(0.04, 0.16, '#4f9a52', -0.05, 0.2, 0, { rz: 0.15 }); k.caps(0.04, 0.18, '#3f8a4a', 0.04, 0.22, 0.02, { rz: -0.12 }); k.caps(0.035, 0.15, '#5fae5c', 0, 0.2, -0.04);

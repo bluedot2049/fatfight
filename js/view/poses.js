@@ -4,7 +4,7 @@
 // 參數：by 身體上下、bz 往前、lean 前傾、bend 上身彎、sq 壓扁(-)拉長(+)、spin 原地轉、tumble 前滾、head 點頭(+低頭)、
 //       aN aF 兩隻手往前舉、aNz aFz 往外張、lN lF 腿往前踢、tail 尾巴往上、sink 鑽進地底
 
-import { MOVES } from '../sim/chars/index.js';
+import { MOVES, CHARS } from '../sim/chars/index.js';
 
 const BASE = {
   idle: {},
@@ -142,10 +142,67 @@ Object.assign(ATK, {
     firestomp: { w: { lN: 1.4, lean: -0.2, aN: 0.8, aF: 0.8, aNz: 0.4, aFz: 0.4, sq: 0.08 }, s: { lN: -0.1, sq: -0.24, by: -0.04, lean: 0.1, aN: 0.5, aF: 0.5, aNz: 1.2, aFz: 1.2, head: 0.1 } },
     hellgate: { w: { aN: 1.3, aF: 0.2, lean: -0.1 }, s: { aN: 1.6, aNz: -0.5, aF: 0.2, lean: 0.05 } },   // 推開門，站旁邊看
   },
+  dog: { ...GEN,
+    bite: { w: { head: -0.4, lean: -0.1 }, s: { head: 0.3, lean: 0.22, bz: 0.08 } },                   // 往前咬
+    biteH: { w: { head: -0.7, lean: -0.2, spin: -0.35 }, s: { head: 0.4, lean: 0.3, spin: 0.45 } },   // 甩頭咬
+    bark: { w: { head: -0.55, sq: 0.08, lean: -0.1 }, s: { head: 0.15, lean: 0.18, sq: -0.06 } },    // 仰頭吸氣、往前吠
+    tunnel: { w: { sq: -0.2, lean: 0.15 }, s: { sq: -0.38, by: -0.14, lean: 0.12, head: 0.25, aN: -0.6, aF: -0.6, lN: 0.6, lF: 0.6 } },   // 壓低衝過去
+    dig: { w: { lean: 0.35, head: 0.45, aN: 1.1, aF: -0.2 }, s: { lean: 0.4, head: 0.5, aN: -0.4, aF: 1.1 } },   // 前腳扒土
+    longdog: { w: { lean: -0.15, head: -0.45 }, s: { head: 0.15, aN: 0.5, aF: 0.5 } },
+  },
   dwarf: { ...GEN,
     chop: { w: { aN: 2.8, aF: 2.4, lean: -0.2, head: -0.2 }, s: { aN: 0.7, aF: 0.6, lean: 0.4, bend: 0.3 } },   // 鎬子從頭上劈下來
     uppick: { w: { aN: -0.4, sq: -0.25 }, s: { aN: 2.9, aF: 2.0, head: -0.35, sq: 0.15 } },
     cavein: { w: { aN: 2.6, aF: 2.6, head: -0.3 }, s: { aN: 0.6, aF: 0.6, lean: 0.8, bend: 0.4, sq: -0.15 } },
+  },
+});
+
+// 第三關（黑森林）：狐狸、貓頭鷹、野豬、營火三冒險者（矮人戰士、精靈弓箭手、法師）
+Object.assign(ATK, {
+  fox: { ...GEN,
+    bite: { w: { lean: -0.2, head: -0.4 }, s: { lean: 0.5, head: 0.3, bend: 0.25, aN: 0.6, aF: 0.6 } },   // 撲上去咬
+    tailup: UPPER,
+  },
+  owl: { ...GEN,
+    swoop: { w: { aNz: 1.7, aFz: 1.7, aN: 0.5, aF: 0.5, lean: -0.25, head: -0.2 }, s: { lean: 0.85, aNz: 2.0, aFz: 2.0, aN: 0.2, aF: 0.2, lN: 1.3, lF: 1.3, head: -0.55 } },   // 翅膀張開往下衝，爪子往前伸
+    gust: { w: { aNz: 1.8, aFz: 1.8, lean: -0.25 }, s: { aN: 1.3, aF: 1.3, aNz: 0.3, aFz: 0.3, lean: 0.3 } },   // 翅膀往前一搧
+  },
+  boar: { ...GEN,
+    charge: { w: { lean: 0.2, head: 0.5, lN: 0.9, sq: -0.1 }, s: { lean: 0.55, head: 0.25, bend: 0.2, sq: -0.06, aN: -0.5, aF: -0.5 } },   // 低頭刨地、整隻往前頂
+    tusk: { w: { head: 0.55, lean: 0.3 }, s: { head: -0.6, lean: -0.1, bend: -0.2 } },                         // 低頭、獠牙往上挑
+    stomp: ATK.elephant.stomp,
+  },
+  warrior: { ...GEN,
+    chop: ATK.dwarf.chop,
+    bash: { w: { aF: 0.5, lean: -0.1 }, s: { aF: 1.5, lean: 0.4, bend: 0.2, aN: -0.5 } },                      // 盾舉在前面頂過去
+    upaxe: ATK.dwarf.uppick,
+    whirl: { w: { spin: -0.8, aN: 1.5, aNz: 1.2 }, s: { spin: 5.5, aN: 1.5, aNz: 1.4, aF: 1.2, aFz: 1.2, lean: 0.1 } },   // 斧頭平舉轉一圈
+  },
+  archer: { ...GEN,
+    shoot: { w: { aN: 1.5, aF: 1.5, lean: -0.1, spin: -0.3 }, s: { aN: 1.55, aF: 0.9, aFz: -0.5, lean: -0.05, spin: -0.5 } },   // 側身舉弓、另一手往後拉
+    flip: UPPER,
+  },
+  mage: { ...GEN,
+    chop: ATK.dwarf.chop,
+    cast: { w: { aN: 2.4, lean: -0.15 }, s: { aN: 1.5, lean: 0.15, aF: 0.6 } },                               // 法杖舉高、往前一指
+    nova: { w: { sq: -0.2, aN: 0.5, aF: 0.5 }, s: { aN: 1.5, aF: 1.5, aNz: 1.8, aFz: 1.8, sq: 0.1, head: -0.2 } },   // 縮一下，兩手往兩邊炸開
+    meteor: { w: { aN: 2.9, aF: 2.7, head: -0.4, lean: -0.2 }, s: { aN: 0.9, aF: 0.9, lean: 0.4, bend: 0.3 } },   // 兩手舉過頭、往下砸
+  },
+});
+
+// 第四關（月球工廠）：機器人、海牛員工、小灰人
+Object.assign(ATK, {
+  robot: { ...GEN,
+    smash: ATK.moss.smash,
+    spinarm: { w: { spin: -0.8, aNz: 1.4, aFz: 1.4, aN: 0.4, aF: 0.4 }, s: { spin: 5.5, aNz: 1.5, aFz: 1.5, aN: 0.4, aF: 0.4, lean: 0.12 } },   // 兩隻手臂平舉轉著衝
+    upjet: UPPER,
+  },
+  worker: { ...GEN, helmet: UPPER },
+  alien: { ...GEN,
+    push: { w: { aN: 0.6, aF: 0.6, lean: -0.15, sq: -0.06 }, s: { aN: 1.5, aF: 1.5, lean: 0.15, head: 0.1 } },                         // 兩手往前一推
+    smash: { w: { aN: 2.8, aF: 2.8, head: -0.3, lean: -0.15 }, s: { aN: 0.8, aF: 0.8, lean: 0.3, head: 0.25 } },                       // 兩手舉高往下一壓
+    cast: { w: { aN: 1.2, aF: 1.2, aNz: 0.8, aFz: 0.8, sq: -0.1 }, s: { aN: 1.7, aF: 1.7, aNz: 0.5, aFz: 0.5, sq: 0.06, head: -0.2 } },   // 兩手往前張開，用力想
+    nova: { w: { sq: -0.2, aN: 0.5, aF: 0.5 }, s: { aN: 1.5, aF: 1.5, aNz: 1.8, aFz: 1.8, sq: 0.1, head: -0.2 } },
   },
 });
 
@@ -198,6 +255,11 @@ export function poseOf(f, clock) {
     case 'atk': p = attackPose(f, m, t, clock); break;
     default: p = {};
   }
+  // 會飛的（角色表 fly）浮在空中、沒在出招：翅膀（兩隻手）往兩邊張開上下拍，身體跟著微微起伏
+  if (CHARS[f.ch].fly && f.y > 0 && (f.act === 'stand' || f.act === 'walk' || f.act === 'run' || f.act === 'guard' || f.act === 'brake')) {
+    const w = Math.sin(clock * 15 + f.i * 1.3);
+    p = over(p, { aN: 0.15, aF: 0.15, aNz: 1.25 + 0.6 * w, aFz: 1.25 + 0.6 * w, by: 0.03 * w, lN: 0.5, lF: 0.5, lean: f.act === 'stand' ? 0.1 : 0.3 });
+  }
   // 舉著重物：手一直舉在頭上
   if (f.ik === 2 && f.act !== 'atk') p = over(p, { aN: BASE.lift.aN, aF: BASE.lift.aF, aNz: BASE.lift.aNz, aFz: BASE.lift.aFz });
   return mix(ZERO, p, 1);
@@ -239,6 +301,11 @@ function attackPose(f, m, t, clock) {
     if (t < at) return { sink: 1.3, spin: t * 0.6 };
     const k = t - at;
     return { aN: 2.8, aF: 2.6, sq: 0.15, spin: Math.max(0, 3 * Math.PI * 2 * (1 - k / 14)), head: -0.3 };
+  }
+  if (id === 'earspin') {                            // 甩耳旋風：整隻往上轉（耳朵往外甩，view 那邊）
+    const k = Math.min(1, t / 4);
+    if (t > m.total - 6) return mix({ spin: 0, aN: 0.8, aF: 0.8 }, BASE.idle, (t - m.total + 6) / 6);
+    return { spin: t * 0.9 * k, aN: 1.6, aF: 1.6, aNz: 0.6, aFz: 0.6, sq: 0.1, head: -0.2 };
   }
   if (id === 'whirl') {                              // 錘頭旋風：往前那段整隻轉三圈（轉完剛好回到正面）
     const a0 = m.vx[1][0], a1 = m.vx[m.vx.length - 1][0];

@@ -27,11 +27,16 @@ export const MOB = [
   { react: 34, think: 56, guard: 6, dodge: 0, aa: 0, sp: 0, combo: 0, aggr: 60, punish: 0, parry: 0, wake: 0 },
   { react: 30, think: 48, guard: 14, dodge: 0, aa: 0, sp: 0, combo: 0, aggr: 75, punish: 10, parry: 0, wake: 0 },
   { react: 26, think: 40, guard: 24, dodge: 4, aa: 0, sp: 0, combo: 1, aggr: 90, punish: 24, parry: 0, wake: 0 },
+  // 3＝精英（關卡表寫 elite: 1、lv 3；第三關起每段最後一波帶一隻）：有魔力、會放必殺（出手前一樣先預告），其他跟 2 級差不多
+  { react: 24, think: 36, guard: 40, dodge: 6, aa: 40, sp: 70, combo: 1, aggr: 100, punish: 40, parry: 0, wake: 0 },
 ];
 // 輪流上（使用者 2026-11-24：被圍不能一直動不了）：雜兵打同一個人要拿「攻擊權」，同時最多 TOK_N 隻（頭目貼著算一隻），
 // 發權至少隔 TOK_GAP 幀；拿到的最多打 TOK_LEN 幀，打完（對方倒了、自己被打）退開 REST 幀。沒拿到的在外圍繞、偶爾假裝要衝。
 // 拿到權的雜兵出手前先停 TELL 幀（畫面上亮一下＝預告），玩家看得出下一拳從哪來、什麼時候來（格檔、爆氣才抓得到）
 const TOK_N = 2, TOK_GAP = 26, TOK_LEN = 110, REST = 36, TELL = 16;
+// 一起上的頭目（營火三冒險者，quest.js 的 pack）：頭目本來不排隊，三個一起貼上來就是被圍。一次只有一個帶頭的上前打，帶 PACK_LEN 幀或被打到就換人，
+// 換人之間空 PACK_GAP 幀；沒帶頭的站外圍，會射箭、放法術的照樣從遠處放（每幀 PACK_SHOT/256 的機會）
+const PACK_LEN = 150, PACK_GAP = 30, PACK_SHOT = 3;
 const lvOf = (A) => (A.mob ? MOB[Math.min(A.lv, MOB.length - 1)] : LV[A.lv]);
 
 export function newAI(lv, seed, mob = 0) {
@@ -57,7 +62,7 @@ function reachOf(m) {
   let far = 0, zr = 0;
   for (const h of m.hits) { far = Math.max(far, h.box[2], m.sweep ? m.sweep.to : 0); zr = Math.max(zr, h.zr || Z_REACH); }
   if (m.proj) { far = Math.max(far, projFar(m.proj)); zr = Math.max(zr, Z_REACH); }
-  return { far: far + d, first: m.hits.length ? m.hits[0].on[0] : m.proj.at, end, zr };
+  return { far: far + d + (m.warp ? m.warp.r : 0), first: m.hits.length ? m.hits[0].on[0] : m.proj.at, end, zr };
 }
 // 飛行道具打多遠：直的飛到沒力；拋的算落地那點；打在腳下的照 r
 function projFar(p) {
@@ -80,13 +85,17 @@ for (const C of ALL) {
     rush: C.specials.filter((s) => kind(s) === 'rush'),
     su: C.supers,
     grab: C.specials.filter((s) => s.m.hits.some((h) => h.grab)),   // 指令投（小象鼻子捲）：對方在擋的時候用
+    heal: C.specials.filter((s) => s.m.spawn),                       // 放吃的（臘腸狗埋骨頭）：血少、離得遠的時候放，之後撿起來吃（itemAI）
     jump: C.ai?.jump ?? 0,           // 愛跳多少（想下一步時「跳」的份量多這麼多；青蛙）
+    flank: C.ai?.flank ?? 0,         // 繞背（狐狸）：對方面向我的時候先往前後錯開、跑到背後才出手
     keep: C.ai?.keep ?? 0,           // 喜歡站多遠（身體之間的空隙）；角色表可以寫 ai: { keep }。站遠吐泡泡的海牛試過，會被胖鼠衝進來打爆
   };
 }
 
 // 道具（items.js）：回傳要按的鍵，-1＝不管道具照平常打
 function itemAI(S, f, A, rx, adz, tw, zb) {
+  const fan = CHARS[f.ch].ai?.items ? 1 : 0;                                              // 專門撿東西丟的（海牛員工）
+  if (CHARS[f.ch].fly) return -1;                                                          // 會飛的（貓頭鷹）不撿東西
   const fresh = !(A.last & BA);
   if (f.ik === 2) return rx < 2600 && adz < 250 ? (fresh ? BA | tw : tw) : tw | zb;      // 舉著重物：走近丟
   const toss = rx > 1200 && rx < 3400 && adz < 200 && f.face === (tw & RIGHT ? 1 : -1) && !(A.last & (BA | BD));   // 防＋攻直接丟（不能按方向，按了是必殺）
@@ -96,12 +105,13 @@ function itemAI(S, f, A, rx, adz, tw, zb) {
   }
   if (f.ik === 1) {                                                                        // 拿著武器：遠一點偶爾跳起來丟，快壞了就直接丟
     const q = S.it.find((o) => o.id === f.item);
-    if (toss && q && q.dur <= 4 && rnd(A) < 40) return BD | BA;
+    if (toss && q && (fan ? rnd(A) < 90 : q.dur <= 4 && rnd(A) < 40)) return BD | BA;
     if (rx > 1500 && rx < 3600 && adz < 200 && rnd(A) < 6) { A.q = [tw, tw, tw, tw, tw, BA | tw]; return BJ | tw; }
     return -1;
   }
-  if (S.f % 90 === f.i) A.iw = rnd(A) < 150 ? 1 : 0;                                      // 這陣子想不想撿東西
-  let best = null, bd = 3000;
+  if (fan) A.iw = 1;
+  else if (S.f % 90 === f.i) A.iw = rnd(A) < 150 ? 1 : 0;                                      // 這陣子想不想撿東西
+  let best = null, bd = fan ? 6000 : 3000;
   for (const q of S.it) {
     if (q.hold >= 0 || q.y > 0 || q.harm) continue;
     const I = ITEMS[q.k], need = I.cat === 'food' ? (I.hp && f.hp < (f.mhp * 3) / 5) || (I.mp && f.mp < 400 && !f.mini) : A.iw;
@@ -123,7 +133,8 @@ function cmd(s, tw) {
 
 const STUNNED = new Set(['hit', 'parried', 'fall', 'down', 'getup', 'dizzy', 'grabbed', 'ko', 'win', 'block']);
 const CAN_ACT = new Set(['stand', 'walk', 'crouch', 'guard']);
-const LYING = new Set(['fall', 'down', 'getup', 'ko']);   // 對方倒著（雜兵不追打）
+const LYING = new Set(['fall', 'down', 'getup', 'ko']);
+const HELPLESS = new Set(['hit', 'dizzy', 'grabbed', 'fall', 'down', 'getup', 'ko']);   // 對方現在按不了鍵   // 對方倒著（雜兵不追打）
 
 // 打誰：最近的敵人（前後差距算兩倍）。每 30 幀或目標倒了才重找
 function target(S, f, A) {
@@ -174,6 +185,7 @@ function decide(S, f, A) {
   if (STUNNED.has(f.act) && f.act !== 'block') {
     A.q.length = 0; A.gt = 0; A.pt = 0; A.chain = 0; A.eng = 0;
     if (A.tok > S.f) yieldTok(S, A);                          // 被打就讓出攻擊權
+    if (f.pack && A.tgt >= 0 && S.p[A.tgt].packI === f.i) S.p[A.tgt].packF = Math.min(S.p[A.tgt].packF, S.f - PACK_LEN);   // 帶頭的被打到：換人
     if (f.act === 'down') return wakeAI(S, f, A, L);
     return burstAI(S, f, A, L);
   }
@@ -209,7 +221,8 @@ function decide(S, f, A) {
         if (s) { A.q = cmd(s, tw); return A.q.shift(); }
       }
       const last = m.hits[m.hits.length - 1].on[1];
-      if (A.chain <= L.combo && f.t >= last + 2 && !(A.last & BA)) return BA | tw | (m.cr ? BS : 0);
+      const stiff = CHARS[o.ch].armor && !HELPLESS.has(o.act);            // 打在打不動的身上：對方沒硬直，不接下一拳（接了會被換到）
+      if (!stiff && A.chain <= L.combo && f.t >= last + 2 && !(A.last & BA)) return BA | tw | (m.cr ? BS : 0);
       return tw | (m.cr ? BS : 0);
     }
     // 會連按加段的招：快到的時候按攻（會接拳的難度才會）
@@ -235,7 +248,8 @@ function decide(S, f, A) {
   // 空中：落下來快碰到才打
   if (f.act === 'air') {
     const r = R[f.dash ? 'dashA' : 'jA'];
-    if (!f.airAtk && f.vy < 30 && rx < r.far + 200 && adz < Z_REACH && !(A.last & BA) && !(f.mini && LYING.has(o.act))) return BA | tw;
+    const up = o.y > 500 && !o.air;                                              // 對方浮在空中（貓頭鷹）：跳上去夠得到就打，不等落下來
+    if (!f.airAtk && (up ? f.y + 900 > o.y : f.vy < 30) && rx < r.far + 200 && adz < Z_REACH && !(A.last & BA) && !(f.mini && LYING.has(o.act))) return BA | tw;
     return tw | zb;
   }
 
@@ -260,7 +274,13 @@ function decide(S, f, A) {
   if (r >= 0) return r;
 
   // ---------- 輪流上：雜兵沒拿到攻擊權就在外圍繞；拿到了但別人正在打，先不插手 ----------
-  if (!hasTok(S, f, A, o, rx)) return orbit(S, f, o, rx, sx, tw, aw);
+  if (!hasTok(S, f, A, o, rx)) {
+    if (f.pack && !HELPLESS.has(o.act) && rnd(A) < PACK_SHOT) {   // 沒帶頭的頭目：對齊了就從遠處射一發（對方正在挨打、被抓、倒著的時候不射，不然接成一長串）
+      const s = K.far.find((q) => f.mp >= q.m.mp && !S.pr.some((e) => e.o === f.i && e.mv === q.m.id) && (q.m.proj.aim ? rx < R[q.m.id].far : adz < 200 && rx > 1200));
+      if (s) { A.q = cmd(s, tw); return A.q.shift(); }
+    }
+    return orbit(S, f, o, rx, sx, tw, aw);
+  }
   if (f.mini && busy(S, f, o)) return zb;
 
   // ---------- 對方露出破綻 ----------
@@ -287,6 +307,18 @@ function decide(S, f, A) {
     return (rx < want - 200 ? aw : rx > want + 400 ? tw : 0) | zb;
   }
 
+  // ---------- 對方浮在空中（貓頭鷹）、沒在俯衝：地上的拳打不到，走到底下跳起來打，有對空必殺就用 ----------
+  if (o.y > 500 && !o.air && !moveOf(o)) {
+    if (adz > 200 || rx > 450) return (rx > 250 ? tw : 0) | zb;
+    if (rnd(A) < (L.aggr >> 2) + 8) {
+      const s = K.air.find((q) => f.mp >= q.m.mp);
+      if (s && rnd(A) < L.aa) { A.q = cmd(s, tw); return A.q.shift(); }
+      A.q = [tw, tw, tw];
+      return BJ | tw;
+    }
+    return 0;
+  }
+
   // ---------- 想下一步 ----------
   if (--A.pt <= 0) plan(S, f, A, L, K, R, o, rx, adz);
   switch (A.plan) {
@@ -305,6 +337,11 @@ function decide(S, f, A) {
       return BD;
     default: {
       // 走：保持喜歡的距離、對齊前後，走到打得到就出手
+      // 繞背（狐狸）：對方面向我，先往前後錯開（有空間的那邊），錯開了就直直跑過去；到了背後照平常走近出手（防只擋前面）
+      if (K.flank && (f.x - o.x) * o.face > 0 && rx < 2400 && !LYING.has(o.act)) {
+        if (adz < 520) return (f.z >= o.z ? (o.z + 620 <= Z_NEAR ? DOWN : UP) : (o.z - 620 >= Z_FAR ? UP : DOWN)) | (rx > 1000 ? tw : 0);
+        return tw;
+      }
       const crowd = !f.mini && engaged(S, f, o) >= 2;      // 雜兵改走攻擊權（hasTok），這條留給頭目、合作的電腦
       const keep = crowd ? 2600 : K.keep;
       if ((o.act === 'guard' || o.act === 'block') && K.grab.length && rnd(A) < L.sp) {
@@ -323,6 +360,8 @@ const FREE_RESET = new Set(['stand', 'walk', 'crouch', 'guard', 'run', 'air', 'l
 function attack(S, f, A, L, K, R, rx, adz, tw) {
   const v = rnd(A);
   A.chain = 0;
+  const o = S.p[A.tgt];                                   // 對方打不動（機器人）：輕拳沒用，夠得到就用吹飛
+  if (o && CHARS[o.ch].armor && !HELPLESS.has(o.act) && v < 90 + (L.punish >> 1) && inR2(R.CD, rx, adz)) { A.q = [0]; return BA | BJ | tw; }   // 越會打的越常想到
   if (v < 40 && inR2(R.crA, rx, adz)) { A.q = [0]; return BS | BA | tw; }
   if (v < 62 + (A.pd ? 70 : 0) && inR2(R.CD, rx, adz)) { A.pd = 0; A.q = [0]; return BA | BJ | tw; }   // 被格檔過：用吹飛剋它
   A.q = [tw];
@@ -343,6 +382,7 @@ function pickRush(S, f, A, L, K, R, rx, adz, combo) {
 function yieldTok(S, A) { A.tok = 0; A.rest = S.f + REST + (rnd(A) & 31); }
 // 這隻雜兵現在能不能打 o：拿著權（對方倒了、時間到就交出去）；沒有的話看能不能拿到
 function hasTok(S, f, A, o, rx) {
+  if (f.pack) return packTok(S, f, o);
   if (!f.mini) return true;
   const lying = LYING.has(o.act);
   if (A.tok > S.f) { if (lying) { yieldTok(S, A); return false; } return true; }
@@ -357,8 +397,20 @@ function hasTok(S, f, A, o, rx) {
   o.tokF = S.f; A.tok = S.f + TOK_LEN;
   return true;
 }
+// 一起上的頭目：我是不是現在帶頭打 o 的那個；沒人帶（上一個帶完了、倒了、被打到）就接手
+function packTok(S, f, o) {
+  const lead = o.packI >= 0 ? S.p[o.packI] : null, on = S.f < o.packF + PACK_LEN;
+  if (o.packI === f.i && on) return !LYING.has(o.act);
+  if (lead && lead !== f && lead.pack && lead.hp > 0 && on) return false;
+  if (LYING.has(o.act)) return false;
+  const others = S.p.some((g) => g !== f && g.pack && g.hp > 0 && g.team === f.team);
+  if (S.f < o.packF + PACK_LEN + PACK_GAP || (o.packI === f.i && others && S.f < o.packF + PACK_LEN + PACK_GAP * 3)) return false;   // 換人之間空一下；剛帶完的讓別人先
+  o.packI = f.i; o.packF = S.f;
+  return true;
+}
 // 別人剛打到 o、o 還在硬直：先不插手（不然兩隻輪流打，硬直接成一串）
 function busy(S, f, o) {
+  if (o.act === 'grabbed' && o.hold !== f.i) return true;      // 被別人抓著：不補刀、不丟東西砸（頭暈 → 被抓 → 被砸飛，超過 3 秒不能動）
   return (o.act === 'hit' || o.act === 'dizzy' || o.act === 'block') && o.lh >= 0 && o.lh !== f.i && S.f - o.lhT < 40;
 }
 // 沒拿到權：站在 1.5–2 公尺外，前後錯開（單號往外、雙號往裡），偶爾往前一步假裝要衝，停著的時候面向對方
@@ -518,6 +570,7 @@ function plan(S, f, A, L, K, R, o, rx, adz) {
     if (ok) add(L.sp >> 1, s);
   }
   for (const s of K.su) if (f.mp >= s.m.mp && inR2(R[s.m.id], rx, adz)) add(L.sp >> 2, s);
+  for (const s of K.heal) if (f.mp >= s.m.mp + 100 && f.hp < (f.mhp * 3) / 5 && rx > 2400 && !S.it.some((q) => q.own === f.i)) add(L.sp >> 2, s);
   for (const s of K.rush) if (f.mp >= s.m.mp + 200 && inR2(R[s.m.id], rx, adz)) add(L.sp >> 3, s);
   let tot = 0;
   for (const [w] of opts) tot += w;
@@ -527,6 +580,7 @@ function plan(S, f, A, L, K, R, o, rx, adz) {
     if (typeof p === 'string') { A.plan = p; return; }
     A.plan = 'walk';
     A.q = cmd(p, o.x >= f.x ? RIGHT : LEFT);
+    if (f.mini) { S.ev.push({ k: 'tell', s: f.i, x: f.x, z: f.z }); A.q = [...Array(TELL).fill(0), ...A.q]; }   // 精英放必殺一樣先預告
     return;
   }
   A.plan = 'walk';

@@ -19,7 +19,9 @@
   --ivory: linear-gradient(#fffaf0, #f2e6c8 55%, #d8c69c);
   --parchbg: linear-gradient(170deg, #f3e6c4 0%, #e3d1a6 55%, #cfb985 100%);
   --noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.7' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .2 0 0 0 0 .12 0 0 0 0 .05 0 0 0 .22 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  --serif: 'Noto Serif TC', 'PMingLiU', serif; --cinzel: 'Cinzel', 'Noto Serif TC', serif;
+  --serif: 'Noto Serif TC', 'PMingLiU', serif; --cinzel: 'Cinzel', 'Noto Serif TC', serif; --deco: 'Cinzel Decorative', 'Cinzel', serif;
+  /* 按鈕的紅（照《伊底帕斯的雙眼》封面牛血紅那一款）：紅只給主按鈕；花飾是淡金 */
+  --ox: #6b1e21; --ivory2: #f2ebd9;
 }
 /* manipulation：點兩下不會放大整頁（iOS 不理 viewport 的禁止縮放） */
 * { box-sizing: border-box; touch-action: manipulation; }
@@ -55,6 +57,19 @@ input { -webkit-user-select: text; user-select: text; }
 @keyframes turn { to { rotate: 360deg; } }
 .seal { display: block; width: 100%; height: 100%; font-family: var(--serif); }
 
+/* ---------- 按鈕和框（js/ui/ornate.js 照大小現畫的 SVG）----------
+   全遊戲一種外形：四角往內凹一個圓弧＋金線。按鈕兩型＝兩個層級：
+   main 主按鈕（會去做事的）：紅的布面、金色雙線、字兩旁各一道花飾；sub 次按鈕（設定、輔助、離開）：深色底、一條金線、沒有花紋。
+   沒選到的整顆壓暗，選到的亮回來（不重畫，只調亮度）。panel＝選單面板的框，plate＝HUD 玩家牌的框 */
+.orn { display: block; overflow: visible; pointer-events: none; }
+.orn path { fill: none; stroke: none; stroke-linejoin: round; }
+.orn .gl { stroke: url(#orn-gold); } .orn .o5 { opacity: .45; }
+.orn .i { fill: url(#orn-gold); stroke: #1a0d0c; stroke-width: .6; }
+.pq-main .f { fill: url(#orn-ox); } .pq-sub .f, .pq-plate .f { fill: url(#orn-dark); } .pq-panel .f { fill: url(#orn-panel); }
+[data-orn] > svg.pq { position: absolute; left: 0; top: 0; z-index: -1; }
+li[data-orn], .mbtn { position: relative; isolation: isolate; }
+
+/* ---------- HUD ---------- */
 /* ---------- HUD ---------- */
 #hud { position: fixed; inset: 0; pointer-events: none; overflow: hidden; --s: 1; font-weight: 900; }
 #hud .fit { position: absolute; left: 0; top: 0; width: calc(100vw / var(--s)); height: calc(100vh / var(--s)); transform: scale(var(--s)); transform-origin: 0 0; }
@@ -63,10 +78,7 @@ input { -webkit-user-select: text; user-select: text; }
 #hud .pp { position: absolute; top: 18px; width: 700px; height: 140px; }
 #hud .pp.p0 { left: 26px; }
 #hud .pp.p1 { right: 26px; transform: scaleX(-1); }
-#hud .pp .plate { position: absolute; left: 70px; top: 14px; width: 620px; height: 98px; border: 2px solid transparent;
-  background: var(--noise), linear-gradient(180deg, rgba(36, 26, 28, .94), rgba(13, 10, 12, .94)) padding-box, var(--goldframe) border-box; box-shadow: 0 0 0 1px #0a0604, inset 0 0 0 1px rgba(0, 0, 0, .65), inset 0 1px 0 1px rgba(255, 240, 205, .07), 0 10px 22px rgba(0, 0, 0, .5); }
-#hud .pp .plate::before { content: ''; position: absolute; inset: 5px; border: 1px solid rgba(210, 181, 122, .2); }
-#hud .pp .plate .stud.tl, #hud .pp .plate .stud.bl { display: none; }
+#hud .pp .plate { position: absolute; left: 70px; top: 14px; width: 620px; height: 98px; }
 #hud .pp .medal { position: absolute; left: 0; top: 0; width: 120px; height: 120px; z-index: 3; border-radius: 50%; padding: 5px; background: var(--grainm), linear-gradient(165deg, #f6e9c4 0%, #c9a865 24%, #6e5124 49%, #3e2c12 57%, #a88a4c 78%, #ecdcaf 100%); box-shadow: 0 0 0 1px #0a0604, inset 0 1px 1px rgba(255, 250, 230, .75), inset 0 -2px 2px rgba(0, 0, 0, .55), 0 8px 18px rgba(0, 0, 0, .6); }
 #hud .pp .medal::before { content: ''; position: absolute; inset: 5px; border-radius: 50%; background: radial-gradient(circle at 50% 32%, color-mix(in srgb, var(--gem) 70%, #fff) 0, var(--gem) 22%, var(--deep) 62%, #050305 100%); box-shadow: inset 0 0 0 2px #000, inset 0 -8px 18px rgba(0, 0, 0, .55); }
 #hud .pp .medal .img { position: absolute; inset: 5px; border-radius: 50%; background: center 40% / 118% no-repeat; }
@@ -98,6 +110,10 @@ input { -webkit-user-select: text; user-select: text; }
 #hud .pp .wins b { width: 18px; height: 18px; border-radius: 50%; background: #120c0c; border: 1px solid #7d6538; box-shadow: 0 0 0 1px #0a0604; }
 #hud .pp .wins b.on { background: var(--grainm), radial-gradient(circle at 35% 30%, #fffaf0 0 10%, #dcc28a 28%, #8e6f38 70%, #3b2a12); border-color: #e6d3a0; animation: stamp .35s; }
 #hud .pp.p1 .nm, #hud .pp.p1 .tag, #hud .pp.p1 .sp { transform: scaleX(-1); }
+
+/* 邊角的細節靠形狀、不靠花紋：牌子外側兩個角跟按鈕一樣往內凹（框是 ornate.js 畫的），血條尾端收一個小尖 */
+#hud .pp .plate > svg.pq { position: absolute; left: 0; top: 0; filter: drop-shadow(0 8px 12px rgba(0, 0, 0, .5)); }
+#hud .pp .hptip { position: absolute; left: 672px; top: 56px; width: 9px; height: 22px; background: var(--goldframe); clip-path: polygon(0 0, 100% 50%, 0 100%); filter: drop-shadow(0 0 1px #0a0604); }
 
 /* 中間回合的金章（羅馬數字） */
 #hud .round { position: absolute; left: 50%; top: 18px; width: 96px; height: 96px; margin-left: -48px; border-radius: 50%; padding: 4px; background: var(--grainm), linear-gradient(165deg, #f6e9c4 0%, #c9a865 24%, #6e5124 49%, #3e2c12 57%, #a88a4c 78%, #ecdcaf 100%); box-shadow: 0 0 0 1px #0a0604, inset 0 1px 1px rgba(255, 250, 230, .75), inset 0 -2px 2px rgba(0, 0, 0, .55), 0 8px 18px rgba(0, 0, 0, .6);
@@ -194,20 +210,34 @@ input { -webkit-user-select: text; user-select: text; }
 /* ---------- 選單（暫停、結果、線上） ---------- */
 .menu { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(8, 5, 6, .72); font-weight: 700; }
 .menu .panel { position: relative; min-width: 420px; padding: 40px 56px 36px; text-align: center; isolation: isolate; }
-.menu .panel > .shape { position: absolute; inset: 0; z-index: -1; border: 2px solid transparent;
-  background: var(--noise), radial-gradient(ellipse at 50% 0, #2e2124, var(--ink) 75%) padding-box, var(--goldframe) border-box; box-shadow: 0 0 0 1px #0a0604, inset 0 0 0 1px rgba(0, 0, 0, .65), inset 0 1px 0 1px rgba(255, 240, 205, .07), 0 18px 40px rgba(0, 0, 0, .6); }
-.menu .panel > .shape::before { content: ''; position: absolute; inset: 7px; border: 1px solid rgba(210, 181, 122, .22); }
-.menu .panel > .shape::after { content: ''; position: absolute; left: 50%; top: -7px; width: 10px; height: 10px; margin-left: -5px; rotate: 45deg; background: var(--goldframe); box-shadow: 0 0 0 1px #0a0604; }
+/* 面板的框是 ornate.js 畫的（四角內凹、金線、裡面一條淡的細線）；上緣中間一顆菱形 */
+.menu .panel > .shape { position: absolute; inset: 0; z-index: -1; }
+.menu .panel > .shape > svg.pq { filter: drop-shadow(0 18px 26px rgba(0, 0, 0, .6)); }
+.menu .panel > .shape::after { content: ''; position: absolute; left: 50%; top: -5px; width: 10px; height: 10px; margin-left: -5px; rotate: 45deg; background: var(--goldframe); box-shadow: 0 0 0 1px #0a0604; }
 .menu h2 { margin: 0 0 14px; font-size: 40px; letter-spacing: .24em; }
 .menu h2 .gt { --fill: var(--ivory); }
 .menu .sub { margin: 0 0 16px; color: var(--dim); font-weight: 500; }
 .menu .sub:empty { display: none; }
 .menu .items { list-style: none; margin: 0; padding: 0; }
-.menu .items li { position: relative; display: flex; align-items: center; justify-content: center; gap: 12px; padding: 7px 34px; margin: 2px 0; font-size: 22px; font-weight: 500; letter-spacing: .16em; color: #a99a7c; cursor: pointer; white-space: nowrap; }
-.menu .items li::before, .menu .items li::after { content: '◆'; font-size: .42em; color: var(--goldc); opacity: 0; transition: opacity .12s, translate .12s; }
-.menu .items li::before { translate: 6px 0; } .menu .items li::after { translate: -6px 0; }
-.menu .items li.sel { color: #fff3da; background: linear-gradient(90deg, transparent, rgba(210, 181, 122, .09) 30%, rgba(210, 181, 122, .09) 70%, transparent); }
-.menu .items li.sel::before, .menu .items li.sel::after { opacity: 1; translate: 0 0; }
+/* 每一項是一顆按鈕（data-orn＝main／sub，menu.js 照項目決定）。沒選到：整顆暗下去；選到：亮起來，主按鈕外面一圈暖光 */
+.menu .items li { display: flex; align-items: center; justify-content: center; gap: 12px; height: 2.1em; padding: 0 2.4em; margin: 8px 0; font-size: 22px; font-weight: 500; letter-spacing: .16em; color: #b3a587; cursor: pointer; white-space: nowrap; transition: color .12s; }
+.menu .items li > svg.pq { filter: brightness(.56) drop-shadow(0 2px 0 rgba(0, 0, 0, .55)); transition: filter .12s; }
+.menu .items li[data-orn="sub"] { color: #a39679; }
+.menu .items li[data-orn="sub"] > svg.pq { filter: brightness(.7) drop-shadow(0 2px 0 rgba(0, 0, 0, .55)); }
+.menu .items li.sel { color: #fff6e2; text-shadow: 0 1px 0 rgba(0, 0, 0, .7); }
+.menu .items li.sel > svg.pq-main { filter: drop-shadow(0 2px 0 rgba(0, 0, 0, .6)) drop-shadow(0 0 9px rgba(190, 70, 50, .5)); }
+.menu .items li.sel > svg.pq-sub { filter: brightness(1.5) drop-shadow(0 2px 0 rgba(0, 0, 0, .6)); }
+@media (hover: hover) {
+  .menu .items li:not(.sel):not(.off):hover { color: #e6d9bb; }
+  .menu .items li:not(.sel):hover > svg.pq-main { filter: brightness(.78) drop-shadow(0 2px 0 rgba(0, 0, 0, .55)); }
+  .menu .items li:not(.sel):hover > svg.pq-sub { filter: brightness(1.05) drop-shadow(0 2px 0 rgba(0, 0, 0, .55)); }
+}
+/* 觸控沒有游標：每一顆都是平常的亮度，按下去那一下才亮 */
+body.touch .menu .items li, body.touch .menu .items li.sel { color: #eadfc3; text-shadow: none; }
+body.touch .menu .items li > svg.pq-main, body.touch .menu .items li.sel > svg.pq-main { filter: brightness(.86) drop-shadow(0 2px 0 rgba(0, 0, 0, .55)); }
+body.touch .menu .items li > svg.pq-sub, body.touch .menu .items li.sel > svg.pq-sub { filter: brightness(1.05) drop-shadow(0 2px 0 rgba(0, 0, 0, .55)); }
+body.touch .menu .items li:active { color: #fff6e2; }
+body.touch .menu .items li:active > svg.pq { filter: brightness(1.25) drop-shadow(0 2px 0 rgba(0, 0, 0, .55)); }
 .menu .items li .no { display: none; }
 .menu .items li em { font-style: normal; font-weight: 500; font-size: .74em; color: var(--parch2); }
 .menu .items li em.cy::before { content: '‹ '; } .menu .items li em.cy::after { content: ' ›'; }
@@ -230,21 +260,35 @@ input { -webkit-user-select: text; user-select: text; }
 /* 比賽結束：選單往下讓，上面留給「誰 勝」的字卡 */
 .menu.result { align-items: flex-end; padding-bottom: 8vh; background: linear-gradient(rgba(8, 5, 6, 0) 30%, rgba(8, 5, 6, .8)); }
 
-/* ---------- 標題 ---------- */
+/* ---------- 標題（首頁） ----------
+   左半邊一欄，從上到下三層：標誌（底下一行 FAT FIGHT）→ 分區的選單 → 按鍵提示，每一層的左右邊都跟標誌對齊；右半邊留給場上兩隻。
+   選單的區（js/main.js toTitle 的 groups）：.sec.play＝要玩什麼，一項一顆橫的主按鈕；.sec.etc＝說明和設定，次按鈕排一列。
+   一區一個小標題：字＋往右淡掉的細金線。大小看寬也看高（min(vw, vh)），矮的視窗不會排到外面；再矮（手機橫拿）的排法在 touch.css */
 .menu.title { justify-content: flex-start; background: linear-gradient(90deg, rgba(8, 5, 6, .94) 0, rgba(8, 5, 6, .82) 34%, rgba(8, 5, 6, 0) 62%); }
-.menu.title .panel { width: 46vw; padding: 0 0 4vh; min-width: 0; }
+.menu.title .panel { width: max-content; min-width: 0; margin-left: 7.2vw; padding: 0 0 2vh; text-align: left; }
 .menu.title .panel > .shape { display: none; }
 .tcircle { position: absolute; left: 50%; top: -6vh; width: 34vw; height: 34vw; margin-left: -17vw; z-index: -1; color: var(--goldc); opacity: .11; pointer-events: none; }
 .tcircle .mcircle { animation-duration: 120s; }
-.logo { margin: 0 0 1vh; font-size: clamp(60px, 7.2vw, 132px); line-height: 1.15; letter-spacing: .1em; white-space: nowrap; }
+.brand { width: max-content; }
+.logo { margin: 0 -.1em .6vh 0; font-size: clamp(60px, min(7.2vw, 13.6vh), 132px); line-height: 1.15; letter-spacing: .1em; white-space: nowrap; }
 .logo .gt { font-weight: 900; }
 .menu.title.enter .logo { animation: rise .7s ease-out both; }
-.tagline { display: flex; align-items: center; justify-content: center; gap: 18px; margin: 0 0 5vh; font-size: clamp(14px, 1.3vw, 22px); letter-spacing: .5em; color: var(--parch2); text-shadow: 0 2px 0 #000; }
-.tagline i { width: 5vw; height: 1px; background: linear-gradient(90deg, transparent, var(--goldc)); }
-.tagline i:last-child { background: linear-gradient(90deg, var(--goldc), transparent); }
-.menu.title .items li { font-size: clamp(18px, 1.6vw, 28px); padding: .28em 2em; }
+/* 副標：帶裝飾筆的羅馬大寫，兩旁各一道細金線 */
+.tagline { display: flex; align-items: center; gap: .9em; font: 700 clamp(17px, min(1.75vw, 3.3vh), 30px)/1 var(--deco); letter-spacing: .24em; color: var(--ivory2); text-shadow: 0 2px 0 #000; white-space: nowrap; }
+.tagline b { font-weight: 700; margin-right: -.24em; }
+.tagline i { flex: 1; height: 1px; background: linear-gradient(90deg, transparent, var(--goldc)); }
+.tagline b + i { background: linear-gradient(90deg, var(--goldc), transparent); }
+/* --f：玩的那幾項的字級 */
+.menu .secs { --f: clamp(19px, min(1.7vw, 3.2vh), 30px); display: grid; gap: 2.2vh 0; margin-top: 3.6vh; }
+.menu .sec h3 { display: flex; align-items: center; gap: 1em; margin: 0 0 .5em; font-size: clamp(13px, min(1.05vw, 2vh), 18px); font-weight: 500; letter-spacing: .42em; color: var(--parch2); white-space: nowrap; }
+.menu .sec h3::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, rgba(210, 181, 122, .5), rgba(210, 181, 122, 0)); }
+.menu.title .items li { margin: 0 0 max(6px, 1vh); font-size: var(--f); height: 1.95em; }
+.menu.title .etc .items { display: flex; flex-wrap: wrap; gap: 0 10px; }
+.menu.title .etc .items li { flex: 1 1 auto; font-size: clamp(16px, min(1.25vw, 2.4vh), 22px); height: 2.1em; padding: 0 1.3em; }
+.menu.title.enter .sec h3 { animation: rise .5s ease-out both; animation-delay: calc(.2s + var(--g) * .12s); }
 .menu.title.enter .items li { animation: rise .5s ease-out both; animation-delay: calc(.25s + var(--i) * .05s); }
-.menu.title .foot { margin-top: 4vh; }
+.menu.title .foot { margin-top: 2.6vh; }
+.menu.title .foot span { margin: 0 18px 0 0; }
 .ver { position: absolute; right: 26px; bottom: 18px; font: 700 12px var(--cinzel); letter-spacing: .2em; color: var(--dim); }
 
 /* 首頁右上角的全螢幕鈕（js/ui/screen.js）：金框圓鈕，開著時不發亮；只在首頁、沒蓋著招式表時 */
@@ -291,7 +335,9 @@ body:not(:has(#menu.title:not([hidden]))) #a2hs { display: none; }   /* 沒按�
 .scard .stud.tl { left: -8px; top: -8px; } .scard .stud.tr { right: -8px; top: -8px; } .scard .stud.bl { left: -8px; bottom: -8px; } .scard .stud.br { right: -8px; bottom: -8px; }
 /* 名字牌＋屬性寶石 */
 .scard .name { position: absolute; left: 8px; right: 8px; top: 8px; height: 42px; display: flex; align-items: center; padding: 0 8px 0 12px; background: var(--parchbg); border: 1px solid #5a4424; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .55), inset 0 -1px 0 rgba(90, 60, 20, .35), 0 1px 0 #000; }
-.scard .name b { font-size: 21px; font-weight: 700; color: var(--brown); letter-spacing: .06em; white-space: nowrap; }
+/* 卡片多了會變窄：名字照名字列的寬度和字數縮（--n 字數，menu.js 寫進去；八個字也不會被屬性寶石蓋到） */
+.scard .name { container-type: inline-size; }
+.scard .name b { font-size: min(21px, calc((100cqw - 58px) / (var(--n, 6) * 1.08))); font-weight: 700; color: var(--brown); letter-spacing: .06em; white-space: nowrap; }
 .scard .name .attr { margin-left: auto; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; font-size: 16px; font-weight: 900; color: #fff; text-shadow: 0 1px 2px #000;
   background: radial-gradient(circle at 32% 28%, #fff 0 10%, color-mix(in srgb, var(--gem) 60%, #fff) 22%, var(--gem) 50%, var(--deep)); box-shadow: 0 0 0 1.5px #b9a06a, 0 0 0 2.5px #0a0604; }
 /* 等級星 */
@@ -303,6 +349,7 @@ body:not(:has(#menu.title:not([hidden]))) #a2hs { display: none; }   /* 沒按�
 .scard .art.sea { background: linear-gradient(170deg, rgba(255, 255, 255, .12) 0 8%, transparent 8% 14%, rgba(255, 255, 255, .08) 14% 18%, transparent 18%), radial-gradient(ellipse at 50% 25%, #6fd0e6 0, #1a6a96 40%, #0a2440 75%, #040d1a 100%); }
 .scard .art.earth { background: linear-gradient(170deg, rgba(255, 240, 200, .14) 0 8%, transparent 8% 14%, rgba(255, 240, 200, .08) 14% 18%, transparent 18%), radial-gradient(ellipse at 50% 28%, #ffd27a 0, #c06a22 40%, #5a2208 75%, #200a03 100%); }
 .scard .art.rose { background: linear-gradient(170deg, rgba(255, 220, 235, .14) 0 8%, transparent 8% 14%, rgba(255, 220, 235, .08) 14% 18%, transparent 18%), radial-gradient(ellipse at 50% 28%, #ffc0d4 0, #c0507a 40%, #4a1430 75%, #1a0610 100%); }
+.scard .art.sky { background: linear-gradient(170deg, rgba(255, 255, 255, .14) 0 8%, transparent 8% 14%, rgba(255, 255, 255, .08) 14% 18%, transparent 18%), radial-gradient(ellipse at 50% 30%, #d8f0ff 0, #5aa8e0 38%, #1c4a7a 72%, #08182c 100%); }
 .scard .art.fire { background: linear-gradient(170deg, rgba(255, 230, 200, .14) 0 8%, transparent 8% 14%, rgba(255, 230, 200, .08) 14% 18%, transparent 18%), radial-gradient(ellipse at 50% 70%, #fff0b0 0, #ff6a2a 30%, #8a1a0a 62%, #1a0402 100%); }
 .scard .art .mcircle { width: 92%; height: auto; color: rgba(255, 255, 255, .5); opacity: .55; animation-duration: 90s; }
 /* 羊皮紙說明欄 */
@@ -348,7 +395,13 @@ body:not(:has(#menu.title:not([hidden]))) #a2hs { display: none; }   /* 沒按�
 #overlay { position: fixed; inset: 0; background: rgba(8, 5, 6, .86); display: flex; align-items: center; justify-content: center; z-index: 5; }
 #overlay .sheet { position: relative; max-width: min(1100px, 94vw); max-height: 90vh; overflow: auto; padding: 28px 38px 22px; border: 2px solid transparent;
   background: var(--noise), radial-gradient(ellipse at 50% 0, #2e2124, var(--ink) 75%) padding-box, var(--goldframe) border-box; box-shadow: 0 0 0 1px #0a0604, inset 0 0 0 1px rgba(0, 0, 0, .65), inset 0 1px 0 1px rgba(255, 240, 205, .07), 0 18px 40px rgba(0, 0, 0, .6); }
-#overlay .close { text-align: center; color: var(--dim); font-size: 13px; letter-spacing: .14em; cursor: pointer; margin: 16px 0 0; }
+/* 關閉：一顆次按鈕，黏在那張的底邊（內容很長、要捲的時候也看得到） */
+#overlay .close { position: sticky; bottom: -22px; z-index: 2; margin: 10px -38px -22px; padding: 18px 0 14px; text-align: center; background: linear-gradient(rgba(16, 11, 12, 0), rgba(16, 11, 12, .96) 45%); pointer-events: none; }
+.cbtn, .kbtn { position: relative; isolation: isolate; display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 26px; font-size: 16px; font-weight: 500; letter-spacing: .2em; color: #d8cba9; cursor: pointer; pointer-events: auto; }
+.cbtn small { font: 700 11px var(--cinzel); letter-spacing: .1em; color: var(--dim); }
+.cbtn > svg.pq, .kbtn > svg.pq { filter: brightness(1) drop-shadow(0 2px 0 rgba(0, 0, 0, .55)); }
+@media (hover: hover) { .cbtn:hover, .kbtn:hover { color: #fff6e2; } .cbtn:hover > svg.pq, .kbtn:hover > svg.pq { filter: brightness(1.45) drop-shadow(0 2px 0 rgba(0, 0, 0, .55)); } }
+.fit9 .keys .kbtn { height: 34px; padding: 0 18px; margin-left: 10px; font-size: 14px; letter-spacing: .12em; }
 #overlay .foot { color: var(--dim); font-size: 13px; }
 #overlay .foot [data-act] { color: var(--parch); text-decoration: underline; cursor: pointer; }
 .movelist { display: grid; grid-template-columns: 1fr 1fr; gap: 24px 36px; }
@@ -399,4 +452,6 @@ body:not(:has(#menu.title:not([hidden]))) #a2hs { display: none; }   /* 沒按�
 #hud .ebars { position: absolute; inset: 0; }
 #hud .ebars .eb { position: absolute; left: 0; top: 0; width: 64px; height: 7px; margin-left: -32px; background: #120c0c; border: 1px solid #7d6538; box-shadow: 0 0 0 1px #0a0604; display: none; }
 #hud .ebars .eb.on { display: block; }
+#hud .ebars .eb.elite { width: 84px; margin-left: -42px; height: 9px; border-color: #e8c868; }   /* 精英雜兵：長一點、金邊 */
+#hud .ebars .eb.elite b { background: linear-gradient(#ffd88a, #c8762a); }
 #hud .ebars .eb b { display: block; height: 100%; background: linear-gradient(#ff8a7a, var(--blood)); }

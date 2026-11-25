@@ -50,7 +50,7 @@ const SU = [
 ];
 
 export default {
-  id: 'marmot', name: '胖鼠', full: '土撥鼠界最狂妄', color: '#ffd84a',
+  id: 'marmot', name: '胖鼠', full: '胖鼠', color: '#ffd84a',
   blurb: '近身亂鑽、翻滾衝撞', stat: [3, 2, 5],
   pal: ['#f2a93b', '#5a2a0c'], card: { attr: '地', type: '狂妄之鼠', lv: 4, art: 'earth' },  // 介面：寶石色（亮、暗）；卡片的屬性、種族、等級星、畫框底色       // 選角畫面：一句話、力氣／距離／速度（1–5）
   voice: { f0: 175, size: 1.12, mora: 0.095 },   // 念招式名稱的聲音：比海牛高、快
