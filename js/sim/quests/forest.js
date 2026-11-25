@@ -8,7 +8,7 @@
 // 數字照 docs/方向.md「闖關難度的尺」調：改完跑 node tools/quest-balance.mjs。目標是 3 級代打一個人掉 2.9–3.6 條命、頭目段不超過被打血量的一半
 const m = (ch, lv, hp, side = 'R') => ({ ch, lv, hp, side, mini: 1, pow: 100 });
 const el = (ch, hp, side = 'R') => ({ ch, lv: 3, hp, side, mini: 1, elite: 1, pow: 100 });
-const boss = (ch, hp, side = 'R') => ({ ch, lv: 3, hp, pow: 90, side, boss: 1, pack: 1 });
+const boss = (ch, hp, side = 'R') => ({ ch, lv: 3, hp, pow: 125, side, boss: 1, pack: 1 });
 
 export default {
   id: 'forest', no: 3, name: '黑森林', scene: 'forest', bossName: '營火三冒險者', bossSay: '第四個人終於來了。不是？',
@@ -28,7 +28,7 @@ export default {
       [m('boar', 2, 260), m('owl', 2, 140), m('fox', 2, 170, 'L'), m('owl', 2, 140, 'L'), el('boar', 300)],
     ] },
     { lo: 24000, hi: 36000, items: [['torch', 4800, -700], ['mushroom', 6200, 800], ['crystal', 4300, 0], ['sword', 7000, -200]], waves: [
-      [boss('warrior', 760), boss('archer', 600), boss('mage', 560, 'L'), m('fox', 2, 170, 'L')],
+      [boss('warrior', 470), boss('archer', 380), boss('mage', 350, 'L'), m('fox', 2, 170, 'L')],
     ] },
   ],
 };

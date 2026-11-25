@@ -12,6 +12,7 @@ import { cmdHtml, withKeys } from './menu.js';
 import { gt, gtSet } from './gt.js';
 import { setPal, seal, ROMAN, studs } from './arcane.js';
 import { portraitURL } from '../view/portrait.js';
+import { markOf, isAlt } from '../view/mark.js';
 import { frame } from './ornate.js';
 
 const $ = (s, el = document) => el.querySelector(s);
@@ -22,7 +23,7 @@ export class Hud {
     this.root = root;
     const side = (i) => `<div class="pp p${i}">
         <div class="plate">${frame(620, 98, { R: 13, cn: [0, 1, 1, 0], inner: 6, cls: 'plate' })}</div>
-        <div class="medal"><i class="img"></i></div><span class="tag">${i + 1}P</span>
+        <div class="medal"><i class="img"></i></div><span class="tag">${i + 1}P</span><b class="mvb">招</b>
         <div class="nm"><b></b></div>
         <div class="hp"><i class="trail"></i><i class="fill"></i></div><i class="hptip"></i>
         <div class="mp">${'<i></i>'.repeat(10)}</div>
@@ -78,20 +79,31 @@ export class Hud {
     for (const c of Object.values(CHARS)) portraitURL(c.id);
   }
 
-  // 左下角招式表：第 i 隻（自己操作的那隻）的必殺、超必殺和幾個同按；魔力不夠的那行變暗
+  // 左下角招式表：第 i 隻（自己操作的那隻）的必殺、超必殺和幾個同按；魔力不夠的那行變暗。
+  // 手機上改掛在自己的玩家牌底下（只列必殺、超必殺），點自己的頭像開關（medalHit）；頭像角落一顆「招」提示點得到
   setMoves(S, i) {
     const f = S.p[i], C = CHARS[f.ch];
     this.mvIdx = i;
+    this.mvSlot = Math.max(0, this.players(S).indexOf(f));
+    this.el.forEach((e, k) => e.pp.classList.toggle('mine', k === this.mvSlot));
     const row = (s, su) => `<tr data-mp="${s.m.mp}" class="${su ? 'su' : ''}"><td>${s.name}</td><td>${cmdHtml(s.d, s.btn)}</td><td class="mp">${s.m.mp}</td></tr>`;
     const sys = [['攻跳 同按', '吹飛'], ['跳防 同按', '翻滾'], ['蹲＋攻', '下段']];
     const el = $('.moves', this.root);
     setPal(el, f.ch);
+    el.classList.toggle('r', this.mvSlot === 1);
     el.innerHTML = `${studs()}<h4>${C.name}<small>招式</small></h4><table>${C.specials.map((s) => row(s)).join('')}${C.supers.map((s) => row(s, 1)).join('')}
       ${sys.map(([c, n]) => `<tr class="sys"><td>${n}</td><td><span class="cmd"><b>${withKeys(c)}</b></span></td><td></td></tr>`).join('')}</table>
       <p>F1 關</p>`;
     this.mvRows = [...el.querySelectorAll('tr[data-mp]')].map((r) => [r, +r.dataset.mp]);
   }
-  showMoves(on) { $('.moves', this.root).hidden = !on; this.mvOn = on; }
+  showMoves(on) { $('.moves', this.root).hidden = !on; this.mvOn = on; this.root.classList.toggle('mvon', on); }
+  // 這一點有沒有按到自己的頭像（手機開關招式表）；左右寬一點、往上到頂，往下只到頭像底（再下面是招式表，那裡的手指要給搖桿）
+  medalHit(x, y) {
+    const pp = this.el[this.mvSlot ?? 0]?.pp;
+    if (!pp || pp.hidden || this.root.hidden) return false;
+    const r = $('.medal', pp).getBoundingClientRect(), m = r.width * 0.3;
+    return r.width > 0 && x > r.left - m && x < r.right + m && y < r.bottom;
+  }
 
   // 兩個玩家那一邊的角色：對戰是 pad 0、1（電腦那隻在第二格）；闖關是第幾個玩家（沒有第二個玩家就是 null）
   players(S) {
@@ -109,9 +121,12 @@ export class Hud {
       const C = CHARS[p.ch];
       for (const el of [e.pp, e.combo, e.sup]) setPal(el, p.ch);
       e.nm.textContent = C.full;
-      const url = portraitURL(p.ch);
+      const url = portraitURL(p.ch, 256, isAlt(S, p));
       e.img.style.backgroundImage = url ? `url(${url})` : '';
       e.tag.textContent = p.ai ? '電腦' : S.opt.train && i === 1 ? '木樁' : `${i + 1}P`;
+      const mk = markOf(S, p);                     // 牌子跟腳下的弧同色
+      e.tag.classList.toggle('pc', !!mk?.label);
+      e.tag.style.setProperty('--pc', mk?.label ? mk.c : '');
       e.need = C.supers[0]?.m.mp || 400;
       e.combo.classList.remove('on'); e.sup.classList.remove('on');
     });

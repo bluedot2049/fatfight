@@ -44,7 +44,8 @@ function part(geo, color, x, y, z, s, o = {}) {
   const m = new THREE.Mesh(geo, toon(color));
   m.scale.set(...s);
   g.add(m);
-  if (o.line !== false) {
+  if (o.line === false) m.userData.deco = true;   // 沒描邊的裝飾（眼睛、指甲、肚皮）：找內線時看穿它
+  else {
     const l = new THREE.Mesh(geo, outlineMat);
     l.scale.copy(m.scale);
     l.userData.hull = true;                 // 描邊殼（inkline.js 找內線時不畫它）

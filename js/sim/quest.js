@@ -19,8 +19,11 @@ const DROP_EVERY = 4;             // 雜兵每打倒幾隻掉一個吃的（關�
 // 兩個玩家（關卡表照一個人寫；2026-11-25 用 tools/quest-balance.mjs 量過：原本只加四成血，兩人每人掉的命只有單人的三到五成）：
 // 主要靠多幾隻，不靠把每隻加厚（加厚只是每隻打比較久）。目標是每人掉的命是單人的七到八成半
 const HP_BY_N = [100, 100, 130];  // 雜兵血量幾成
-const BOSS_BY_N = [100, 100, 220]; // 頭目血量幾成（頭目一次只追一個人，兩個人輪流打它，要厚一點才撐得到差不多的時間）
+const POW_BY_N = [100, 100, 115];  // 雜兵打人再乘幾成（2026-11-25：頭目段縮短後兩人少掉的危險，放在路上補）
+const BOSS_BY_N = [100, 100, 150]; // 頭目血量幾成（頭目一次只追一個人，兩個人輪流打它，要厚一點才撐得到差不多的時間）
+const BOSS_POW_BY_N = [100, 100, 135]; // 頭目打人再乘幾成（2026-11-25：頭目血從 220% 降到 150% 讓兩人打得比一個人快，少掉的危險從這裡補）
 const ADD_BY_N = [0, 0, 2];       // 每一波多幾隻雜兵（照這一波的雜兵輪著抄，從另一邊進來）
+const ADD_BOSS_BY_N = [0, 0, 1];  // 頭目那一波多幾隻（2026-11-25：原本也多兩隻，頭目段兩人反而比一個人久）
 const AI_CONT = 60;               // 電腦代打的玩家（線上朋友斷線後）出局多久自己接關
 
 // chars：玩家選的角色（1 或 2 隻），id：哪一關。seed：亂數種子（線上兩邊要一樣）；score：上一關帶過來的分數（每個玩家一格，沒寫就從頭）。
@@ -164,7 +167,7 @@ function progress(S, Q) {
   if (S.wave + 1 < sec.waves.length) {
     S.wave++;
     S.pend = sec.waves[S.wave].map((e) => ({ ...e }));
-    const minis = S.pend.filter((e) => e.mini), add = minis.length ? ADD_BY_N[Math.min(S.np, ADD_BY_N.length - 1)] : 0;
+    const minis = S.pend.filter((e) => e.mini), add = minis.length ? (S.pend.some((e) => e.boss) ? ADD_BOSS_BY_N : ADD_BY_N)[Math.min(S.np, ADD_BY_N.length - 1)] : 0;
     for (let k = 0; k < add; k++) { const e = minis[k % minis.length]; S.pend.push({ ...e, side: e.side === 'L' ? 'R' : 'L' }); }
     S.st = 0; S.wt = 50;
     return;
@@ -198,6 +201,7 @@ function spawnNext(S) {
   f.mp = e.boss ? MP : 300;
   f.mini = e.mini ? 1 : 0;
   f.pow = e.pow ?? 100;
+  f.pow = (f.pow * (e.boss ? BOSS_POW_BY_N : POW_BY_N)[Math.min(S.np, POW_BY_N.length - 1)] / 100) | 0;
   if (f.mini) f.mp = e.elite ? 200 : 0;               // 雜兵不放必殺（ai.js 的 MOB 也不會按）；精英（elite）有魔力、會放
   if (e.elite) f.elite = 1;
   if (e.carry) giveItem(S, f, e.carry);               // 扛著東西進場（海牛員工）

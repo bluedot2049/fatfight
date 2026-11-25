@@ -83,6 +83,7 @@ li[data-orn], .mbtn { position: relative; isolation: isolate; }
 #hud .pp .medal::before { content: ''; position: absolute; inset: 5px; border-radius: 50%; background: radial-gradient(circle at 50% 32%, color-mix(in srgb, var(--gem) 70%, #fff) 0, var(--gem) 22%, var(--deep) 62%, #050305 100%); box-shadow: inset 0 0 0 2px #000, inset 0 -8px 18px rgba(0, 0, 0, .55); }
 #hud .pp .medal .img { position: absolute; inset: 5px; border-radius: 50%; background: center 40% / 118% no-repeat; }
 #hud .pp .tag { position: absolute; left: 32px; top: 108px; z-index: 4; font: 900 15px/1 var(--cinzel); letter-spacing: .08em; color: var(--brown); background: var(--parchbg); padding: 5px 14px 4px; clip-path: polygon(0 0, 100% 0, calc(100% - 7px) 50%, 100% 100%, 0 100%, 7px 50%); filter: drop-shadow(0 2px 0 #000); white-space: nowrap; }
+#hud .pp .tag.pc { background: var(--pc); color: #fff; text-shadow: 0 1px 0 rgba(0,0,0,.55); }   /* 玩家：跟腳下的弧同色 */
 #hud .pp .nm { position: absolute; left: 138px; top: 24px; white-space: nowrap; }
 #hud .pp .nm b { font-size: 23px; font-weight: 700; letter-spacing: .12em; color: var(--ivoryc); text-shadow: 0 2px 0 #000, 0 0 8px rgba(0, 0, 0, .8); }
 /* 血條：金框裡一道溝，裝寶石色的光（靠頭像那頭是滿的） */
@@ -109,7 +110,8 @@ li[data-orn], .mbtn { position: relative; isolation: isolate; }
 #hud .pp .wins { position: absolute; left: 462px; top: 84px; display: flex; gap: 8px; }
 #hud .pp .wins b { width: 18px; height: 18px; border-radius: 50%; background: #120c0c; border: 1px solid #7d6538; box-shadow: 0 0 0 1px #0a0604; }
 #hud .pp .wins b.on { background: var(--grainm), radial-gradient(circle at 35% 30%, #fffaf0 0 10%, #dcc28a 28%, #8e6f38 70%, #3b2a12); border-color: #e6d3a0; animation: stamp .35s; }
-#hud .pp.p1 .nm, #hud .pp.p1 .tag, #hud .pp.p1 .sp { transform: scaleX(-1); }
+#hud .pp.p1 .nm, #hud .pp.p1 .tag, #hud .pp.p1 .sp, #hud .pp.p1 .mvb { transform: scaleX(-1); }
+#hud .pp .mvb { display: none; }
 
 /* 邊角的細節靠形狀、不靠花紋：牌子外側兩個角跟按鈕一樣往內凹（框是 ornate.js 畫的），血條尾端收一個小尖 */
 #hud .pp .plate > svg.pq { position: absolute; left: 0; top: 0; filter: drop-shadow(0 8px 12px rgba(0, 0, 0, .5)); }
@@ -404,8 +406,18 @@ body:not(:has(#menu.title:not([hidden]))) #a2hs { display: none; }   /* 沒按�
 .fit9 .keys .kbtn { height: 34px; padding: 0 18px; margin-left: 10px; font-size: 14px; letter-spacing: .12em; }
 #overlay .foot { color: var(--dim); font-size: 13px; }
 #overlay .foot [data-act] { color: var(--parch); text-decoration: underline; cursor: pointer; }
-.movelist { display: grid; grid-template-columns: 1fr 1fr; gap: 24px 36px; }
-.movelist section.sys { grid-column: 1 / -1; }
+/* 招式表：上面一排頭像分頁（選到的亮、金框、寶石色底；沒選到的暗下去，跟選角卡一樣），下面一次一頁。寬度固定，換頁不跳 */
+.movelist { width: min(860px, 86vw); }
+.movelist .mtabs { display: flex; align-items: flex-end; gap: 14px; margin: 0 0 16px; padding-bottom: 12px; border-bottom: 1px solid rgba(210, 181, 122, .22); }
+.movelist .mtab { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 0; border: 0; background: none; cursor: pointer; font: 700 14px var(--serif); letter-spacing: .1em; color: var(--dim); filter: brightness(.55) saturate(.6); transition: filter .12s; }
+.movelist .mtab:not([style]) { --gem: #b49a62; --deep: #2a2218; }
+.movelist .mtab .img { position: relative; width: 62px; height: 62px; border-radius: 50%; border: 2px solid transparent;
+  background: var(--p, none) center 40% / 118% no-repeat padding-box, radial-gradient(circle at 50% 32%, color-mix(in srgb, var(--gem) 70%, #fff) 0, var(--gem) 22%, var(--deep) 62%, #050305 100%) padding-box, var(--goldframe) border-box; box-shadow: 0 0 0 1px #0a0604, 0 4px 10px rgba(0, 0, 0, .5); }
+.movelist .mtab .img[data-gem]::after { content: ''; position: absolute; inset: 0; margin: auto; width: 20px; height: 20px; rotate: 45deg; background: radial-gradient(circle at 30% 30%, #fff 0 14%, #d8c38c 50%, #5a4520); border: 1px solid #e2cf9e; }
+.movelist .mtab.on { filter: none; color: var(--ivoryc); }
+.movelist .mtab.on .img { box-shadow: 0 0 0 1px #0a0604, 0 0 0 4px color-mix(in srgb, var(--gem, #d8c38c) 55%, transparent), 0 4px 12px rgba(0, 0, 0, .5); }
+@media (hover: hover) { .movelist .mtab:hover { filter: brightness(.85); } .movelist .mtab.on:hover { filter: none; } }
+.movelist .mtabs .hint { margin-left: auto; align-self: center; color: var(--dim); font-size: 13px; font-weight: 500; white-space: nowrap; }
 .movelist h3, .keyhelp h3, #overlay h3 { display: flex; align-items: center; gap: 12px; margin: 0 0 8px; font-weight: 700; font-size: 23px; color: var(--ivoryc); letter-spacing: .14em; }
 .movelist h3 .gem, .keyhelp h3 .gem { width: 12px; height: 12px; rotate: 45deg; background: radial-gradient(circle at 30% 30%, #fff 0 14%, var(--gem) 50%, var(--deep)); border: 1px solid #e2cf9e; }
 .movelist table, .keyhelp table { border-collapse: collapse; width: 100%; }

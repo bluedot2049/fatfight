@@ -4,6 +4,7 @@
 
 import * as THREE from 'three';
 import { kit } from './kit.js';
+import { tagInkAll } from './inkline.js';
 import { ITEMS, ITEM_LIFE } from '../sim/items.js';
 
 const U = 1 / 1000;
@@ -106,6 +107,7 @@ export class ItemView {
   make(k) {
     const g = new THREE.Group();
     LOOK[k](kit(g), g);
+    tagInkAll(g);                                   // 拿在手上疊在身前也有內線
     const sh = new THREE.Mesh(this.shGeo, this.shMat);
     sh.rotation.x = -Math.PI / 2;
     this.scene.add(g, sh);

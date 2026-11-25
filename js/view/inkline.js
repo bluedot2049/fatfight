@@ -6,8 +6,8 @@ import * as THREE from 'three';
 import { INK } from './kit.js';
 
 const W = 0.018;        // 跟 kit.js 描邊一樣粗（世界單位，遠一點加粗一點的算法也一樣）
-const THR = 0.006;      // 前後差多少開始有線（公尺）；肩膀那種從身體長出來的交界差不多是 0，不畫
-const THR2 = 0.035;     // 差到這麼多線就全黑，中間漸淡（手臂沒入身體那頭線會自己收尖）
+const THR = 0.002;      // 前後差多少開始有線（公尺）。調高：貼平的手（企鵝翅膀）上半截會沒線；調低：肩膀交界也會出線
+const THR2 = 0.02;      // 差到這麼多線就全粗，中間變細（手臂沒入身體那頭線會自己收尖）
 const FAR = 64;         // 深度存 16 位元、0～64 公尺
 
 // 編號圖：r＝編號低位、a＝編號高位、g b＝深度
@@ -25,16 +25,23 @@ const idMat = (n) => new THREE.ShaderMaterial({
 const OCC = idMat(0);   // 擋在前面的別的東西：編號 0，線不畫在它上面
 
 let next = 1;
+const fresh = () => { const m = idMat(next); next = next >= 65535 ? 1 : next + 1; return m; };
 // 角色建好之後叫一次：每個關節底下的零件拿同一個編號；上身、臘腸狗中間那截跟身體同一號（都算一層肉）
 export function tagInk(m) {
   const same = [m.J.upper, m.stretch?.mid];
   const walk = (o, mat) => {
-    if (o.userData.joint && !same.includes(o)) { mat = idMat(next); next = next >= 65535 ? 1 : next + 1; }
+    if (o.userData.joint && !same.includes(o)) mat = fresh();
     if (o.isMesh && !o.userData.hull && mat) o.userData.inkMat = mat;
     for (const c of o.children) walk(c, mat);
   };
   walk(m.root, null);
   return m;
+}
+// 一整個東西一個編號（地上的東西、拿在手上的武器）
+export function tagInkAll(g) {
+  const mat = fresh();
+  g.traverse((o) => { if (o.isMesh && !o.userData.hull) o.userData.inkMat = mat; });
+  return g;
 }
 
 const compFrag = `uniform sampler2D tId; uniform vec2 inv; uniform float ppm, pk; uniform vec3 ink;
@@ -81,19 +88,23 @@ export class InkLines {
     this.swap = [];
     this.hide = [];
   }
-  // 畫完場景之後叫：vp＝這次畫的範圍（畫布的實際像素、左下角起算）；畫布目前的 viewport 要已經是同一塊
-  draw(scene, camera, vp) {
+  // 畫完場景之後叫：vp＝這次畫的範圍（畫布的實際像素、左下角起算）；畫布目前的 viewport 要已經是同一塊。
+  // keep：只畫場景最上層的這幾個（角色、地上的東西、飛行道具），場地整個跳過（場地大，再畫一次太貴）
+  draw(scene, camera, vp, keep = null) {
     const r = this.r, rt = this.rt;
     r.getDrawingBufferSize(tmp);
     if (rt.width !== tmp.x || rt.height !== tmp.y) rt.setSize(tmp.x, tmp.y);
     rt.viewport.set(vp[0], vp[1], vp[2], vp[3]);
     rt.scissor.copy(rt.viewport);
     rt.scissorTest = true;
-    // 換材質：角色零件換成自己的編號、別的實心東西當擋板、透明的和描邊殼先藏起來
+    // 換材質：角色零件換成自己的編號、別的實心東西當擋板；透明的、描邊殼、沒描邊的裝飾先藏起來
     const swap = this.swap, hide = this.hide;
+    if (keep) for (const o of scene.children) if (o.visible && !keep.has(o)) hide.push(o);
+    for (const o of hide) o.visible = false;
     scene.traverseVisible((o) => {
       if (!(o.isMesh || o.isPoints || o.isLine || o.isSprite)) return;
-      if (o.userData.inkMat) swap.push(o, o.material, o.userData.inkMat);
+      if (o.userData.deco) hide.push(o);
+      else if (o.userData.inkMat) swap.push(o, o.material, o.userData.inkMat);
       else if (o.isMesh && !o.isInstancedMesh && !o.userData.hull && !Array.isArray(o.material) && !o.material.transparent && o.material.depthWrite !== false) swap.push(o, o.material, OCC);
       else hide.push(o);
     });

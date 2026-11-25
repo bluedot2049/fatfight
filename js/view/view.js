@@ -3,7 +3,8 @@
 // 畫面：每個畫面讀一次比賽狀態，擺好場上每隻角色（左右 x、前後 z、高度 y）、泡泡、浪、氣焰和斜斜往下看的鏡頭，事件（打中、擋住、超必殺…）變成特效。只讀不寫，回滾重算也不怕。
 
 import * as THREE from 'three';
-import { BUILD } from './models.js';
+import { BUILD, recolor } from './models.js';
+import { markOf, isAlt, footMark, placeMark } from './mark.js';
 import { poseOf, applyPose, ZERO } from './poses.js';
 import { FX, starSprite, bubbleMesh, beamMesh, fireballMesh, ringMesh, soundMesh } from './fx.js';
 import { Stage } from './stage.js';
@@ -19,6 +20,7 @@ import { QUESTS } from '../sim/quests/index.js';
 import { hurtBoxes } from '../sim/combat.js';
 import { ItemView, handAnchor } from './items.js';
 import { ITEMS } from '../sim/items.js';
+import { InkLines } from './inkline.js';
 
 const ROCK = '#8a5a2e';   // 地裂噴出來的碎石
 const U = 1 / 1000;
@@ -53,10 +55,14 @@ export class View {
     this.cam = { x: 0, z: 0, d: 7.6 };
     this.debug = false;
     this.camOffset = 0;            // 標題畫面把角色推到右半邊
+    this.marks = true;             // 腳下的弧和 1P 2P（標題畫面關掉）
     this.onEvent = null;
     this.boxes = new THREE.LineSegments(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ vertexColors: true, depthTest: false, transparent: true }));
     this.boxes.renderOrder = 10;
     this.scene.add(this.boxes);
+    this.ink = /[?&]noink/.test(location.search) ? null : new InkLines(this.renderer);   // 手疊在身上的內線（?noink 關掉對照）
+    this.inkKeep = new Set();
+    this.inkSize = new THREE.Vector2();
     this.resize();
     addEventListener('resize', () => this.resize());
   }
@@ -107,17 +113,19 @@ export class View {
       this.items.clear();
     }
     S.p.forEach((p, i) => {
-      const key = p.ch + (p.mini ? '*' : '');
+      const m = markOf(S, p), alt = isAlt(S, p);
+      const key = p.ch + (p.mini ? '*' : '') + (alt ? '~' : '') + (m ? m.c + m.label : '');   // 換色、腳下標記不同也重建
       const v = this.fighters[i];
       if (v && v.key === key) return;
       if (v) this.drop(v);
-      this.fighters[i] = this.make(p, key);
+      this.fighters[i] = this.make(p, key, m, alt);
     });
   }
-  drop(f) { this.scene.remove(f.model.root, f.shadow, f.beam, f.tip, ...f.stars); }
-  make(p, key) {
+  drop(f) { this.scene.remove(f.model.root, f.shadow, f.beam, f.tip, ...f.stars); if (f.mark) this.scene.remove(f.mark.arc, ...(f.mark.lab ? [f.mark.lab] : [])); }
+  make(p, key, mk, alt) {
     const model = BUILD[p.ch]();
-    if (p.mini && !CHARS[p.ch].npc) shade(model.root);   // 拿可選角色當雜兵才壓成影子色；專門的雜兵（npc）照本來的顏色
+    if (p.mini && !CHARS[p.ch].npc) shade(model.root);
+    else if (alt) recolor(model.root, p.ch);             // 同角色的第二隻：第二套色   // 拿可選角色當雜兵才壓成影子色；專門的雜兵（npc）照本來的顏色
     // 每隻自己一份材質（打中整隻閃白用；共用的話同色的別人也會跟著閃）
     const mats = [];
     model.root.traverse((o) => { if (o.isMesh && o.material?.isMeshToonMaterial) { o.material = o.material.clone(); mats.push(o.material); } });
@@ -134,7 +142,9 @@ export class View {
     const stars = [0, 1, 2].map((i) => starSprite(i === 1 ? '#ffffff' : '#ffe98a'));
     this.scene.add(...stars);
     const hand = handAnchor(model);                   // 拿東西的手（量好位置掛在手臂上）
-    return { key, ch: p.ch, model, shadow, beam, tip, stars, pose: { ...ZERO }, jig: { x: 0, v: 0 }, flash: 0, px: p.x, mats, white: 0, whiteNow: 0, fxT: 0, hand };
+    const mark = mk ? footMark(mk, CHARS[p.ch].w) : null;   // 腳下的弧（認人用）
+    if (mark) this.scene.add(mark.arc, ...(mark.lab ? [mark.lab] : []));
+    return { key, ch: p.ch, model, shadow, beam, tip, stars, mark, pose: { ...ZERO }, jig: { x: 0, v: 0 }, flash: 0, px: p.x, mats, white: 0, whiteNow: 0, fxT: 0, hand };
   }
 
   // 對戰是競技場，闖關照關卡表的場景
@@ -175,6 +185,15 @@ export class View {
     this.updateCamera(S, dt);
     this.drawBoxes(S);
     this.renderer.render(this.scene, this.camera);
+    if (this.ink) {                                  // 內線只找角色、地上的東西、飛行道具之間的，場地不畫
+      const k = this.inkKeep;
+      k.clear();
+      for (const f of this.fighters) if (f) k.add(f.model.root);
+      for (const o of this.items.m.values()) k.add(o.g);
+      for (const m of this.projs.values()) k.add(m);
+      this.renderer.getDrawingBufferSize(this.inkSize);
+      this.ink.draw(this.scene, this.camera, [0, 0, this.inkSize.x, this.inkSize.y], k);
+    }
   }
 
   event(S, e) {
@@ -182,6 +201,7 @@ export class View {
     const HOT = '#fff6e8';       // 能量的白芯（偏一點暖，不是死白）
     const z = (e.z || 0) * U;
     switch (e.k) {
+      case 'round': case 'stage': for (const f of this.fighters) if (f?.mark) f.mark.t = 2.4; break;   // 每回合、每關開頭腳前再浮一次 1P 2P
       case 'hit': {
         const x = e.x * U, y = e.y * U, c = col(e.s), su = e.kind === 'su';
         if (e.armor) {                                   // 打在打不動的身上（機器人）：一小撮冷白的火花，對方不閃白、不抖，看得出這拳沒用
@@ -454,6 +474,7 @@ export class View {
     const sh = Math.max(0.3, 1 - p.y * U * 0.4) * (m && m.under && p.t >= 8 && p.t <= m.under[1] ? 0.4 : 1);
     v.shadow.position.set(p.x * U, 0.005, p.z * U);
     v.shadow.scale.set(C.w * U * 1.35 * sh, C.w * U * 0.75 * sh, 1);
+    if (v.mark) placeMark(v.mark, p.x * U, p.z * U, p.face, this.marks && p.gone !== 2, this.dt);   // 跳起來、鑽地都留在地上，看得出人在哪一條線
     v.flash *= 0.94;
     // 必殺、超必殺衝出去的時候往後拉殘影；跑步腳下揚土
     const dx = (p.x - v.px) * U;

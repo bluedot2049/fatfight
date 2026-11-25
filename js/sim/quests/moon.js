@@ -27,7 +27,7 @@ export default {
       [m('robot', 2, 240), m('robot', 2, 230, 'L'), m('worker', 2, 140, 'R', 'cannon'), m('worker', 2, 140, 'L'), el('robot', 280)],
     ] },
     { lo: 24000, hi: 36000, items: [['crate', 4800, -700], ['cannon', 6200, 800], ['bluepot', 4300, 0], ['crate', 7200, -200]], waves: [
-      [{ ch: 'alien', lv: 3, hp: 2000, pow: 85, side: 'R', boss: 1, rage: 1 }, m('worker', 1, 130, 'L', 'crate'), m('robot', 1, 220)],
+      [{ ch: 'alien', lv: 3, hp: 1000, pow: 120, side: 'R', boss: 1, rage: 1 }, m('worker', 1, 130, 'L', 'crate'), m('robot', 1, 220)],
     ] },
   ],
 };

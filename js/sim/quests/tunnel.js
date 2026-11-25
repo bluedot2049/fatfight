@@ -25,7 +25,7 @@ export default {
       [m('moss', 2, 250), m('mushroom', 2, 170), m('moss', 2, 230, 'L'), m('mushroom', 2, 170, 'L'), m('mushroom', 2, 160)],
     ] },
     { lo: 24000, hi: 36000, items: [['pick', 4800, -700], ['mushroom', 6200, 800], ['crystal', 4300, 0], ['torch', 7000, -200]], waves: [
-      [{ ch: 'dwarf', lv: 3, hp: 1800, pow: 85, side: 'R', boss: 1 }, m('moss', 1, 220, 'L'), m('mushroom', 1, 160)],
+      [{ ch: 'dwarf', lv: 3, hp: 1100, pow: 100, side: 'R', boss: 1 }, m('moss', 1, 220, 'L'), m('mushroom', 1, 160)],
     ] },
   ],
 };

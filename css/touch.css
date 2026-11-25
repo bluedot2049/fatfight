@@ -74,7 +74,17 @@ body.touch.tall #turn { display: flex; }
 
 /* ---------- 用觸控時其他介面的調整 ---------- */
 body.touch { touch-action: manipulation; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
-body.touch #hud .moves { display: none; }                         /* 左下角招式表的位置是搖桿，手機看暫停裡的整頁招式表 */
+/* 招式表：左下角是搖桿，改掛在自己的玩家牌底下（.r＝自己在右邊），只列必殺、超必殺，字放大（HUD 整塊照 1600 寬縮小）。
+   手指照樣穿過去（#touch 在上面，這裡是搖桿的範圍）；開關＝點自己的頭像，頭像右下一顆「招」提示 */
+body.touch #hud .moves { left: calc(40px + env(safe-area-inset-left, 0px) / var(--s)); top: 150px; bottom: auto; padding: 10px 20px 8px; font-size: 27px; opacity: .9;
+  background: linear-gradient(rgba(26, 19, 21, .82), rgba(13, 10, 12, .82)) padding-box, var(--goldframe) border-box; }
+body.touch #hud .moves.r { left: auto; right: calc(40px + env(safe-area-inset-right, 0px) / var(--s)); }
+body.touch #hud .moves .stud, body.touch #hud .moves h4, body.touch #hud .moves tr.sys, body.touch #hud .moves p, body.touch #hud .moves td.mp { display: none; }
+body.touch #hud .moves td { padding: 3px 18px 3px 0; }
+body.touch #hud .moves td:nth-child(2) { padding-right: 0; }
+body.touch #hud .pp.mine .mvb { display: grid; place-items: center; position: absolute; left: 92px; top: 84px; z-index: 5; width: 40px; height: 40px; border-radius: 50%; border: 2px solid transparent; font-size: 21px; font-weight: 700; line-height: 1; color: var(--ivoryc);
+  background: radial-gradient(circle at 50% 30%, rgba(62, 46, 40, .95), rgba(13, 10, 12, .95) 72%) padding-box, var(--goldframe) border-box; box-shadow: 0 0 0 1px #0a0604, 0 3px 6px rgba(0, 0, 0, .6); }
+body.touch #hud.mvon .pp.mine .mvb { background: radial-gradient(circle at 50% 30%, color-mix(in srgb, var(--gem) 65%, #fff) 0, var(--gem) 26%, var(--deep) 78%) padding-box, var(--goldframe) border-box; }
 body.touch .menu .foot, body.touch .fit9 .keys { display: none; }       /* 鍵盤的按鍵提示；返回用左上角那顆 */
 body.touch #hud .net { bottom: 2px; font-size: 10px; }
 /* 招式表、操作說明：讓出左上角的返回，整張從返回底下開始；關閉用返回 */
@@ -115,7 +125,10 @@ body.touch #hud .pp.p1 { right: calc(26px + env(safe-area-inset-right, 0px) / va
   .menu .code { font-size: 44px; margin: 6px 0 4px; }
   .menu input { font-size: 32px; }
   #overlay .sheet { max-height: 96vh; padding: 14px 22px 12px; font-size: 14px; }
-  .movelist { gap: 10px 24px; }
+  .movelist { width: min(760px, 90vw); }
+  .movelist .mtabs { gap: 10px; margin-bottom: 6px; padding-bottom: 6px; }
+  .movelist .mtab { font-size: 12px; gap: 3px; }
+  .movelist .mtab .img { width: 44px; height: 44px; }
   .movelist h3, .keyhelp h3, #overlay h3 { font-size: 18px; margin-bottom: 2px; }
   .movelist td, .keyhelp td { padding: 3px 8px 3px 0; }
   .movelist th { padding-top: 4px; }

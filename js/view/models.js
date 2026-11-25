@@ -4,7 +4,7 @@
 // 模型朝 +z（臉朝前）、aN 是靠鏡頭那隻手（-x）；面向左邊時整隻鏡像（root.scale.x = -1），靠鏡頭的永遠是同一隻。
 
 import * as THREE from 'three';
-import { kit, joint, INK, fuse } from './kit.js';
+import { kit, joint, INK, fuse, toon } from './kit.js';
 import { tagInk } from './inkline.js';
 import { FOREST } from './models-forest.js';
 import { MOON } from './models-moon.js';       // 第四關月球工廠的三隻（另一支檔）   // 第三關黑森林的六隻（另一支檔）
@@ -459,6 +459,25 @@ export function buildDog() {
   });
   for (const s of [-1, 1]) h.ball(0.018, INK, s * 0.08, 0.07, 0.19, { line: false });   // 豆豆眼
   return { root, turn, J: { body, upper, head, aN, aF, tail, lN, lF }, tongue: null, ears, stretch: { upper, mid, z0: 0.22, m0: -0.04, len: 0.72 }, h: 1.0 };
+}
+
+// 第二套色（同角色對打時第二隻穿）：主色換掉、眼睛嘴巴描邊不動。明暗跟本來的差一截，遠遠看也分得出來；沒寫的角色不換
+export const ALT = {
+  manatee: { '#8fa8b2': '#a88e84', '#aac0c8': '#c8b0a4' },                                   // 灰藍 → 粉褐
+  marmot: { '#8a7b55': '#6e4a33', '#a69770': '#8f6a4c', '#bcae86': '#ad8c6a', '#5a4f33': '#42291a' },   // 橄欖褐 → 巧克力
+  elephant: { '#a9adbf': '#c4ab8e', '#868aa0': '#9c8468', '#eaa6b8': '#e8b48a' },           // 灰紫 → 沙色
+  penguin: { '#f3efe6': '#7d90a6', '#eadcbc': '#e8c87a', '#d9cdb8': '#e0b868' },            // 白 → 石板藍、嘴腳偏黃
+  dog: { '#f6c93c': '#b8673a', '#d9a62a': '#8e4826', '#e6b232': '#a3552e' },                 // 黃 → 紅棕（真的臘腸狗那種）
+};
+export function recolor(root, ch) {
+  const map = ALT[ch];
+  if (!map) return;
+  const to = Object.fromEntries(Object.entries(map).map(([a, b]) => [new THREE.Color(a).getHexString(), b]));
+  root.traverse((o) => {
+    if (!o.isMesh || !o.material?.isMeshToonMaterial) return;
+    const c = to[o.material.color.getHexString()];
+    if (c) o.material = toon(c);
+  });
 }
 
 const MAKE = { manatee: buildManatee, marmot: buildMarmot, elephant: buildElephant, penguin: buildPenguin, dog: buildDog, sealion: buildSealion, hammer: buildHammer, squid: buildSquid, frog: buildFrog, mushroom: buildMushroom, moss: buildMoss, dwarf: buildDwarf, ...FOREST, ...MOON };

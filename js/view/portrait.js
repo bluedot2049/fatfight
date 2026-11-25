@@ -3,7 +3,8 @@
 // 頭像：把角色模型的頭拍成一張透明底的小圖（HUD、選角用），每隻角色只拍一次。
 
 import * as THREE from 'three';
-import { BUILD } from './models.js';
+import { BUILD, recolor } from './models.js';
+import { InkLines } from './inkline.js';
 
 const cache = {};
 
@@ -36,12 +37,15 @@ function release() {
   cam = null;
 }
 
-export function portraitURL(ch, size = 256) {
-  if (ch in cache) return cache[ch];
+// alt：同角色對打的第二套色
+export function portraitURL(ch, size = 256, alt = false) {
+  const id = alt ? ch + '~' : ch;
+  if (id in cache) return cache[id];
   let url = '';
   try {
     const { canvas, r, scene, eye } = camera(size);
     const model = BUILD[ch]();
+    if (alt) recolor(model.root, ch);
     scene.add(model.root);
     model.root.updateMatrixWorld(true);
     const head = new THREE.Vector3();
@@ -53,6 +57,6 @@ export function portraitURL(ch, size = 256) {
     url = canvas.toDataURL('image/png');
     scene.remove(model.root);
   } catch { url = ''; }
-  cache[ch] = url;
+  cache[id] = url;
   return url;
 }
