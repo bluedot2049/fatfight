@@ -54,10 +54,11 @@ export function pressedBoth(H, b1, b2, buf = 4) {
   return [i1, i2];
 }
 
-// 出招指令：防 → 方向 → 攻或跳，每一步之間 18 幀內。回傳 { d: 'f' 左右／'u' 上／'d' 下, x: 往哪邊（左右時）, btn: BA／BJ, i: 按鍵那格 }
+// 出招指令：防 → 方向 → 攻或跳，每一步之間 GAP 幀內（使用者 2026-11-26：原本 18 幀，按到一半停一下就出不來，放寬到 45）。
+//   一步隔超過 QUICK 幀的話，那一步中間不能按別的（只能重按同一個方向）：擋完、走一走、往下再出拳不會誤放必殺。回傳 { d: 'f' 左右／'u' 上／'d' 下, x: 往哪邊（左右時）, btn: BA／BJ, i: 按鍵那格 }
 // 也可以先按著方向（使用者 2026-11-25：鍵盤走路中常出不來）：按著一個方向 → 防 → 攻或跳，防和攻隔 HELD_MIN～HELD_GAP 幀，
 //   方向從按防到按攻一直按著、只按一個方向、沒按蹲。隔太近是兩鍵同按（翻滾、丟東西），隔太久是擋完再出拳，都不算。
-const GAP = 18, HELD_MIN = 3, HELD_GAP = 10;
+const GAP = 45, QUICK = 18, HELD_MIN = 3, HELD_GAP = 10;
 export function command(H) {
   for (const btn of [BA, BJ]) {
     const bi = pressed(H, btn);
@@ -72,7 +73,7 @@ export function command(H) {
       if (H.t[di] - H.t[i] > GAP) break;
       if (H.k[i] === BD) { gi = i; break; }
     }
-    if (gi < 0 || H.t[gi] <= H.used[CMD]) {            // 防那一下拿去防禦沒關係，拿去出過必殺就不行
+    if (gi < 0 || H.t[gi] <= H.used[CMD] || !clean(H, gi, di) || !clean(H, di, bi)) {   // 防那一下拿去防禦沒關係，拿去出過必殺就不行
       const c = held(H, btn, bi);                       // 方向在防之前就按著了
       if (c) return c;
       continue;
@@ -82,6 +83,14 @@ export function command(H) {
     return { d, x: k === RIGHT ? 1 : k === LEFT ? -1 : 0, btn, i: bi, gi };
   }
   return null;
+}
+
+// 慢慢按的那一步（隔超過 QUICK 幀）：中間只能是同一個方向重按
+function clean(H, a, b) {
+  if (H.t[b] - H.t[a] <= QUICK) return true;
+  const d = H.k[a] & (UP | DOWN | LEFT | RIGHT) ? H.k[a] : H.k[b];
+  for (let i = a + 1; i < b; i++) if (H.k[i] !== d) return false;
+  return true;
 }
 
 function held(H, btn, bi) {
