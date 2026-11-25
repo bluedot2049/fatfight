@@ -102,6 +102,123 @@ export function fuse(body, upper) {
   }
 }
 
+// 零件合併（效能）：同一個關節底下的零件本來一顆一個網格、再一個描邊殼，一隻要畫四五十次。
+// 建好之後把同一層的零件烘成一個網格：顏色寫進頂點，描邊殼翻面跟著放進去（頂點的 ink 標記：0 本體、1 描邊、2 往後退的描邊、-1 沒描邊的裝飾），
+// 著色器看 ink 往外推、塗墨色——本體和描邊一次畫完，一個關節一次。長相跟原本一樣。
+// 模型表上指名的零件（海牛的舌頭這種 view 會單獨縮放、藏起來的）不合。
+const INKC = new THREE.Color(INK);
+const W = 0.018;
+const inkShader = (sh) => {
+  sh.vertexShader = sh.vertexShader
+    .replace('#include <common>', '#include <common>\nattribute float ink;\nvarying float vInk;')
+    .replace('#include <project_vertex>', `#include <project_vertex>
+      vInk = ink;
+      if (ink > 0.5) {
+        mvPosition.xyz += normalize(transformedNormal) * ${W} * (1.0 + 0.04 * -mvPosition.z);
+        gl_Position = projectionMatrix * mvPosition;
+        if (ink > 1.5) { vec4 far = projectionMatrix * (mvPosition + vec4(0.0, 0.0, -0.16, 0.0)); gl_Position.z = far.z / far.w * gl_Position.w; }
+      }`);
+  sh.fragmentShader = sh.fragmentShader
+    .replace('#include <common>', '#include <common>\nvarying float vInk;')
+    .replace('#include <dithering_fragment>', `#include <dithering_fragment>
+      if (vInk > 0.5) gl_FragColor = vec4(${INKC.r.toFixed(5)}, ${INKC.g.toFixed(5)}, ${INKC.b.toFixed(5)}, 1.0);`);
+};
+// 複製（每隻自己一份好閃白）也要帶著改過的著色器，所以做成子類別
+class InkToon extends THREE.MeshToonMaterial {
+  constructor(p) { super(p); this.onBeforeCompile = inkShader; }
+  customProgramCacheKey() { return 'inktoon'; }
+}
+const inkToon = new InkToon({ color: '#ffffff', vertexColors: true, gradientMap: ramp });
+const isPart = (g) => g.isGroup && !g.userData.joint && g.visible && (g.children.length === 1 || (g.children.length === 2 && g.children[1].userData.hull))
+  && g.children[0].isMesh && g.children[0].material.isMeshToonMaterial && g.children.every((c) => c.visible && !c.children.length);
+const baked = new Map();
+export function merge(model) {
+  const pinned = new Set();
+  const pin = (v, d) => { if (!v || typeof v !== 'object' || d > 4) return; if (v.isObject3D) { pinned.add(v); return; } for (const k of Object.keys(v)) pin(v[k], d + 1); };
+  for (const k of Object.keys(model)) if (k !== 'root' && k !== 'turn' && k !== 'J') pin(model[k], 0);
+  const layers = new Map();
+  model.root.traverse((o) => { if (isPart(o) && !pinned.has(o)) { if (!layers.has(o.parent)) layers.set(o.parent, []); layers.get(o.parent).push(o); } });
+  for (const [P, parts] of layers) {
+    const src = [];
+    for (const g of parts) {
+      g.updateMatrix();
+      for (const m of g.children) {
+        m.updateMatrix();
+        const M = g.matrix.clone().multiply(m.matrix);
+        src.push(m.userData.hull ? [m.geometry, M, INKC, m.material === backLine ? 2 : 1] : [m.geometry, M, m.material.color, m.userData.deco ? -1 : 0]);
+      }
+    }
+    const key = src.map(([geo, M, c, f]) => geo.uuid + c.getHexString() + f + M.elements.map((e) => e.toFixed(4)).join()).join('|');
+    if (!baked.has(key)) baked.set(key, bake(src));
+    for (const g of parts) P.remove(g);
+    P.add(new THREE.Mesh(baked.get(key), inkToon));
+  }
+  return model;
+}
+function bake(src) {
+  let nv = 0, ni = 0;
+  for (const [g] of src) { nv += g.attributes.position.count; ni += g.index ? g.index.count : g.attributes.position.count; }
+  const P = new Float32Array(nv * 3), N = new Float32Array(nv * 3), C = new Float32Array(nv * 3), K = new Float32Array(nv);
+  const I = nv > 65535 ? new Uint32Array(ni) : new Uint16Array(ni);
+  const v = new THREE.Vector3(), nm = new THREE.Matrix3();
+  let o = 0, oi = 0;
+  for (const [g, M, c, f] of src) {
+    nm.getNormalMatrix(M);
+    const pos = g.attributes.position, nor = g.attributes.normal, n = pos.count, idx = g.index;
+    for (let i = 0; i < n; i++) {
+      const j = (o + i) * 3;
+      v.fromBufferAttribute(pos, i).applyMatrix4(M); P[j] = v.x; P[j + 1] = v.y; P[j + 2] = v.z;
+      v.fromBufferAttribute(nor, i).applyMatrix3(nm).normalize(); N[j] = v.x; N[j + 1] = v.y; N[j + 2] = v.z;
+      C[j] = c.r; C[j + 1] = c.g; C[j + 2] = c.b;
+      K[o + i] = f;
+    }
+    // 描邊殼原本畫背面，這裡改成翻面畫正面；零件本身是鏡像的話三角形已經反過一次
+    const flip = (f > 0) !== (M.determinant() < 0);
+    const nt = idx ? idx.count : n;
+    for (let t = 0; t < nt; t += 3) {
+      const a = idx ? idx.getX(t) : t, b = idx ? idx.getX(t + 1) : t + 1, d = idx ? idx.getX(t + 2) : t + 2;
+      I[oi++] = o + a; I[oi++] = o + (flip ? d : b); I[oi++] = o + (flip ? b : d);
+    }
+    o += n;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(P, 3));
+  geo.setAttribute('normal', new THREE.BufferAttribute(N, 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(C, 3));
+  geo.setAttribute('ink', new THREE.BufferAttribute(K, 1));
+  geo.setIndex(new THREE.BufferAttribute(I, 1));
+  geo.computeBoundingSphere();
+  return geo;
+}
+
+// 換顏色（雜兵壓影子色、同角色第二套色）：f(hex 不含 #) 回傳新顏色或 null（不換）。tag 是這種換法的名字（合併過的網格照它快取）
+const painted = new Map();
+export function repaint(root, f, tag) {
+  root.traverse((o) => {
+    if (!o.isMesh || !o.material?.isMeshToonMaterial) return;
+    const g = o.geometry;
+    if (!g.attributes.ink) { const c = f(o.material.color.getHexString()); if (c) o.material = toon(c); return; }
+    const k = g.uuid + tag;
+    if (!painted.has(k)) {
+      const A = g.attributes.color, K = g.attributes.ink, C = new Float32Array(A.array), cc = new THREE.Color(), memo = new Map();
+      for (let i = 0; i < A.count; i++) {
+        if (K.getX(i) > 0.5) continue;
+        const h = cc.fromBufferAttribute(A, i).getHexString();
+        if (!memo.has(h)) { const n = f(h); memo.set(h, n ? new THREE.Color(n) : null); }
+        const n = memo.get(h);
+        if (n) { C[i * 3] = n.r; C[i * 3 + 1] = n.g; C[i * 3 + 2] = n.b; }
+      }
+      const g2 = new THREE.BufferGeometry();
+      g2.setIndex(g.index);
+      for (const name in g.attributes) g2.setAttribute(name, g.attributes[name]);
+      g2.setAttribute('color', new THREE.BufferAttribute(C, 3));
+      g2.boundingSphere = g.boundingSphere;
+      painted.set(k, g2);
+    }
+    o.geometry = painted.get(k);
+  });
+}
+
 // 關節：一個空的 Group，零件掛在底下，轉它整串跟著動
 export function joint(parent, x, y, z) {
   const g = new THREE.Group();

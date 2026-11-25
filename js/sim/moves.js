@@ -13,7 +13,7 @@
 //         炸開範圍內每個人打一次），出招中再按攻當場炸、出招跳到剩 rec 幀；出招被打斷（不在這招了）裂縫還沒炸就消失
 //   cr    蹲著出的招（受擊框變矮）；next 打到人後按著蹲再按攻接哪一招
 //   mp    要多少魔力；flash 超必殺的定格；cancel 1＝打到人之後可以接必殺
-//   pose  畫面用哪個姿勢（poses.js 的 ATK 表，跟 KOF 版共用同一套角色和姿勢）
+//   pose  畫面用哪個姿勢（poses.js 的 ATK 表，跟 KOF 版共用同一套角色和姿勢）；tr 1＝用鼻子打的（畫面把鼻象的鼻子伸到打擊框，sim 不看）
 //   爽度（使用者 2026-11-24）：
 //   hits 的 carry 1＝打中把對手一起帶上去（往上衝的必殺，最後一下再打飛；不算追打次數）
 //   hang  往上衝到頂點停幾幀；cancel 也能寫在必殺上（打到人、最後一下打完之後可以再出別的必殺）
@@ -25,6 +25,14 @@
 //   指令投（小象鼻子捲）：hits 寫 grab 1 的那下擋不住、空中和倒地的抓不到，抓到就換成 then 那招（同一張角色表的 extra 裡）；
 //         那招寫 grip { at, dmg, vx, vy, back, reel }：at 幀之前每幀最多 reel 把人捲到身前，at 幀丟出去（back 1＝往背後甩）
 //   quake [幀, …]：這幾幀送 quake 事件（踩地震，畫面搖、地上一圈）
+//   鼻象（2026-11-25 重做）：
+//   armor [起,迄]：霸體，這段時間被輕的普通拳打到（倒值 40 以下、不是一定打倒的；丟過來的東西、撞過來的人不算）只扣血、不停招
+//   hits 的 grab 2＝只抓空中的（鼻子撈天；會飛的浮著也抓得到）；skip i＝第 i 下這一幀打到的人，這一下不再打（踩地的外圈不重打裡圈的人）
+//   charge 寫在沒有飛行道具的招上：打擊框往前後、左右和傷害照集了多少變大（集滿 1.5 倍；象腳踏地按住攻抬高腳）
+//   grip 的 sw { to, mp }：捲住、甩出去之前按攻，換成 to 那招（也寫 grip），扣 mp；orbit 1＝抓著的人繞著身體轉一圈一圈（掄人），
+//         at 幀往面向那邊丟（那幀按著左右就往那邊）；slam 1＝空中抓到的往下拉、at 幀往地上砸（會彈地），招式的 hits 打不到被抓的那個
+//   hurl { at, k, vx, vy, y }：at 幀從地上拔出一個 k（items.js）直接丟出去（算自己丟的，按上下往前後偏）；落地留著誰都撿得到。
+//         一隻一次只有一個自己拔的，再拔的話舊的碎掉
 //   企鵝（火）：
 //   hits 的 fire 1＝打倒的人著火（f.burn，飛出去撞到人也點著；落地就熄，不扣血）。飛行道具、boom 也能寫 fire
 //   keep  { at, to, n, mp }：到 at 幀還按著攻，跳回 to 幀接著噴（最多 n 次，每次扣 mp；放開或沒魔力就收）
@@ -84,6 +92,8 @@ function tune(m) {
   if (m.it) m.it = { ...m.it, at: T(m.it.at) };
   if (m.grip) m.grip = { ...m.grip, at: T(m.grip.at), reel: MOVE_V(m.grip.reel) };
   if (m.quake) m.quake = m.quake.map(T);
+  m.armor = R(m.armor);
+  if (m.hurl) m.hurl = { ...m.hurl, at: T(m.hurl.at) };
   if (m.sweep) m.sweep = { ...m.sweep, on: R(m.sweep.on), to: m.sweep.to + BOX_X, near: m.sweep.near + BOX_X, low: m.sweep.low + BOX_UP, ...(m.sweep.back ? { back: R(m.sweep.back) } : {}) };
   if (m.flip) m.flip = T(m.flip);
   if (m.spawn) m.spawn = { ...m.spawn, at: T(m.spawn.at) };

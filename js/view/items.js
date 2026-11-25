@@ -3,7 +3,7 @@
 // 地上的東西的模型和擺法：幾個大形狀拼（kit 卡通明暗＋描邊）。拿著的輕東西掛在手上、重物頂在頭上、丟出去會轉。只讀狀態。
 
 import * as THREE from 'three';
-import { kit } from './kit.js';
+import { kit, merge } from './kit.js';
 import { tagInkAll } from './inkline.js';
 import { ITEMS, ITEM_LIFE } from '../sim/items.js';
 
@@ -55,6 +55,22 @@ const LOOK = {
     k.caps(0.015, 0.06, '#e8d8a0', 0.05, 0.66, 0, { rz: -0.4 });
   },
   boulder(k) { k.ball(0.32, '#7d7468', 0, 0.28, 0, { sx: 1.12, sy: 0.88 }); k.ball(0.14, '#6a6258', 0.18, 0.42, 0.1, { line: false }); },
+  // 鼻象拔起來的岩塊：比大石塊大一圈、有稜角，底下沾著剛拔出來的土。滾的時候繞石頭中心轉（pivot），不是繞底部
+  erock(k, g) {
+    const pv = new THREE.Group();
+    pv.position.y = 0.38;
+    g.add(pv);
+    g.userData.pivot = pv;
+    const q = kit(pv);
+    q.ball(0.34, '#8c7e72', 0, 0, 0, { sx: 1.06, sy: 0.98, sz: 0.94 });
+    q.ball(0.22, '#7c6e64', 0.2, 0.12, 0.06);                                  // 疊上去的幾塊，看起來不圓
+    q.ball(0.2, '#9a8c80', -0.2, 0.1, -0.04);
+    q.ball(0.18, '#83756a', 0.04, -0.2, 0.14);
+    q.ball(0.1, '#ada092', -0.1, 0.2, 0.24, { line: false });                  // 亮的一面
+    q.ball(0.1, '#5a4636', 0.16, -0.22, -0.2, { sy: 0.6, line: false });       // 沾著的土（兩小撮，怎麼滾停下來都不怪）
+    q.ball(0.08, '#5a4636', -0.26, 0.08, 0.2, { sy: 0.6, line: false });
+    q.ball(0.06, '#4a8a4e', -0.24, 0.16, 0.22, { sy: 0.7, line: false });      // 一撮草
+  },
   redpot(k) { flask(k, '#d8443a'); },
   bone(k) {                                            // 臘腸狗埋的骨頭：一根橫的，兩頭各兩顆
     k.caps(0.07, 0.36, '#f4ecd8', 0, 0.1, 0, { rz: Math.PI / 2 });
@@ -83,6 +99,13 @@ function flask(k, c) {
 }
 
 // 手的位置：手臂關節底下那顆的最下面（模型剛建好、還沒擺姿勢的時候量一次）
+// 單獨一個東西的模型（首頁海報上鼻象舉的岩塊）
+export function itemMesh(k) {
+  const g = new THREE.Group();
+  LOOK[k](kit(g), g);
+  return merge({ root: g }).root;
+}
+
 export function handAnchor(model) {
   const a = model.J.aN;
   model.root.updateMatrixWorld(true);
@@ -107,6 +130,7 @@ export class ItemView {
   make(k) {
     const g = new THREE.Group();
     LOOK[k](kit(g), g);
+    merge({ root: g });                             // 零件合成一個網格、描邊一起畫（kit.js）
     tagInkAll(g);                                   // 拿在手上疊在身前也有內線
     const sh = new THREE.Mesh(this.shGeo, this.shMat);
     sh.rotation.x = -Math.PI / 2;
@@ -133,13 +157,14 @@ export class ItemView {
         if (o.g.parent !== this.scene) this.scene.add(o.g);
         o.g.position.set(q.x * U, q.y * U, q.z * U);
         const flying = q.hold < 0 && (q.harm || q.y > 0);
-        if (q.hold >= 0) { o.g.rotation.set(0, 0, 0); o.spin = 0; }
+        const R = o.g.userData.pivot || o.g;         // 有 pivot 的（岩塊）轉 pivot，繞中心滾
+        if (q.hold >= 0) { R.rotation.set(0, 0, 0); o.spin = 0; }
         else if (flying) {
           o.spin -= Math.sign(q.vx || 1) * dt * (I.cat === 'heavy' ? 7 : 18);
           if (I.cat === 'light') { o.g.rotation.set(0, 0, o.spin); o.g.position.y += 0.2; }
-          else o.g.rotation.set(0, 0, o.spin * (I.roll ? 1 : 0.35));
+          else R.rotation.set(0, 0, o.spin * (I.roll ? 1 : 0.35));
         } else if (I.cat === 'light') { o.g.rotation.set(0, 0.3, Math.PI / 2); o.g.position.y += 0.05; }   // 武器躺在地上
-        else { o.g.rotation.set(0, 0, I.roll ? o.spin : 0); if (I.roll) o.spin -= q.vx * U * dt * 60 / 0.2; }
+        else { R.rotation.set(0, 0, I.roll ? o.spin : 0); if (I.roll) o.spin -= q.vx * U * dt * 60 / (R === o.g ? 0.2 : 0.38); }
         o.sh.visible = q.hold < 0;
         o.sh.position.set(q.x * U, 0.004, q.z * U);
         const s = Math.max(0.3, 1 - q.y * U * 0.4) * I.w * U * 1.1;

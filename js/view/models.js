@@ -4,7 +4,7 @@
 // 模型朝 +z（臉朝前）、aN 是靠鏡頭那隻手（-x）；面向左邊時整隻鏡像（root.scale.x = -1），靠鏡頭的永遠是同一隻。
 
 import * as THREE from 'three';
-import { kit, joint, INK, fuse, toon } from './kit.js';
+import { kit, joint, INK, fuse, toon, merge, repaint } from './kit.js';
 import { tagInk } from './inkline.js';
 import { FOREST } from './models-forest.js';
 import { MOON } from './models-moon.js';       // 第四關月球工廠的三隻（另一支檔）   // 第三關黑森林的六隻（另一支檔）
@@ -116,7 +116,46 @@ function lash(head, x, y, z, w, h, r, c) {
   kit(j).box(w, h, 1, c, 0, 0, 0.5);
   kit(tip).ball(r, c, 0, 0, 0);
   j.visible = tip.visible = false;
-  return { j, tip, z0: z };
+  return { j, tip, z0: z, y0: y };
+}
+
+// 會伸的鼻子（鼻象）：一節一節的關節串（每節一條膠囊往 +z 長，平常照 rest 一節一節往下彎）。
+// 出招時 aimTrunk 把整條拉直、拉長指向某一點——就是原本那條鼻子伸出去，不另外長一條。
+// segs：[[半徑, 長, 這節相對上一節彎多少], …]；tip 是鼻孔那顆
+const TZ = new THREE.Vector3(0, 0, 1), TQ = new THREE.Quaternion();
+function trunkChain(head, base, segs, c, tipC) {
+  const js = [], gs = [];
+  let par = head, pos = base;
+  segs.forEach(([r, len, rx], i) => {
+    const j = joint(par, ...pos);
+    j.rotation.x = rx;
+    const g = new THREE.Group();                 // 拉長的時候拉這層（膠囊跟著變長）
+    j.add(g);
+    kit(g).caps(r, len, c, 0, 0, len / 2, { rx: Math.PI / 2 });
+    js.push(j); gs.push(g);
+    par = j; pos = [0, 0, len];
+  });
+  const tip = new THREE.Group();
+  js[js.length - 1].add(tip);
+  tip.position.z = segs[segs.length - 1][1];
+  kit(tip).ball(segs[segs.length - 1][0] * 0.95, tipC, 0, 0, 0.005, { sz: 0.6, line: false });
+  return { js, gs, tip, len: segs.map((q) => q[1]), rest: segs.map((q) => q[2]), q0: js[0].quaternion.clone(), y0: base[1], z0: base[2], total: segs.reduce((a, q) => a + q[1], 0), same: js };
+}
+// dir：頭的座標裡從鼻根往哪個方向（單位向量）；len：鼻根到鼻尖多長（公尺）；k：0＝平常彎著、1＝整條拉直指過去
+export function aimTrunk(tr, dir, len, k) {
+  if (k <= 0.001) {
+    tr.js[0].quaternion.copy(tr.q0);
+    tr.js.forEach((j, i) => { if (i) j.rotation.set(tr.rest[i], 0, 0); });
+    tr.gs.forEach((g, i) => { g.scale.z = 1; if (i + 1 < tr.js.length) tr.js[i + 1].position.z = tr.len[i]; });
+    tr.tip.position.z = tr.len[tr.len.length - 1];
+    return;
+  }
+  TQ.setFromUnitVectors(TZ, dir);
+  tr.js[0].quaternion.slerpQuaternions(tr.q0, TQ, k);
+  const sc = 1 + (Math.max(0.3, len / tr.total) - 1) * k;
+  tr.js.forEach((j, i) => { if (i) j.rotation.set(tr.rest[i] * (1 - k) + (i === tr.js.length - 1 ? -0.25 * k : 0), 0, 0); });   // 拉直了鼻尖還是往上翹一點
+  tr.gs.forEach((g, i) => { g.scale.z = sc; if (i + 1 < tr.js.length) tr.js[i + 1].position.z = tr.len[i] * sc; });
+  tr.tip.position.z = tr.len[tr.len.length - 1] * sc;
 }
 
 // 錘頭（第一關雜兵）：站起來的鯊魚，T 字頭兩端是黃眼睛、白肚子、背鰭、新月形的尾鰭
@@ -340,7 +379,7 @@ export function buildDwarf() {
   return { root, turn, J: { body, upper, head, aN, aF, tail, lN, lF }, tongue: null, h: 1.25 };
 }
 
-// 小象（可選角色）：粉紅肉色大圓身體、兩片大耳朵（裡面深一點的粉紅）、一條往下彎的鼻子（鼻子捲那招另外伸一條 lash 出去）、短短的柱子腳
+// 小象（可選角色）：粉紅肉色大圓身體、兩片大耳朵（裡面深一點的粉紅）、一條往下彎的鼻子（一節一節的關節，出招整條伸出去，view 照招式指向哪）、短短的柱子腳
 export function buildElephant() {
   const { root, turn, body } = rig();
   const C = '#f2b8ac', EAR = '#e48c98', DARK = '#cf8a82', NAIL = '#f7f0e4', CHEEK = '#ea7f8e';
@@ -367,11 +406,8 @@ export function buildElephant() {
     h.ball(0.01, '#fffaf0', s * 0.13 - s * 0.01, 0.095, 0.33, { line: false });
     h.ball(0.055, CHEEK, s * 0.2, -0.07, 0.27, { sy: 0.6, sz: 0.4, line: false });
   }
-  // 鼻子：從臉中間往前往下彎，尖端往前翹一點
-  h.caps(0.085, 0.2, C, 0, -0.12, 0.34, { rx: 0.5 });
-  h.caps(0.07, 0.2, C, 0, -0.3, 0.42, { rx: 0.15 });
-  h.caps(0.06, 0.14, C, 0, -0.44, 0.47, { rx: -0.6 });
-  h.ball(0.055, DARK, 0, -0.49, 0.54, { sz: 0.6, line: false });
+  // 鼻子：從臉中間往前往下彎，尖端往前翹一點。一節一節的關節，出招時整條拉直伸出去（aimTrunk）
+  const trunk = trunkChain(head, [0, -0.05, 0.31], [[0.085, 0.17, 1.15], [0.075, 0.15, 0.3], [0.065, 0.12, -0.5], [0.058, 0.08, -0.6]], C, DARK);
   for (const s of [-1, 1]) h.cone(0.03, 0.12, NAIL, s * 0.1, -0.2, 0.3, { rx: 1.9 });            // 小象牙
   const aN = joint(upper, -0.34, 0.08, 0.1), aF = joint(upper, 0.34, 0.08, 0.1);
   for (const [a, s] of [[aN, -1], [aF, 1]]) {
@@ -379,7 +415,7 @@ export function buildElephant() {
     q.ball(0.11, C, s * 0.02, -0.17, 0.03, { sy: 1.9 });
     for (const x of [-0.04, 0.04]) q.ball(0.028, NAIL, s * 0.02 + x, -0.36, 0.09, { sy: 0.7, line: false });
   }
-  return { root, turn, J: { body, upper, head, aN, aF, tail, lN, lF }, tongue: null, lash: lash(head, 0, -0.12, 0.36, 0.13, 0.13, 0.09, C), h: 1.45 };
+  return { root, turn, J: { body, upper, head, aN, aF, tail, lN, lF }, tongue: null, trunk, h: 1.45 };
 }
 
 // 白企鵝（照使用者 2022 的貼圖）：子彈形的白身體、沒有脖子、小豆豆眼（眼皮壓一半，冷著臉）、長嘴從臉上往前往下垂、長長的鰭貼著身體垂下來。
@@ -473,13 +509,12 @@ export function recolor(root, ch) {
   const map = ALT[ch];
   if (!map) return;
   const to = Object.fromEntries(Object.entries(map).map(([a, b]) => [new THREE.Color(a).getHexString(), b]));
-  root.traverse((o) => {
-    if (!o.isMesh || !o.material?.isMeshToonMaterial) return;
-    const c = to[o.material.color.getHexString()];
-    if (c) o.material = toon(c);
-  });
+  repaint(root, (h) => to[h], 'alt:' + ch);
 }
 
 const MAKE = { manatee: buildManatee, marmot: buildMarmot, elephant: buildElephant, penguin: buildPenguin, dog: buildDog, sealion: buildSealion, hammer: buildHammer, squid: buildSquid, frog: buildFrog, mushroom: buildMushroom, moss: buildMoss, dwarf: buildDwarf, ...FOREST, ...MOON };
 // 建好之後身體和上身接成一層（kit.js 的 fuse）；身體會拉長的（臘腸狗）不接。每個關節發一個內線編號（inkline.js）
-export const BUILD = Object.fromEntries(Object.entries(MAKE).map(([id, make]) => [id, () => { const m = make(); if (!m.stretch) fuse(m.J.body, m.J.upper); return tagInk(m); }]));
+// 再把同一個關節底下的零件合成一個網格（kit.js 的 merge，描邊一起畫）
+// ?nomerge 不合（對照用；OPT.merge 也可以在頁面裡切）
+export const OPT = { merge: typeof location === 'undefined' || !/[?&]nomerge/.test(location.search) };
+export const BUILD = Object.fromEntries(Object.entries(MAKE).map(([id, make]) => [id, () => { const m = make(); if (!m.stretch) fuse(m.J.body, m.J.upper); return tagInk(OPT.merge ? merge(m) : m); }]));

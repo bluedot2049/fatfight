@@ -12,6 +12,7 @@ import { hit, mv } from './moves.js';
 //   brk   地上被打幾下會破（寶箱、木箱、炸藥桶）；drop 破掉掉出什麼（照順序輪）；land 1＝丟出去落地也會破
 //   boom  { r 範圍, dmg } 破掉就炸（炸到丟的人那隊以外的人）
 //   roll  1＝落地會滾（滑得比較遠）
+//   wall  飛著、放在地上都擋得住別隊直直飛過來的飛行道具，擋這麼多下就碎（鼻象的岩塊）
 //   hp mp 一口補多少；sips 幾口
 export const ITEMS = {
   // ---- 競技場（對戰從天上掉）----
@@ -52,6 +53,9 @@ export const ITEMS = {
   // ---- 臘腸狗埋的（招式放的，不會從天上掉）----
   bone: { name: '骨頭', cat: 'food', w: 170, h: 140, hp: 50, mp: 0, sips: 2,
     thr: { vx: 84, vy: 12, g: 3, dmg: 30, fall: 30, kd: 0, dvx: 18, dvy: 40, stop: 5 } },
+  // ---- 鼻象拔的石頭（招式的 hurl：拔起來直接丟，落地會滾；留在地上誰都撿得起來，鼻象隔得遠也撿得到、舉得快；擋得住飛行道具）----
+  erock: { name: '岩塊', cat: 'heavy', w: 320, h: 760, roll: 1, wall: 3,
+    thr: { vx: 60, vy: 42, g: 7, dmg: 90, fall: 80, kd: 1, dvx: 36, dvy: 70, stop: 10 } },
 };
 
 // 對戰從天上掉什麼（照順序輪，表裡重複的出得多）

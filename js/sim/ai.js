@@ -78,13 +78,14 @@ export const KIT = {};
 for (const C of ALL) {
   const R = (REACH[C.id] = {});
   for (const [id, m] of Object.entries(MOVES[C.id])) R[id] = reachOf(m);
-  const kind = (s) => (s.m.proj ? 'far' : s.m.inv && s.d === 'u' ? 'air' : 'rush');   // 對空：上＋起手打不到（往上跳的、企鵝原地踩火的）
+  const kind = (s) => (s.m.proj ? 'far' : s.m.hurl ? 'hurl' : s.m.inv && s.d === 'u' ? 'air' : 'rush');   // 對空：上＋起手打不到（往上跳的、企鵝原地踩火的）
   KIT[C.id] = {
     far: C.specials.filter((s) => kind(s) === 'far'),
     air: C.specials.filter((s) => kind(s) === 'air'),
     rush: C.specials.filter((s) => kind(s) === 'rush'),
     su: C.supers,
-    grab: C.specials.filter((s) => s.m.hits.some((h) => h.grab)),   // 指令投（小象鼻子捲）：對方在擋的時候用
+    grab: C.specials.filter((s) => s.m.hits.some((h) => h.grab === 1)),   // 指令投（鼻象鼻子捲）：對方在擋的時候用（鼻子撈天是對空，算 air）
+    hurl: C.specials.filter((s) => kind(s) === 'hurl'),             // 拔東西丟（鼻象拔石頭）：中距離、前後對齊了丟
     heal: C.specials.filter((s) => s.m.spawn),                       // 放吃的（臘腸狗埋骨頭）：血少、離得遠的時候放，之後撿起來吃（itemAI）
     jump: C.ai?.jump ?? 0,           // 愛跳多少（想下一步時「跳」的份量多這麼多；青蛙）
     flank: C.ai?.flank ?? 0,         // 繞背（狐狸）：對方面向我的時候先往前後錯開、跑到背後才出手
@@ -224,6 +225,11 @@ function decide(S, f, A) {
       const stiff = CHARS[o.ch].armor && !HELPLESS.has(o.act);            // 打在打不動的身上：對方沒硬直，不接下一拳（接了會被換到）
       if (!stiff && A.chain <= L.combo && f.t >= last + 2 && !(A.last & BA)) return BA | tw | (m.cr ? BS : 0);
       return tw | (m.cr ? BS : 0);
+    }
+    // 捲住人：會接拳的難度按攻改成掄人（場上有別的敵人在身邊更想掄）
+    if (m.grip && m.grip.sw && f.t < m.grip.at - 2 && f.mp >= m.grip.sw.mp && L.combo >= 1 && !(A.last & BA)) {
+      const crowd = S.p.some((e) => e.team !== f.team && e.i !== f.hold && e.hp > 0 && !e.gone && Math.abs(e.x - f.x) < 1800 && Math.abs(e.z - f.z) < 1000);
+      if (crowd || (L.combo >= 2 && f.mp >= m.grip.sw.mp + 150)) return BA;
     }
     // 會連按加段的招：快到的時候按攻（會接拳的難度才會）
     if (m.mash && f.ext < m.mash.n && f.mp >= m.mash.mp && L.combo >= 2 && f.t >= m.mash.at - 8 && f.t < m.mash.at && !(A.last & BA)) return BA;
@@ -570,6 +576,7 @@ function plan(S, f, A, L, K, R, o, rx, adz) {
     if (ok) add(L.sp >> 1, s);
   }
   for (const s of K.su) if (f.mp >= s.m.mp && inR2(R[s.m.id], rx, adz)) add(L.sp >> 2, s);
+  for (const s of K.hurl) if (f.mp >= s.m.mp && adz < 300 && rx > 1000 && rx < 3200) add(L.sp >> 1, s);
   for (const s of K.heal) if (f.mp >= s.m.mp + 100 && f.hp < (f.mhp * 3) / 5 && rx > 2400 && !S.it.some((q) => q.own === f.i)) add(L.sp >> 2, s);
   for (const s of K.rush) if (f.mp >= s.m.mp + 200 && inR2(R[s.m.id], rx, adz)) add(L.sp >> 3, s);
   let tot = 0;

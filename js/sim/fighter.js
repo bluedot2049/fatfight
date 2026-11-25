@@ -7,7 +7,7 @@ import { CHARS, MOVES } from './chars/index.js';
 import { sweepFront } from './moves.js';
 import { newHistory, record, pressed, pressedBoth, consume, consumeCommand, command, tapTwice, useTap, holding, dirX, dirZ } from './input.js';
 import { ITEMS, WEAR_SWING } from './items.js';
-import { heldItem, pickTry, itemAct, keepSipping, dropItem, wear, spawnItem, flingItem } from './item.js';
+import { heldItem, pickTry, itemAct, keepSipping, dropItem, wear, spawnItem, flingItem, hurlItem } from './item.js';
 
 export const FREE = new Set(['stand', 'walk', 'crouch']);
 const GRAB_TIME = 85;           // 抓住最多幾幀，時間到對方掙脫
@@ -159,7 +159,7 @@ function whiffCancel(S, f) {
 export function grabStart(S, f, o) {
   if (o.item >= 0) dropItem(S, o, 0);
   setAct(f, 'grab'); f.hold = o.i; f.grabT = GRAB_TIME; f.vx = f.vz = 0; f.mv = '';
-  setAct(o, 'grabbed'); o.hold = f.i; o.face = -f.face; o.mv = ''; o.vx = o.vz = 0;
+  setAct(o, 'grabbed'); o.hold = f.i; o.face = -f.face; o.mv = ''; o.vx = o.vz = 0; o.vy = 0; o.air = 0;   // 空中抓到的（鼻子撈天）：高度由抓的人管，不受重力
   S.ev.push({ k: 'grab', s: f.i });
 }
 
@@ -324,7 +324,7 @@ function release(S, f) {
   if (o && o.hold === f.i) {
     o.hold = -1;
     // 鬆手後 REL_IV 幀打不到：以前抓的人先能動，9 幀硬直一結束剛好接下一套（頭暈 → 抓 → 再一套 → 追打，3 秒以上不能動）
-    if (o.act === 'grabbed') { setAct(o, 'hit'); o.stun = 9; o.fallv = 0; o.slide = 400; o.sdir = f.face; o.iv = Math.max(o.iv, REL_IV); }
+    if (o.act === 'grabbed') { setAct(o, 'hit'); o.stun = 9; o.fallv = 0; o.slide = 400; o.sdir = f.face; o.iv = Math.max(o.iv, REL_IV); if (o.y > 0) { o.air = 1; o.vy = 0; } }   // 在空中被放掉的掉下來
   }
 }
 
@@ -430,6 +430,14 @@ export function crackBoom(S, q, b) {
   S.ev.push({ k: q.aim ? 'pillar' : q.lob ? 'pool' : 'erupt', s: q.o, x: q.x, z: q.z, id: q.id });
 }
 
+// 掄人（鼻子捲按攻）：抓著的人繞一圈的八個位置（往前、往前後，× 1000）
+const ORBIT = [[1000, 0], [707, 707], [0, 1000], [-707, 707], [-1000, 0], [-707, -707], [0, -1000], [707, -707]];
+function pinStage(S, o) {
+  const w = CHARS[o.ch].w;
+  o.x = Math.max(S.lo + w, Math.min(S.hi - w, o.x));
+  o.z = Math.max(Z_FAR, Math.min(Z_NEAR, o.z));
+}
+
 // 被抓的人貼在抓的人前面
 function pin(f, o) {
   o.x = f.x + f.face * (CHARS[f.ch].w + CHARS[o.ch].w - 80);
@@ -468,6 +476,7 @@ function atkStep(S, f, C) {
     const want = (o.x - f.x) * f.face - CHARS[o.ch].w + 250;
     f.sf = Math.max(1, Math.min(sweepFront(m.sweep, m.hits[0].box[2], f.t), want));
   }
+  if (m.hurl && f.t === m.hurl.at) hurlItem(S, f, m.hurl);
   if (m.spawn && f.t === m.spawn.at) {
     const x = Math.max(S.lo + 300, Math.min(S.hi - 300, f.x + f.face * m.spawn.x));
     spawnItem(S, m.spawn.k, x, f.z).own = f.i;
@@ -532,7 +541,7 @@ function atkStep(S, f, C) {
       }
     }
   }
-  if (m.quake && m.quake.includes(f.t)) S.ev.push({ k: 'quake', s: f.i, x: f.x, z: f.z, t: f.t });
+  if (m.quake && m.quake.includes(f.t)) S.ev.push({ k: 'quake', s: f.i, x: f.x, z: f.z, t: f.t, r: m.charge && !m.proj ? 100 + ((f.chg * 50) / m.charge.max | 0) : 100 });   // r：集氣的踩地圈多大（畫面用）
   // 瞬移、念力丟（小灰人）：都找最近的敵人（左右前後加起來算）
   if ((m.warp && f.t === m.warp.at) || (m.tk && f.t === m.tk.at)) {
     let o = null, bd = 1e9;
@@ -563,21 +572,42 @@ function atkStep(S, f, C) {
     S.ev.push({ k: 'quake', s: f.i, x: f.x, z: f.z, t: 0 }, { k: 'dizzy', s: f.i });
     return;
   }
-  // 指令投抓到之後：先把人捲到身前，到 at 幀丟出去（back 往背後甩）
+  // 指令投抓到之後：先把人捲到身前，到 at 幀丟出去（back 往背後甩）。
+  // sw：甩出去之前按攻換成掄人那招；orbit：抓著的人繞著身體轉，at 幀往面向那邊丟；slam：空中抓到的往下拉，at 幀往地上砸
   if (m.grip) {
     const o = f.hold >= 0 ? S.p[f.hold] : null, G = m.grip;
     if (o && o.act === 'grabbed') {
+      let k;
+      if (G.sw && f.t < G.at && f.mp >= G.sw.mp && !command(H) && (k = pressed(H, BA)) >= 0) {
+        consume(H, k);
+        startMove(S, f, MOVES[f.ch][G.sw.to]);
+        f.mp -= G.sw.mp;
+        S.ev.push({ k: 'ext', s: f.i, id: G.sw.to, n: 1 });
+        return;
+      }
+      const R = C.w + CHARS[o.ch].w - 80;
       if (f.t < G.at) {
-        const want = f.x + f.face * (C.w + CHARS[o.ch].w - 80), r = G.reel;
-        o.x += Math.max(-r, Math.min(r, want - o.x));
-        o.z += Math.max(-(r >> 1), Math.min(r >> 1, f.z - o.z));
-        o.y = 0; o.face = -f.face;
+        if (G.orbit) {
+          const [cx, cz] = ORBIT[((f.t + 64 - G.at) >> 1) & 7], r = R + 330;
+          o.x = f.x + f.face * ((cx * r) / 1000 | 0); o.z = f.z + ((cz * r * 3) / 4000 | 0); o.y = 350;
+        } else {
+          const want = f.x + f.face * R, r = G.reel;
+          o.x += Math.max(-r, Math.min(r, want - o.x));
+          o.z += Math.max(-(r >> 1), Math.min(r >> 1, f.z - o.z));
+          o.y = G.slam ? Math.max(G.slam, o.y - r) : 0;
+        }
+        o.face = -f.face;
+        pinStage(S, o);
       } else if (f.t === G.at) {
+        if (G.orbit) { faceInput(f); o.x = f.x + f.face * R; o.z = f.z; pinStage(S, o); }
         o.hp -= (G.dmg * f.pow / 100) | 0; if (o.hp < 0) o.hp = 0;
         f.hold = -1; o.hold = -1;
-        o.act = 'fall'; o.t = 0; o.air = 1; o.y = 10; o.vx = (G.back ? -f.face : f.face) * G.vx; o.vy = G.vy; o.vz = 0; o.fallv = 0;
+        o.act = 'fall'; o.t = 0; o.air = 1; o.vz = 0; o.fallv = 0;
+        if (G.slam) { o.y = Math.max(o.y, 300); o.vx = f.face * G.vx; o.vy = -G.vy; }
+        else { o.y = G.orbit ? o.y : 10; o.vx = (G.back ? -f.face : f.face) * G.vx; o.vy = G.vy; }
         o.mv = ''; o.by = f.i; o.bh = 0; o.bnc = 0; o.face = G.back ? f.face : -f.face;
-        S.ev.push({ k: 'hit', s: f.i, d: o.i, x: o.x, y: 800, z: o.z, big: 1, dmg: G.dmg, kind: 'sp', stop: 8 });
+        for (let i = 0; i < m.hits.length; i++) if (!f.hitList.includes(i * 16 + o.i)) f.hitList.push(i * 16 + o.i);   // 這招自己的打擊（掄、震波）不打被抓的這個
+        S.ev.push({ k: 'hit', s: f.i, d: o.i, x: o.x, y: G.slam ? 300 : 800, z: o.z, big: 1, dmg: G.dmg, kind: 'sp', stop: 8 });
       }
     } else f.hold = -1;
     if (f.t >= m.total - 1) { f.hold = -1; toFree(f); }

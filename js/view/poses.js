@@ -125,10 +125,14 @@ Object.assign(ATK, {
     heave: ATK.sealion.clap,
   },
   elephant: { ...GEN,
+    // 用鼻子打的普通技：甩頭帶鼻子（鼻子怎麼伸 view 照打擊框算），手不揮
+    sA: { w: { head: -0.35, lean: -0.1, spin: -0.15 }, s: { head: 0.2, lean: 0.16, spin: 0.2 } },
+    crA: { w: { head: -0.2 }, s: { head: 0.3, lean: 0.22 } },
+    jC: { w: { head: -0.4 }, s: { head: 0.35, lean: 0.3 } },
     chop: { w: { aN: 2.6, aF: 2.2, lean: -0.2, head: -0.45 }, s: { aN: 0.8, aF: 0.6, lean: 0.4, bend: 0.3, head: 0.35 } },   // 鼻子、手舉高往下鎚
     stomp: { w: { lN: 1.5, lean: -0.25, aN: 0.9, aF: 0.9, aNz: 0.4, aFz: 0.4, head: -0.3, sq: 0.08 }, s: { lN: -0.1, sq: -0.26, by: -0.05, lean: 0.12, aN: 0.4, aF: 0.4, head: 0.15 } },   // 抬腳踩下去
-    spray: { w: { head: -0.45, bend: -0.2, sq: 0.06 }, s: { head: 0.2, lean: 0.15, bend: 0.12, sq: -0.04 } },   // 仰頭吸一口、往前噴
-    uptrunk: { w: { sq: -0.25, head: 0.2 }, s: { aN: 2.6, aF: 2.3, head: -0.55, sq: 0.15 } },
+    rock: { w: { lean: 0.38, bend: 0.3, head: 0.5, sq: -0.14, aN: 0.5, aF: 0.4, lN: 0.25 }, s: { lean: -0.22, bend: -0.18, head: -0.55, sq: 0.1, aN: 1.7, aF: 1.4, lF: 0.3 } },   // 低頭把鼻子插進土裡 → 仰頭甩出去
+    skygrab: { w: { sq: -0.22, head: 0.15, lean: 0.05 }, s: { head: -0.6, lean: -0.22, sq: 0.12, aN: 1.9, aF: 1.6, lN: 0.25 } },                                   // 蹲一下、鼻子直直往上撈
     trunkT: { w: { lean: 0.25, bend: 0.2, head: 0.3, aN: 1.2, aF: 1.1, sq: -0.1 }, s: { lean: -0.45, bend: -0.3, head: -0.6, aN: 2.7, aF: 2.5, sq: 0.08 } },   // 低頭捲住、往後仰把人甩過頭
     stampede: { w: { lean: -0.35, head: -0.6, aN: 2.2, aF: 1.6, sq: 0.1 }, s: { lean: 0.35, aN: 1.3, aF: 1.3, head: 0.2, lN: 0.8, lF: -0.6 } },   // 揚起鼻子叫一聲、衝過去
   },
@@ -346,6 +350,16 @@ function attackPose(f, m, t, clock) {
     if (t < end) { const s = Math.sin(clock * 50); return over(slam, { sq: slam.sq + 0.03 * s, aN: slam.aN + 0.06 * s, aF: slam.aF - 0.06 * s }); }
     return mix(slam, BASE.idle, ease(Math.min(1, (t - end) / Math.max(1, m.total - end))));
   }
+  if (id === 'trunkS') {                             // 掄人：整隻跟著被掄的人轉（角度跟 sim 的 ORBIT 一樣，每 2 幀 45 度），最後往前甩
+    const at = m.grip.at;
+    if (t <= at) return { spin: -((t + 64 - at) / 2) * (Math.PI / 4), lean: -0.12, sq: -0.06, aN: 1.4, aF: 1.3, aNz: 0.5, aFz: 0.5, head: 0.1, lN: 0.2 * Math.sin(t * 0.8) };
+    return mix({ spin: 0, lean: 0.4, bend: 0.3, head: 0.3, aN: 1.8, aF: 1.6 }, BASE.idle, Math.min(1, (t - at) / Math.max(1, m.total - at)));
+  }
+  if (id === 'skyT') {                               // 撈天捲到：仰著頭把人拉下來 → 往前低頭砸地
+    const at = m.grip.at, up = ATK.elephant.skygrab.s, slam = { head: 0.55, lean: 0.42, bend: 0.32, sq: -0.2, by: -0.04, aN: 0.9, aF: 0.8 };
+    if (t < at) return mix(up, slam, ease(t / at));
+    return mix(slam, BASE.idle, Math.min(1, (t - at - 4) / Math.max(1, m.total - at - 4)));
+  }
   if (id === 'frenzy') {                             // 衝過去（照 vx 停下那幀）→ 亂打 → 最後一下往上打（照最後一下的幀數；兩版節奏不同也對得上）
     const dash = m.vx[m.vx.length - 1][0], fin = m.hits[m.hits.length - 1].on[0] - 2;
     if (t < dash) return BASE.run;
@@ -357,7 +371,7 @@ function attackPose(f, m, t, clock) {
   const P = ATK[f.ch][id] || { w: {}, s: {} };
   const base = m.air ? (f.vy > 0 ? BASE.up : BASE.down) : m.cr ? BASE.crouch : BASE.idle;
   if (!m.hits.length) {                               // 吐泡泡這種沒有打擊框的：照射出那一幀
-    const a0 = m.proj ? m.proj.at : (m.total / 3) | 0;
+    const a0 = m.proj ? m.proj.at : m.hurl ? m.hurl.at : (m.total / 3) | 0;
     if (t < a0) return mix(base, over(base, P.w), ease(t / a0));
     return mix(over(base, P.s), base, Math.min(1, (t - a0 - 6) / Math.max(1, m.total - a0 - 6)));
   }

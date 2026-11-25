@@ -47,6 +47,24 @@ export function flingItem(S, f, q, o) {
   S.ev.push({ k: 'ithrow', id: q.id, s: f.i, ik: q.k, tk: 1, x: q.x, z: q.z });
 }
 
+// 拔起來丟（鼻象拔石頭，招式的 hurl）：身前地上拔出一個 k 直接丟出去，算自己丟的；按上下往前後偏。
+// 一隻一次只有一個自己拔的：舊的還在（地上、別人手上都算）就碎掉
+export function hurlItem(S, f, H) {
+  for (const q of [...S.it]) {
+    if (q.own !== f.i || q.k !== H.k) continue;
+    S.ev.push({ k: 'ibreak', id: q.id, x: q.x, y: q.y + (ITEMS[q.k].h >> 1), z: q.z, ik: q.k });
+    remove(S, q);
+  }
+  const C = CHARS[f.ch], I = ITEMS[H.k];
+  const x = Math.max(S.lo + I.w, Math.min(S.hi - I.w, f.x + f.face * (C.w + 250)));
+  const q = spawnItem(S, H.k, x, f.z, H.y);
+  q.own = f.i;
+  const dz = (f.H.prev & DOWN ? 1 : 0) - (f.H.prev & UP ? 1 : 0);
+  q.vx = H.vx * f.face; q.vy = H.vy; q.vz = dz * 14;
+  q.harm = 1; q.by = f.i; q.team = f.team; q.hb = 0; q.t = 0;
+  S.ev.push({ k: 'ithrow', id: q.id, s: f.i, ik: q.k, hurl: 1, x: q.x, z: q.z });
+}
+
 export function dropItem(S, f, toss = 0) {
   const q = heldItem(S, f);
   f.item = -1; f.ik = 0;
@@ -189,6 +207,24 @@ export function arenaDrop(S) {
   const x = Math.max(S.lo + 800, Math.min(S.hi - 800, cx + ((rnd(S) % 4000) - 2000)));
   const z = (rnd(S) % 2400) - 1200;
   spawnItem(S, ARENA_POOL[(S.drops = (S.drops | 0) + 1) % ARENA_POOL.length], x, z, 3200);
+}
+
+// 擋飛行道具（items.js 的 wall，鼻象的岩塊）：飛著、放在地上都擋得住別隊直直飛過來的（泡泡、箭、石頭；穿人的聲波、貼地的裂縫、拋的火球不算），
+// 擋 wall 下就碎。拿在手上的不擋
+export function wallBlocks(S, pr) {
+  for (const it of [...S.it]) {
+    const I = ITEMS[it.k];
+    if (!I.wall || it.hold >= 0) continue;
+    const team = it.own >= 0 && S.p[it.own] ? S.p[it.own].team : it.team;
+    for (const q of pr) {
+      if (q.life <= 0 || q.wt || q.gr || q.bt || q.lob || q.pierce || q.team === team) continue;
+      if (Math.abs(q.x - it.x) >= q.w + I.w || q.y - q.h >= it.y + I.h || q.y + q.h <= it.y || Math.abs(q.z - it.z) > Z_REACH) continue;
+      q.life = 0;
+      it.wh = (it.wh | 0) + 1;
+      S.ev.push({ k: 'iknock', id: it.id, x: (q.x + it.x) >> 1, y: q.y, z: it.z, ik: it.k, wall: 1 });
+      if (it.wh >= I.wall) { S.ev.push({ k: 'ibreak', id: it.id, x: it.x, y: it.y + (I.h >> 1), z: it.z, ik: it.k }); remove(S, it); break; }
+    }
+  }
 }
 
 // 判定：丟出去的東西撞人、地上的東西被打。hitFn(a, d, h, fromX) 交給 combat 算傷害

@@ -3,16 +3,16 @@
 // 畫面：每個畫面讀一次比賽狀態，擺好場上每隻角色（左右 x、前後 z、高度 y）、泡泡、浪、氣焰和斜斜往下看的鏡頭，事件（打中、擋住、超必殺…）變成特效。只讀不寫，回滾重算也不怕。
 
 import * as THREE from 'three';
-import { BUILD, recolor } from './models.js';
+import { BUILD, recolor, aimTrunk } from './models.js';
 import { markOf, isAlt, footMark, placeMark } from './mark.js';
 import { poseOf, applyPose, ZERO } from './poses.js';
-import { FX, starSprite, bubbleMesh, beamMesh, fireballMesh, ringMesh, soundMesh } from './fx.js';
+import { FX, starSprite, bubbleMesh, beamMesh, shapeBeam, fireballMesh, ringMesh, soundMesh } from './fx.js';
 import { Stage } from './stage.js';
 import { SeaStage } from './sea.js';
 import { TunnelStage } from './tunnel.js';
 import { ForestStage } from './forest.js';
 import { MoonStage } from './moon.js';
-import { kit, toon } from './kit.js';
+import { kit, repaint, merge } from './kit.js';
 import { CHARS, MOVES } from '../sim/chars/index.js';
 import { hitBoxes } from '../sim/moves.js';
 import { STAGE_HALF, Z_NEAR } from '../sim/const.js';
@@ -25,6 +25,22 @@ import { InkLines } from './inkline.js';
 const ROCK = '#8a5a2e';   // 地裂噴出來的碎石
 const U = 1 / 1000;
 const SCENES = { sea: SeaStage, tunnel: TunnelStage, forest: ForestStage, moon: MoonStage };   // 闖關的場景：關卡表的 scene → 哪個類別
+
+// 鼻象的鼻子這幀要指到哪：{ k 伸出來多少（0 平常彎著、1 拉直）, x 往前多遠, y 多高 }（sim 單位，從腳底、面向那邊算），沒在用鼻子回 null。
+// 捉著人的時候 view 直接指向那個人，不走這裡
+const ramp = (t, a0, a1, out = 5) => (t < a0 - 3 ? 0 : t < a0 ? (t - a0 + 3) / 3 : t <= a1 ? 1 : Math.max(0, 1 - (t - a1) / out));
+function trunkAim(m, p) {
+  const id = m.pose || m.id, t = p.t;
+  const front = (h) => ({ x: h.box[2] - 60, y: (h.box[1] + h.box[3]) >> 1 });
+  if (id === 'lash') { const h = m.hits[0]; return { k: ramp(t, h.on[0], m.hits[m.hits.length - 1].on[1]), ...front(h) }; }
+  if (id === 'skygrab') { const h = m.hits[0]; return { k: ramp(t, h.on[0], h.on[1]), x: (h.box[0] + h.box[2]) >> 1, y: h.box[3] - 150 }; }
+  if (id === 'rock') { const at = m.hurl.at; return t <= at ? { k: Math.min(1, t / 4), x: 650, y: 0 } : { k: Math.max(0, 1 - (t - at) / 8), x: 450, y: 1700 }; }   // 插進土裡 → 甩上去
+  if (id === 'skyT') return { k: Math.max(0, 1 - (t - m.grip.at) / 8), x: 650, y: 150 };     // 砸完鼻子還按在地上一下
+  if (id === 'trunkS' || id === 'trunkT') return { k: Math.max(0, 1 - (t - m.grip.at) / 6), x: 800, y: 900 };
+  if (m.tr && m.hits.length) { const h = m.hits[0]; return { k: ramp(t, h.on[0], h.on[1], 6), ...front(h) }; }   // 普通技用鼻子打的（角色表寫 tr）
+  return null;
+}
+const LZ = new THREE.Vector3(0, 0, 1), LDIR = new THREE.Vector3(), LTGT = new THREE.Vector3();
 
 export class View {
   constructor(canvas) {
@@ -121,30 +137,29 @@ export class View {
       this.fighters[i] = this.make(p, key, m, alt);
     });
   }
-  drop(f) { this.scene.remove(f.model.root, f.shadow, f.beam, f.tip, ...f.stars); if (f.mark) this.scene.remove(f.mark.arc, ...(f.mark.lab ? [f.mark.lab] : [])); }
+  drop(f) { this.scene.remove(f.model.root, f.shadow, f.beam, ...f.stars); if (f.herd) for (const g of f.herd.g) this.scene.remove(g.m.root, g.d.root); if (f.mark) this.scene.remove(f.mark.arc, ...(f.mark.lab ? [f.mark.lab] : [])); }
   make(p, key, mk, alt) {
     const model = BUILD[p.ch]();
     if (p.mini && !CHARS[p.ch].npc) shade(model.root);
     else if (alt) recolor(model.root, p.ch);             // 同角色的第二隻：第二套色   // 拿可選角色當雜兵才壓成影子色；專門的雜兵（npc）照本來的顏色
     // 每隻自己一份材質（打中整隻閃白用；共用的話同色的別人也會跟著閃）
-    const mats = [];
-    model.root.traverse((o) => { if (o.isMesh && o.material?.isMeshToonMaterial) { o.material = o.material.clone(); mats.push(o.material); } });
+    const own = new Map();                               // 同一份材質複製一次就好（合併過的網格一隻只有一兩種）
+    model.root.traverse((o) => { if (o.isMesh && o.material?.isMeshToonMaterial) { if (!own.has(o.material)) own.set(o.material, o.material.clone()); o.material = own.get(o.material); } });
+    const mats = [...own.values()];
     this.scene.add(model.root);
     const shadow = new THREE.Mesh(new THREE.CircleGeometry(1, 24), new THREE.MeshBasicMaterial({ color: '#070a04', transparent: true, opacity: 0.55, depthWrite: false }));
     shadow.rotation.x = -Math.PI / 2;
     this.scene.add(shadow);
     const beam = beamMesh(CHARS[p.ch].pal?.[0] || CHARS[p.ch].color);
     beam.visible = false;
-    const tip = new THREE.Mesh(beam.geometry, beam.material);   // 往前推的浪：浪頭（矮）另外一條，同一份材質
-    tip.visible = false;
-    this.scene.add(beam, tip);
+    this.scene.add(beam);
     this.renderer.initTexture(beam.material.map);
     const stars = [0, 1, 2].map((i) => starSprite(i === 1 ? '#ffffff' : '#ffe98a'));
     this.scene.add(...stars);
     const hand = handAnchor(model);                   // 拿東西的手（量好位置掛在手臂上）
     const mark = mk ? footMark(mk, CHARS[p.ch].w) : null;   // 腳下的弧（認人用）
     if (mark) this.scene.add(mark.arc, ...(mark.lab ? [mark.lab] : []));
-    return { key, ch: p.ch, model, shadow, beam, tip, stars, mark, pose: { ...ZERO }, jig: { x: 0, v: 0 }, flash: 0, px: p.x, mats, white: 0, whiteNow: 0, fxT: 0, hand };
+    return { key, ch: p.ch, model, shadow, beam, stars, mark, pose: { ...ZERO }, jig: { x: 0, v: 0 }, flash: 0, px: p.x, mats, white: 0, whiteNow: 0, fxT: 0, hand };
   }
 
   // 對戰是競技場，闖關照關卡表的場景
@@ -255,7 +270,7 @@ export class View {
       }
       // ---- 地上的東西 ----
       case 'item': if (e.ik === 'bone') { this.fx.dust(e.x * U, 0, 8, '#6a5236', z); this.fx.shards(e.x * U, 0.15, '#8a6a44', 8, 2.5, z); this.fx.motes(e.x * U, 0.2, '#fff3c0', 4, z); break; }   // 臘腸狗挖出骨頭
-        if (e.ik && !S.quest) { this.fx.glow(e.x * U, 0.1, '#fff1c8', 1.2, z, 0.5); this.fx.groundRing(e.x * U, z, '#e8c45a', 1.2, 0.6); } break;   // 對戰從天上掉：落點先亮
+        if (e.ik && e.ik !== 'erock' && !S.quest) { this.fx.glow(e.x * U, 0.1, '#fff1c8', 1.2, z, 0.5); this.fx.groundRing(e.x * U, z, '#e8c45a', 1.2, 0.6); } break;   // 對戰從天上掉：落點先亮
       case 'ipick': { const p = S.p[e.s]; this.fx.dust(p.x * U + p.face * 0.3, 0, 3, null, p.z * U); this.fx.motes(p.x * U + p.face * 0.3, 0.3, '#fff1c8', 3, p.z * U); break; }
       case 'warp': {                                     // 瞬移（小灰人）：消失和出現的地方各一圈光、幾道電
         const C = CHARS[S.p[e.s].ch], x = e.x * U, pz = e.z * U, y = C.h * U * 0.5, c = col(e.s);
@@ -269,9 +284,17 @@ export class View {
           this.fx.glow(x, 0.5, c, 1.4, pz, 0.3); this.fx.bolts(x, 0.5, c, 4, 0.9, pz, 0.2); this.fx.groundRing(x, pz, c, 1.4, 0.3);
           break;
         }
+        if (e.hurl) {                                    // 拔石頭：地上炸開一個坑、土和碎石往上噴
+          const x = e.x * U, pz = e.z * U;
+          this.fx.dust(x, 0, 12, '#5a4636', pz); this.fx.shards(x, 0.2, ROCK, 12, 4.5, pz); this.fx.groundRing(x, pz, '#8a7258', 1.3, 0.35);
+          this.shake = Math.max(this.shake, 0.05);
+          break;
+        }
         const p = S.p[e.s]; this.fx.shock((p.x + p.face * 400) * U, CHARS[p.ch].h * U * 0.6, '#fff6e8', 1.0, p.z * U, 0.15); break; }
       case 'iland': this.fx.dust(e.x * U, 0, ITEMS[e.ik]?.cat === 'heavy' ? 7 : 3, null, z); if (ITEMS[e.ik]?.cat === 'heavy') { this.fx.groundRing(e.x * U, z, '#b8a88e', 1.4, 0.3); this.shake = Math.max(this.shake, 0.04); } break;
-      case 'iknock': this.fx.shards(e.x * U, e.y * U, '#b07a44', 6, 3, z); this.fx.dust(e.x * U, 0, 2, null, z); break;
+      case 'iknock':
+        if (e.wall) { this.fx.spark(e.x * U, e.y * U, 0, '#fff1c8', z); this.fx.shards(e.x * U, e.y * U, ROCK, 8, 3, z); this.fx.pop(e.x * U, e.y * U, '#bfeaff', z); break; }   // 岩塊擋下飛行道具
+        this.fx.shards(e.x * U, e.y * U, '#b07a44', 6, 3, z); this.fx.dust(e.x * U, 0, 2, null, z); break;
       case 'ibreak': this.fx.shards(e.x * U, e.y * U, ITEMS[e.ik]?.cat === 'light' ? '#d6aa6c' : '#b07a44', 16, 5, z); this.fx.dust(e.x * U, 0, 8, null, z); this.fx.shock(e.x * U, e.y * U, '#fff1c8', 1.4, z, 0.2); break;
       case 'boom': {
         const x = e.x * U, y = 0.5, r = (e.r || 1500) * U;
@@ -396,11 +419,11 @@ export class View {
         this.shake = Math.max(this.shake, 0.08); this.punch = Math.max(this.punch, 0.3);
         break;
       }
-      case 'quake': {                                  // 小象踩地：腳邊兩圈震波、揚土、碎石，鏡頭震
-        const x = e.x * U, c = col(e.s);
-        this.fx.groundRing(x, z, '#d8c8a8', 2.8, 0.45); this.fx.groundRing(x, z, c, 1.8, 0.3); this.fx.wave(x, z, c, 2.6, 0.4);
-        this.fx.dust(x, 0, 14, '#5a4a38', z); this.fx.shards(x, 0.1, ROCK, 10, 4, z);
-        this.shake = Math.max(this.shake, 0.1); this.punch = Math.max(this.punch, 0.3);
+      case 'quake': {                                  // 小象踩地：腳邊兩圈震波、揚土、碎石，鏡頭震（r：集氣踩得越大圈越大）
+        const x = e.x * U, c = col(e.s), r = (e.r || 100) / 100;
+        this.fx.groundRing(x, z, '#d8c8a8', 2.8 * r, 0.45); this.fx.groundRing(x, z, c, 1.4 * r, 0.3); this.fx.wave(x, z, c, 2.6 * r, 0.4);
+        this.fx.dust(x, 0, (14 * r) | 0, '#5a4a38', z); this.fx.shards(x, 0.1, ROCK, (10 * r) | 0, 4, z);
+        this.shake = Math.max(this.shake, 0.1 * r); this.punch = Math.max(this.punch, 0.3 * r);
         break;
       }
       case 'fizzle': if (e.fire) { this.fx.smoke(e.x * U, 0.1, z, 5); break; } else { const x = e.x * U; this.fx.dust(x, 0, 5, null, z); this.fx.shards(x, 0.1, ROCK, 4, 2, z); this.fx.bolts(x, 0.15, col(e.s), 1, 0.5, z); break; }
@@ -506,20 +529,17 @@ export class View {
       s.position.set(p.x * U + Math.cos(a) * 0.34, p.y * U + C.h * U + 0.14 + Math.sin(a * 2) * 0.03, p.z * U + 0.3 + Math.sin(a) * 0.12);
       s.material.rotation = a;
     });
-    // 海牛的浪：照 sim 的 hitBoxes 畫（往前推的話分浪身、浪頭兩條，浪頭冒水花）
-    v.tip.visible = false;
+    // 海牛的浪：照 sim 的 hitBoxes 畫成一整條（往前推的話浪身到浪頭順順降下去，浪頭冒水花）
     if (m && m.sweep && !m.sweep.head && p.t >= m.hits[0].on[0] - 2 && p.t <= m.hits[m.hits.length - 1].on[1] + 6) {
       const bs = hitBoxes(m, m.hits[0], p.t), wob = 0.9 + 0.1 * Math.sin(this.clock * 30);
-      bs.forEach((b, i) => {
-        const o = i ? v.tip : v.beam;
-        o.visible = true;
-        o.scale.set((b[2] - b[0]) * U, (b[3] - b[1]) * U * wob, 1);
-        o.position.set((p.x + p.face * (b[0] + b[2]) / 2) * U, (b[1] + b[3]) / 2 * U, p.z * U + 0.2);
-      });
+      shapeBeam(v.beam, bs, U, wob);
+      v.beam.visible = true;
+      v.beam.scale.set(p.face, 1, 1);
+      v.beam.position.set(p.x * U, 0, p.z * U + 0.2);
       const f = bs[bs.length - 1];
       if (m.id === 'hellgate') this.gateFire(p, bs);
       else if (m.sweep && p.t <= m.sweep.on[1] + 2 && v.fxT % 2 === 0) this.fx.motes((p.x + p.face * f[2]) * U, f[3] * U * 0.6, '#d8f6ff', 3, p.z * U, 0.5);
-      v.beam.material.map.offset.x -= 0.06 * p.face;
+      v.beam.material.map.offset.x -= 0.06;   // 網格已經照 face 翻面，往前流就是一直減
       v.beam.material.opacity = 0.9;
     } else v.beam.visible = false;
     this.fireFx(S, p, v, m, C);
@@ -539,6 +559,25 @@ export class View {
       L.j.scale.z = Math.max(0.01, len * k);
       L.tip.position.z = L.z0 + len * k;
     }
+    // 鼻象的鼻子：原本那條拉直、拉長指過去（捲著人就指向那個人）
+    if (v.model.trunk) {
+      const T = v.model.trunk, o = m && m.grip && p.hold >= 0 ? S.p[p.hold] : null;
+      let k = 0;
+      if (o && o.act === 'grabbed') { k = 1; LTGT.set(o.x * U, (o.y + CHARS[o.ch].h * 0.45) * U, o.z * U); }
+      else if (m) {
+        const a = trunkAim(m, p);
+        if (a && a.k > 0) { k = a.k; LTGT.set((p.x + p.face * a.x) * U, (p.y + a.y) * U, p.z * U); }
+      }
+      if (k > 0) {
+        aimTrunk(T, LZ, 0, 0);                        // 先放回平常的樣子再量（頭的位置照這幀的姿勢）
+        v.model.root.updateMatrixWorld(true);
+        T.js[0].parent.worldToLocal(LTGT);
+        LTGT.y -= T.y0; LTGT.z -= T.z0;
+        const len = Math.max(0.2, LTGT.length() - 0.05);
+        aimTrunk(T, LDIR.copy(LTGT).normalize(), len, k);
+      } else aimTrunk(T, LZ, 0, 0);
+    }
+    this.elephantFx(S, p, v, m);
     // 海獅鼻子上的球：頂出去之後到收招前不在鼻子上
     if (v.model.ball) v.model.ball.visible = !(m && m.proj && p.t >= m.proj.at);
   }
@@ -608,6 +647,51 @@ export class View {
         D.glow.material.opacity = 0.25 + 0.7 * open * (0.85 + 0.15 * Math.sin(this.clock * 30));
       }
     }
+  }
+  // 鼻象：拔石頭前鼻子插進土裡揚土；萬象奔騰背後衝出一群象的影子
+  elephantFx(S, p, v, m) {
+    const id = m && (m.pose || m.id);
+    if (id === 'rock' && p.t > 3 && p.t < m.hurl.at && v.fxT % 2 === 0) {
+      const x = (p.x + p.face * 650) * U;
+      this.fx.dust(x, 0, 2, '#5a4636', p.z * U); this.fx.speck(x, 0.1, '#7a6a5c', 1.4, p.z * U, 5);
+    }
+    if (p.ch !== 'elephant' && !v.herd) return;
+    const on = id === 'stampede' && p.t >= m.vx[1][0] - 2;
+    if (on && !v.herd) v.herd = this.makeHerd(p);
+    if (!v.herd) return;
+    const H = v.herd, end = on ? m.vx[m.vx.length - 1][0] : 0;
+    H.a += ((on ? (p.t < end + 6 ? 0.42 : Math.max(0, 0.42 * (1 - (p.t - end - 6) / 24))) : 0) - H.a) * 0.25;
+    H.mat.opacity = H.a;
+    for (const g of H.g) {
+      g.m.root.visible = g.d.root.visible = H.a > 0.02;
+      if (!g.m.root.visible) continue;
+      const run = p.t < end + 4;
+      const s = Math.sin((S.f + g.ph) * 0.55);
+      const pose = run ? { ...ZERO, lean: 0.3, head: -0.2, by: 0.06 * Math.abs(s), lN: 1.0 * s, lF: -1.0 * s, aN: 0.5 * s, aF: -0.5 * s }
+        : { ...ZERO, lN: -0.1, sq: -0.2, lean: 0.12, aN: 0.4, aF: 0.4, head: 0.15, by: 0.02 * Math.abs(s) };
+      const lag = run ? g.dx : g.dx * 0.6;
+      for (const mm of [g.m, g.d]) {
+        applyPose(mm, pose);
+        mm.root.position.set((p.x - p.face * lag) * U, 0, (p.z + g.dz) * U);
+        mm.root.scale.set(p.face * g.s, g.s, g.s);
+      }
+      if (run && v.fxT % 3 === g.i) this.fx.dust(g.m.root.position.x, 0, 1, null, g.m.root.position.z);
+    }
+  }
+  // 萬象奔騰的象群：三隻同一個模型的半透明剪影（自己的顏色），跟在後面前後錯開。
+  // 每隻兩份：先畫一份只寫深度的，再畫一份顏色的只留最前面那層（不然每顆球、描邊疊在一起變成一團泡泡）
+  makeHerd(p) {
+    const mat = new THREE.MeshBasicMaterial({ color: CHARS[p.ch].pal[0], transparent: true, opacity: 0, depthWrite: false, depthFunc: THREE.LessEqualDepth });
+    const pre = new THREE.MeshBasicMaterial({ colorWrite: false });
+    const one = (mt, ro) => {
+      const m = BUILD[p.ch]();
+      m.root.traverse((o) => { if (o.isMesh) { o.material = mt; o.renderOrder = ro; } });
+      m.root.visible = false;
+      this.scene.add(m.root);
+      return m;
+    };
+    const g = [[700, -650, 0.9], [1300, 600, 0.95], [1900, -150, 0.85]].map(([dx, dz, sc], i) => ({ m: one(mat, 11), d: one(pre, 10), dx, dz, s: sc, ph: i * 7, i }));
+    return { g, mat, a: 0 };
   }
   // 臘腸狗：長長長臘腸（前半身往前推、中間拉長；拉的時候轉成正側面，不然會往鏡頭伸）、甩耳旋風耳朵往外甩、鑽褲襠揚土、埋骨頭扒土
   dogFx(S, p, v, m) {
@@ -760,7 +844,7 @@ export class View {
     b.position.set(x, 1, 0);
     this.scene.add(b);
     const was = this.fighters.map((f) => f.beam.visible);
-    for (const f of this.fighters) { f.beam.visible = f.tip.visible = true; for (const s of f.stars) s.visible = true; }
+    for (const f of this.fighters) { f.beam.visible = true; for (const s of f.stars) s.visible = true; }
     fx.update(0);             // 粒子填進表裡，這一次才畫得到
     const rt = new THREE.WebGLRenderTarget(16, 16);
     this.renderer.setRenderTarget(rt);
@@ -768,7 +852,7 @@ export class View {
     this.renderer.setRenderTarget(null);
     rt.dispose();
     this.scene.remove(b);
-    this.fighters.forEach((f, i) => { f.beam.visible = was[i]; f.tip.visible = false; for (const s of f.stars) s.visible = false; });
+    this.fighters.forEach((f, i) => { f.beam.visible = was[i]; for (const s of f.stars) s.visible = false; });
     fx.update(99);            // 剛剛放的全部收掉
     fx.list = keep;
   }
@@ -815,11 +899,9 @@ function spring(s, dt, w, z) {
 
 // 雜兵（闖關）：照角色的模型，顏色往深紫的影子壓六成，一眼看得出不是本尊
 const SHADE = new THREE.Color('#251d3d');
+const shadeTo = new THREE.Color();
 function shade(root) {
-  root.traverse((o) => {
-    if (!o.isMesh || !o.material?.isMeshToonMaterial) return;
-    o.material = toon('#' + o.material.color.clone().lerp(SHADE, 0.62).getHexString());
-  });
+  repaint(root, (h) => '#' + shadeTo.set('#' + h).lerp(SHADE, 0.62).getHexString(), 'shade');
 }
 
 // 飛行道具的球（半徑 1，view 照判定框縮放）：角色表的 shot [主色, 中間那條帶子的顏色或 null]
@@ -830,14 +912,14 @@ function arrowMesh([c, wood]) {
   k.box(1.0, 0.045, 0.045, wood || '#6a4a2a', 0, 0, 0);
   k.cone(0.075, 0.22, '#c8ced4', 0.58, 0, 0, { rz: -Math.PI / 2 });
   for (const rx of [0.6, -0.6]) k.box(0.2, 0.11, 0.015, c, -0.42, 0, 0, { rx, line: false });
-  return g;
+  return merge({ root: g }).root;
 }
 function ballMesh([c, band]) {
   const g = new THREE.Group();
   const k = kit(g);
   k.ball(1, c, 0, 0, 0);
   if (band) k.ball(1.01, band, 0, 0, 0, { sy: 0.32, line: false });
-  return g;
+  return merge({ root: g }).root;
 }
 // 往白靠一半：特效的亮色
 const lighten = (c) => '#' + new THREE.Color(c).lerp(new THREE.Color('#ffffff'), 0.55).getHexString();

@@ -5,7 +5,7 @@
 import { Z_REACH, DIZZY, KNOCK, BREAK, MP, MP_GAIN, BODY_V, PUSH_Z, BD, JD_WIN, JD_WIN_Q, JD_LOCK, JD_RECOIL, JD_PUSH, JD_STOP, GANG_T } from './const.js';
 import { CHARS, MOVES } from './chars/index.js';
 import { moveOf, strikeInv, isUnder, setAct, release, startMove, GUARD_MIN, crackBoom, grabStart } from './fighter.js';
-import { itemHits, wear, dropItem } from './item.js';
+import { itemHits, wear, dropItem, wallBlocks } from './item.js';
 import { WEAR_HIT, WPN_KNOCK } from './items.js';
 import { hitBoxes } from './moves.js';
 
@@ -142,6 +142,14 @@ function applyHit(S, a, d, h, kind, fromX, isProj, m = null) {
     S.ev.push({ k: 'hit', s: a.i, d: d.i, x: ex, y: ey, z: ez, big: 0, dmg: h.dmg, combo: 1, kind, stop: h.stop, armor: 1 });
     return;
   }                        // 被抓的或在抓人的被打，手就鬆了
+  // 霸體（招式的 armor，鼻象）：那段時間挨輕的普通拳不停招，血照扣
+  const dm = d.act === 'atk' ? moveOf(d) : null;
+  if (dm && dm.armor && d.t >= dm.armor[0] && d.t <= dm.armor[1] && kind === 'n' && !isProj && !h.kd && h.fall < ARMOR_FALL && d.hp > h.dmg) {
+    d.hp -= h.dmg; d.lh = a.i; d.lhT = S.f; d.lhN = d.H.n;
+    a.stop = h.stop; a.con = 1; d.stop = 2;
+    S.ev.push({ k: 'hit', s: a.i, d: d.i, x: ex, y: ey, z: ez, big: 0, dmg: h.dmg, combo: 1, kind, stop: h.stop, armor: 1 });
+    return;
+  }
   // 被圍：不同的人接著打你，倒值只會讓你倒地、不會頭暈
   const gang = d.lh >= 0 && d.lh !== a.i && S.f - d.lhT < GANG_T;
   d.lh = a.i; d.lhT = S.f; d.lhN = d.H.n;
@@ -236,8 +244,12 @@ export function resolveHits(S, booms = []) {
   for (const a of S.p) {
     const m = moveOf(a);
     if (!m) continue;
-    for (const [i, h] of activeHits(a)) {
-      const hbs = hitBoxes(m, h, a.t, a.sf).map((b) => box(a, b)), zr = h.zr || Z_REACH, az = a.z + (m.aim ? a.az : 0);
+    // 集氣的近身招（象腳踏地）：框和傷害照集了多少變大，集滿 1.5 倍
+    const cs = m.charge && !m.proj && a.chg ? 100 + ((a.chg * 50) / m.charge.max | 0) : 100;
+    const grow = (b) => (cs === 100 ? b : [(b[0] * cs / 100) | 0, b[1], (b[2] * cs / 100) | 0, b[3]]);
+    for (const [i, h0] of activeHits(a)) {
+      const h = cs === 100 ? h0 : { ...h0, dmg: (h0.dmg * cs / 100) | 0 };
+      const hbs = hitBoxes(m, h, a.t, a.sf).map((b) => box(a, grow(b))), zr = (((h.zr || Z_REACH) * cs) / 100) | 0, az = a.z + (m.aim ? a.az : 0);
       for (const hb of hbs) atk.push([a, hb]);
       for (const d of S.p) {
         if (d.team === a.team || !hittable(d)) continue;
@@ -248,10 +260,12 @@ export function resolveHits(S, booms = []) {
     }
   }
   for (const [a, d, h, kind, i, m] of found) {
+    if (h.skip !== undefined && a.hitList.includes(h.skip * 16 + d.i)) continue;   // 裡圈打過的，外圈不再打
     a.hitList.push(i * 16 + d.i);
     if (!hittable(d)) continue;          // 同一幀被兩個人打，第一下打倒了就不再算
-    if (h.grab) {                        // 指令投：擋不住；空中、倒地、已經被抓的抓不到；一次只抓一個
-      if (d.air || d.hold >= 0 || a.hold >= 0 || a.mv !== m.id || d.act === 'fall' || d.act === 'down' || d.act === 'getup') continue;
+    if (h.grab) {                        // 指令投：擋不住；倒地、已經被抓的抓不到；一次只抓一個。grab 1 只抓地上的，grab 2 只抓空中的（會飛的浮著也算）
+      const up = d.air || d.y > 0;
+      if ((h.grab === 2 ? !up : up) || d.hold >= 0 || a.hold >= 0 || a.mv !== m.id || d.act === 'fall' || d.act === 'down' || d.act === 'getup') continue;
       grabStart(S, a, d);
       startMove(S, a, MOVES[a.ch][m.then]);
       a.hold = d.i;
@@ -277,6 +291,7 @@ export function resolveHits(S, booms = []) {
       }
     }
   }
+  wallBlocks(S, pr);                                   // 岩塊擋下來的先消掉
   for (const q of pr) {
     if (q.life <= 0 || q.wt) continue;                  // 腳下還在亮（火焰爆擊）的打不到人
     if (q.gr || q.bt) { crackHits(S, q); continue; }

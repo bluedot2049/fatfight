@@ -393,7 +393,9 @@ export function bubbleMesh() {
   return g;
 }
 
-// 超必殺的浪：一長條往前流的光帶
+// 超必殺的浪：一長條往前流的光帶。一整條網格（不是兩塊方板接起來），高度照 sim 的打擊框現算：
+// 浪身到浪頭中間順順降下去，前後兩端淡掉（疊加混色，頂點色變暗＝變透明）
+const BEAM_N = 40;
 export function beamMesh(color) {
   const c = document.createElement('canvas');
   c.width = 256; c.height = 64;
@@ -408,9 +410,36 @@ export function beamMesh(color) {
   g.fillStyle = grd; g.fillRect(0, 0, 256, 64);
   const t = new THREE.CanvasTexture(c);
   t.wrapS = THREE.RepeatWrapping;
-  t.repeat.set(3, 1);
-  const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: t, color, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+  const geo = new THREE.BufferGeometry();
+  const idx = [];
+  for (let i = 0; i < BEAM_N - 1; i++) { const a = i * 2; idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); }
+  geo.setIndex(idx);
+  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(BEAM_N * 6), 3));
+  geo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(BEAM_N * 4), 2));
+  geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(BEAM_N * 6), 3));
+  const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: t, color, vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+  m.frustumCulled = false;
   return m;
+}
+
+// 照打擊框（sim 單位、角色朝右）擺浪：bs 一格＝整條一樣高；兩格＝浪身、浪頭，接縫附近順順降下去。
+// mesh 放在角色腳下，scale.x 用 face 翻面；u 是 sim 單位換公尺，wob 是浪高的抖動
+export function shapeBeam(mesh, bs, u, wob) {
+  const g = mesh.geometry, P = g.attributes.position.array, UV = g.attributes.uv.array, Cl = g.attributes.color.array;
+  const x0 = bs[0][0], x1 = bs[bs.length - 1][2], bot = bs[0][1], top0 = bs[0][3];
+  const near = bs.length > 1 ? bs[1][0] : x1, top1 = bs.length > 1 ? bs[1][3] : top0;
+  const ramp = Math.min(900, (x1 - x0) * 0.3), fadeB = Math.min(350, (x1 - x0) * 0.2), fadeF = Math.min(600, (x1 - x0) * 0.25);
+  const ss = (a, b, x) => { const k = Math.max(0, Math.min(1, (x - a) / (b - a))); return k * k * (3 - 2 * k); };
+  for (let i = 0; i < BEAM_N; i++) {
+    const x = x0 + ((x1 - x0) * i) / (BEAM_N - 1);
+    const top = top0 + (top1 - top0) * ss(near - ramp * 0.5, near + ramp * 0.5, x);
+    const h = (top - bot) * wob, a = ss(x0, x0 + fadeB, x) * ss(x1, x1 - fadeF, x);
+    const j = i * 6;
+    P[j] = P[j + 3] = x * u; P[j + 1] = bot * u; P[j + 4] = (bot + h) * u; P[j + 2] = P[j + 5] = 0;
+    UV[i * 4] = UV[i * 4 + 2] = x * u * 0.9; UV[i * 4 + 1] = 0; UV[i * 4 + 3] = 1;
+    Cl[j] = Cl[j + 1] = Cl[j + 2] = Cl[j + 3] = Cl[j + 4] = Cl[j + 5] = a;
+  }
+  g.attributes.position.needsUpdate = g.attributes.uv.needsUpdate = g.attributes.color.needsUpdate = true;
 }
 
 // 地上一圈（火焰爆擊的預告）：貼地的環，view 自己縮放、自己收

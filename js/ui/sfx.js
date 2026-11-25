@@ -299,13 +299,14 @@ KIT.dog = {
 // shot＝飛行道具出手那一聲（沒寫的用通用的泡泡聲）；雜兵沒有超必殺，super 用 mobSuper 墊著
 const mobSuper = (t) => { rumble(t, 0.5, 0.4, 100, 1); boom(t + 0.5, 0.8); };
 
-// 鼻象：號角、踏地、水。厚、慢、響
+// 鼻象：號角、踏地、土石。厚、慢、響
 KIT.elephant = {
   sp: {
     trunk(t) { noise(t, 0.16, 400, 1.3, 0.3, 'bandpass', 2600); trumpet(t + 0.04, 0.6, 260); },
     stomp(t) { trumpet(t, 0.5, 180); tone(t + 0.2, 0.3, 90, 35, 0.7); rumble(t + 0.2, 0.5, 0.5, 110); },
-    spray(t) { noise(t, 0.12, 300, 1, 0.3, 'lowpass', 1400, 0.12); surf(t + 0.12, 0.5, 0.8); bloops(t + 0.15, 5, 320); },
-    uptrunk(t) { trumpet(t, 0.9, 300); noise(t, 0.2, 500, 1.2, 0.25, 'bandpass', 3200); },
+    rock(t) { noise(t, 0.3, 220, 0.8, 0.4, 'lowpass', 600, 0.2); rumble(t, 0.3, 0.45, 80); tone(t + 0.2, 0.14, 160, 50, 0.55); noise(t + 0.2, 0.18, 1400, 1, 0.3, 'bandpass', 500); trumpet(t + 0.22, 0.35, 230); },   // 鼻子插進土裡拔起來：土裂開、悶悶一聲、短號角
+    skygrab(t) { trumpet(t, 0.7, 340); noise(t, 0.22, 600, 1.2, 0.25, 'bandpass', 3600); },                                // 鼻子往上撈：號角往上衝
+    trunkS(t) { for (let i = 0; i < 3; i++) noise(t + i * 0.16, 0.14, 500, 1.4, 0.3, 'bandpass', 1800); trumpet(t + 0.1, 0.5, 280); },   // 掄人：呼、呼、呼
   },
   super(t) {
     trumpet(t, 1.1, 220); trumpet(t + 0.22, 0.8, 330);

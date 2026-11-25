@@ -10,37 +10,40 @@ const THR = 0.002;      // 前後差多少開始有線（公尺）。調高：�
 const THR2 = 0.02;      // 差到這麼多線就全粗，中間變細（手臂沒入身體那頭線會自己收尖）
 const FAR = 64;         // 深度存 16 位元、0～64 公尺
 
-// 編號圖：r＝編號低位、a＝編號高位、g b＝深度
-const idVert = `varying float vz;
-  void main() { vec4 mv = modelViewMatrix * vec4(position, 1.0); vz = -mv.z; gl_Position = projectionMatrix * mv; }`;
+// 編號圖：r＝編號低位、a＝編號高位、g b＝深度。全部共用一個材質，畫每一個之前把那個的編號放進去（material.onBeforeRender）。
+// 合併過的網格（kit.js merge）裡描邊殼和沒描邊的裝飾（ink ≠ 0）縮成一點不畫：描邊不算肉，裝飾要看穿
+const idVert = `attribute float ink; varying float vz;
+  void main() {
+    if (abs(ink) > 0.5) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
+    vec4 mv = modelViewMatrix * vec4(position, 1.0); vz = -mv.z; gl_Position = projectionMatrix * mv;
+  }`;
 const idFrag = `uniform vec2 id; varying float vz;
   void main() {
     float v = floor(clamp(vz / ${FAR.toFixed(1)}, 0.0, 1.0) * 65535.0);
     gl_FragColor = vec4(id.x, floor(v / 256.0) / 255.0, mod(v, 256.0) / 255.0, id.y);
   }`;
-const idMat = (n) => new THREE.ShaderMaterial({
-  uniforms: { id: { value: new THREE.Vector2((n & 255) / 255, (n >> 8) / 255) } },
-  vertexShader: idVert, fragmentShader: idFrag, side: THREE.DoubleSide,
-});
-const OCC = idMat(0);   // 擋在前面的別的東西：編號 0，線不畫在它上面
+const NONE = new THREE.Vector2();      // 擋在前面的別的東西：編號 0，線不畫在它上面
+const ID = new THREE.ShaderMaterial({ uniforms: { id: { value: new THREE.Vector2() } }, vertexShader: idVert, fragmentShader: idFrag, side: THREE.DoubleSide });
+ID.defaultAttributeValues = { ...ID.defaultAttributeValues, ink: [0] };     // 沒有 ink 的網格（地上的東西）讀到 0，不會吃到別支著色器留下的值
+ID.onBeforeRender = (r, s, c, g, o) => { ID.uniforms.id.value.copy(o.userData.inkId || NONE); ID.uniformsNeedUpdate = true; };
 
 let next = 1;
-const fresh = () => { const m = idMat(next); next = next >= 65535 ? 1 : next + 1; return m; };
+const fresh = () => { const v = new THREE.Vector2((next & 255) / 255, (next >> 8) / 255); next = next >= 65535 ? 1 : next + 1; return v; };
 // 角色建好之後叫一次：每個關節底下的零件拿同一個編號；上身、臘腸狗中間那截跟身體同一號（都算一層肉）
 export function tagInk(m) {
   const same = [m.J.upper, m.stretch?.mid];
-  const walk = (o, mat) => {
-    if (o.userData.joint && !same.includes(o)) mat = fresh();
-    if (o.isMesh && !o.userData.hull && mat) o.userData.inkMat = mat;
-    for (const c of o.children) walk(c, mat);
+  const walk = (o, id) => {
+    if (o.userData.joint && !same.includes(o)) id = fresh();
+    if (o.isMesh && !o.userData.hull && id) o.userData.inkId = id;
+    for (const c of o.children) walk(c, id);
   };
   walk(m.root, null);
   return m;
 }
 // 一整個東西一個編號（地上的東西、拿在手上的武器）
 export function tagInkAll(g) {
-  const mat = fresh();
-  g.traverse((o) => { if (o.isMesh && !o.userData.hull) o.userData.inkMat = mat; });
+  const id = fresh();
+  g.traverse((o) => { if (o.isMesh && !o.userData.hull) o.userData.inkId = id; });
   return g;
 }
 
@@ -89,7 +92,8 @@ export class InkLines {
     this.hide = [];
   }
   // 畫完場景之後叫：vp＝這次畫的範圍（畫布的實際像素、左下角起算）；畫布目前的 viewport 要已經是同一塊。
-  // keep：只畫場景最上層的這幾個（角色、地上的東西、飛行道具），場地整個跳過（場地大，再畫一次太貴）
+  // keep：只畫這幾個（角色、地上的東西、飛行道具），一個一個畫，場地整個跳過（場地大，再畫一次太貴）。
+  //   不用「把場地藏起來再畫整個場景」：場地的燈跟著藏，燈的組合一變，下一幀主畫面每個有打光的材質都要重挑一次著色器
   draw(scene, camera, vp, keep = null) {
     const r = this.r, rt = this.rt;
     r.getDrawingBufferSize(tmp);
@@ -97,18 +101,16 @@ export class InkLines {
     rt.viewport.set(vp[0], vp[1], vp[2], vp[3]);
     rt.scissor.copy(rt.viewport);
     rt.scissorTest = true;
-    // 換材質：角色零件換成自己的編號、別的實心東西當擋板；透明的、描邊殼、沒描邊的裝飾先藏起來
+    // 換材質：角色零件換成編號圖、別的實心東西當擋板；透明的、描邊殼、沒描邊的裝飾先藏起來
     const swap = this.swap, hide = this.hide;
-    if (keep) for (const o of scene.children) if (o.visible && !keep.has(o)) hide.push(o);
-    for (const o of hide) o.visible = false;
-    scene.traverseVisible((o) => {
+    const sort = (o) => {
       if (!(o.isMesh || o.isPoints || o.isLine || o.isSprite)) return;
       if (o.userData.deco) hide.push(o);
-      else if (o.userData.inkMat) swap.push(o, o.material, o.userData.inkMat);
-      else if (o.isMesh && !o.isInstancedMesh && !o.userData.hull && !Array.isArray(o.material) && !o.material.transparent && o.material.depthWrite !== false) swap.push(o, o.material, OCC);
+      else if (o.userData.inkId || (o.isMesh && !o.isInstancedMesh && !o.userData.hull && !Array.isArray(o.material) && !o.material.transparent && o.material.depthWrite !== false)) swap.push(o, o.material);
       else hide.push(o);
-    });
-    for (let i = 0; i < swap.length; i += 3) swap[i].material = swap[i + 2];
+    };
+    if (keep) { for (const o of keep) o.traverseVisible(sort); } else scene.traverseVisible(sort);
+    for (let i = 0; i < swap.length; i += 2) swap[i].material = ID;
     for (const o of hide) o.visible = false;
     const bg = scene.background, prev = r.getRenderTarget(), ca = r.getClearAlpha(), ac = r.autoClear;
     r.getClearColor(cc);
@@ -117,11 +119,18 @@ export class InkLines {
     r.setRenderTarget(rt);
     r.setClearColor(0x000000, 0);
     r.clear(true, true, false);
-    r.render(scene, camera);
+    if (keep) {
+      for (const o of keep) {
+        if (!o.visible) continue;
+        o.matrixWorldAutoUpdate = false;            // 主畫面剛算過
+        r.render(o, camera);
+        o.matrixWorldAutoUpdate = true;
+      }
+    } else r.render(scene, camera);
     r.setRenderTarget(prev);
     r.setClearColor(cc, ca);
     scene.background = bg;
-    for (let i = 0; i < swap.length; i += 3) swap[i].material = swap[i + 1];
+    for (let i = 0; i < swap.length; i += 2) swap[i].material = swap[i + 1];
     for (const o of hide) o.visible = true;
     swap.length = 0; hide.length = 0;
     // 疊上去
