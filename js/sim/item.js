@@ -94,6 +94,13 @@ function take(S, f, q) {
   S.ev.push({ k: 'ipick', id: q.id, s: f.i, ik: q.k });
 }
 
+// 現在按蹲撿得到什麼（給畫面看：手機的蹲鈕改寫撿／舉）。只讀，0＝沒有、1＝撿、2＝舉
+export function pickKind(S, f) {
+  if (f.item >= 0) return 0;
+  const q = underfoot(S, f, 0);
+  return !q ? 0 : catOf(q.k) === 2 ? 2 : 1;
+}
+
 // 按蹲：腳邊有東西就撿（重物舉起來）。回傳有沒有撿
 export function pickTry(S, f, startMove, MOVES) {
   if (f.item >= 0) return false;

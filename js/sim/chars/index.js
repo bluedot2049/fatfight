@@ -14,6 +14,7 @@ import dwarf from './dwarf.js';
 import elephant from './elephant.js';
 import penguin from './penguin.js';
 import dog from './dog.js';
+import bear from './bear.js';
 import fox from './fox.js';
 import owl from './owl.js';
 import boar from './boar.js';
@@ -27,7 +28,7 @@ import { SYS } from '../moves.js';
 import { ITEM_MOVES } from '../items.js';
 import { TRAP_MOVES } from '../traps.js';
 
-export const ALL = [manatee, marmot, elephant, penguin, dog, sealion, hammer, squid, frog, mushroom, moss, dwarf, fox, owl, boar, warrior, archer, mage, robot, worker, alien];
+export const ALL = [manatee, marmot, elephant, penguin, dog, bear, sealion, hammer, squid, frog, mushroom, moss, dwarf, fox, owl, boar, warrior, archer, mage, robot, worker, alien];
 export const ROSTER = ALL.filter((c) => !c.npc);
 export const CHARS = Object.fromEntries(ALL.map((c) => [c.id, c]));
 

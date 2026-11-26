@@ -42,6 +42,7 @@ export function newFighter(ch, i, team, x, face) {
     dz: 0,                        // 這套連打裡暈過了（回到能動之前不再暈，打到倒值滿就倒地）
     packI: -1, packF: -9999,      // 闖關：一起上的頭目（營火三冒險者）現在誰帶頭打我、從第幾幀起（ai.js packTok）
     tokF: -9999,                  // 闖關：敵人上一次拿到打我的攻擊權是第幾幀（ai.js 輪流上）
+    pv: 0,                        // 被動的計時（爛熊的烏鴉，角色表 crow）
     H: newHistory(),
   };
 }
@@ -305,6 +306,28 @@ export function think(S, f, noInput) {
   if (want === 'walk') grabTry(S, f);
 }
 
+// 被動（角色表 crow，爛熊）：每 every 幀從最近的敵人背後飛來一群烏鴉，穿過去、每人打一次（從背後來，擋不住；不痛，打斷人）。
+// 倒地、出局的時候不算；KO 之後不飛
+export function crowStep(S, ko) {
+  if (ko) return;
+  for (const f of S.p) {
+    const K = CHARS[f.ch].crow;
+    if (!K || f.hp <= 0 || f.gone || f.act === 'ko') continue;
+    if (f.pv < K.every) { f.pv++; continue; }
+    let o = null, bd = 1e9;
+    for (const e of S.p) {
+      if (e.team === f.team || e.hp <= 0 || e.gone || e.act === 'down' || e.act === 'ko') continue;
+      const d = Math.abs(e.x - f.x) + Math.abs(e.z - f.z);
+      if (d < bd) { bd = d; o = e; }
+    }
+    if (!o) continue;                                   // 沒有站著的敵人：等到有再飛
+    f.pv = 0;
+    const dir = o.face, x = Math.max(S.lo - 500, Math.min(S.hi + 500, o.x - dir * K.far));
+    S.pr.push({ o: f.i, team: f.team, x, y: K.y, z: o.z, vx: dir * K.v, w: K.w, h: K.h, dmg: K.dmg, fall: K.fall, big: 0, life: K.life, t: 0, id: S.pid++, mv: 'crow', pierce: 1, hl: [], look: 'crow' });
+    S.ev.push({ k: 'crow', s: f.i, x, z: o.z });
+  }
+}
+
 // 走（或跑）進頭暈的人就抓住
 function grabTry(S, f) {
   if (!dirX(f.H)) return false;
@@ -542,7 +565,18 @@ function atkStep(S, f, C) {
       q.x = Math.max(S.lo, Math.min(S.hi, q.x));
       q.y = 0; q.vx = 0; q.aim = 1; q.wt = p.aim.wait; q.bt = 0; q.hl = []; q.life = p.aim.wait + 1;
     }
-    S.pr.push(q);
+    if (p.look) q.look = p.look;
+    if (p.grow) q.gw = p.grow;
+    if (p.fan) {
+      // 好幾個方向各一支（苦無）：往前那支照 face，往前後的照 fan 的第二格；curl 的每支錯開
+      p.fan.forEach(([fx, fz], j) => {
+        const e = j ? { ...q, id: S.pid++ } : q;
+        e.vx = ((p.vx * fx) / 1000 | 0) * f.face; e.vz = (p.vx * fz) / 1000 | 0;
+        e.x = f.x + ((f.face * p.x * fx) / 1000 | 0); e.z = f.z + ((p.x * fz) / 1000 | 0);
+        if (p.curl) e.cu = j;
+        S.pr.push(e);
+      });
+    } else S.pr.push(q);
     S.ev.push({ k: 'proj', s: f.i, n: f.ext, big, gr: p.gr ? 1 : 0, lob: p.lob ? 1 : 0, aim: p.aim ? 1 : 0, pierce: p.pierce ? 1 : 0, x: q.x, z: q.z });
     f.chg = 0;
   }

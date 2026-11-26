@@ -272,11 +272,8 @@ export function selectScreen({ mode, side = 0, coop = false, done, back, onPick,
 }
 
 // 觸控的按法跟鍵盤不一樣的那幾條（照 SYS_LIST 的指令那欄對）：菱形＝旁邊兩顆一起按
-const TOUCH_SYS = {
-  '→→': ['搖桿推到外圈', '跑（放開就停；撥兩下也可以）'], '攻跳 同按': ['攻◆跳', '吹飛（打飛很遠）'], '跳防 同按': ['防◆跳', '翻滾（往推著的方向）'],
-  '蹲＋攻': ['蹲→攻', '下段攻擊（蹲滑到攻、或蹲放開馬上按攻），打到再按攻接短手、再按掃腿'],
-};
-const sysList = () => (device.touch ? SYS_LIST.map((r) => TOUCH_SYS[r[0]] || r) : SYS_LIST);
+const TOUCH_SYS = { '→→': ['搖桿推到底', '跑'], '攻跳 同按': ['攻◆跳', '吹飛'], '跳防 同按': ['防◆跳', '翻滾'], '蹲＋攻': ['蹲→攻', '下段'] };
+const sysList = () => (device.touch ? SYS_LIST.map(([t, rows]) => [t, rows.map((r) => TOUCH_SYS[r[0]] || r)]) : SYS_LIST);
 
 // 招式表：上面一排頭像（選角卡上每隻一格＋共通），一次看一頁；cur＝先開哪隻（對戰中是自己那隻）。換頁用 moveListTab
 export function moveListHtml(cur) {
@@ -288,10 +285,10 @@ export function moveListHtml(cur) {
   const page = (id, html, style = '') => `<section data-page="${id}" style="${style}"${id === at ? '' : ' hidden'}>${html}</section>`;
   return `<div class="movelist"><nav class="mtabs">${tabs}${device.touch ? '' : `<small class="hint">${kbd(k0('left'), k0('right'))} 換</small>`}</nav>${ROSTER.map((c) => page(c.id, `
       <h3><i class="gem"></i>${c.full}</h3>
-      <table><tr><th colspan="3">${device.touch ? '必殺技（→ 是左或右，往哪邊推就往哪邊出）' : '必殺技（→ 是面向的方向，往左按 ← 就往左出）'}</th></tr>${c.specials.map(row).join('')}
+      <table><tr><th colspan="3">必殺技（→＝左右皆可）</th></tr>${c.specials.map(row).join('')}
       <tr><th colspan="3">超必殺技</th></tr>${c.supers.map(row).join('')}</table>`, palStyle(c.id))).join('')}
-    ${page('sys', `<h3><i class="gem"></i>共通</h3><div class="sysgrid">${sysList().map(([c, n]) => `<div><span class="cmd"><b>${withKeys(c)}</b></span><span>${n}</span></div>`).join('')}</div>
-    <p class="foot">${device.touch ? '必殺：搖桿推著方向，防接著按攻或跳（拇指從防滑過去也可以）。◆ 是兩顆中間的菱形，按它＝兩顆一起按。' : '指令照順序按，不用同時按。'}魔力會自己慢慢回，血少時回得快。</p>`)}
+    ${page('sys', `<h3><i class="gem"></i>共通</h3><div class="sysgrid">${sysList().map(([t, rows]) => `<section><h4>${t}</h4>${rows.map(([c, n]) => `<div><span class="cmd"><b>${withKeys(c)}</b></span><span>${n}</span></div>`).join('')}</section>`).join('')}</div>
+    <p class="foot">${device.touch ? '必殺：推方向，依序按防、攻或跳（可從防滑過去）。◆＝兩鍵同按。' : '指令依序輸入，不需同按。'}魔力自動回復，體力低時較快。</p>`)}
   </div>`;
 }
 // 招式表換頁：to＝往左右幾格（-1、1，繞一圈），或頁的名字（點頭像）。root 裡沒有招式表就回 false

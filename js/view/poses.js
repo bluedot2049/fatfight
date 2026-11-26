@@ -174,6 +174,15 @@ Object.assign(ATK, {
     runS: { w: { sq: -0.25, lean: 0.15 }, s: { sq: -0.42, by: -0.16, lean: 0.15, head: 0.2, aN: 1.4, aF: 1.4, lN: -1.0, lF: -1.0 } },   // 滑行：前腳往前、後腳往後，整條貼地竄
     longdog: { w: { lean: -0.15, head: -0.45 }, s: { head: 0.15, aN: 0.5, aF: 0.5 } },
   },
+  bear: { ...GEN,
+    sD: { w: { spin: -0.6, aN: 0.6 }, s: { spin: 2.6, aN: 1.5, aNz: 0.7, lean: 0.12 } },                // 迴旋熊掌：轉一圈甩掌
+    spread: { w: { lean: 0.35, sq: -0.15 }, s: { lean: 1.35, by: 0.3, aN: 0.3, aF: 0.3, aNz: 1.3, aFz: 1.3, head: -0.6, lN: -0.3, lF: -0.3 } },   // 大字滑：趴平、手腳張開（身體墊高，不然轉到地板下面描邊會透出來）
+    kunai: { w: { aN: 2.3, aF: 2.1, aNz: -0.4, aFz: -0.4, spin: -0.35, sq: -0.08, head: 0.1 }, s: { aN: 1.3, aF: 1.3, aNz: 1.7, aFz: 1.7, spin: 0.45, lean: 0.1, sq: 0.05 } },   // 兩手交叉舉高 → 往兩邊一甩撒出去
+    genjutsu: { w: { aN: 1.4, aNz: -0.35, head: 0.15, lean: -0.05 }, s: { aN: 1.75, aNz: -0.55, head: -0.12, lean: 0.06 } },   // 一隻手舉到臉前、盯著看
+    kick: { w: { lN: 1.0, lean: -0.32, aN: 0.7, aF: 0.5, aNz: 0.3, sq: 0.04 }, s: { lN: 1.8, lean: -0.5, aN: 1.1, aF: -0.4, aNz: 0.7, bz: 0.08 } },   // 抬腳 → 一腳踹出去
+    fireball: { w: { sq: 0.1, head: -0.45, lean: -0.28, bend: -0.25, aN: 1.0, aF: 1.0, aNz: 0.4, aFz: 0.4 }, s: { head: 0.12, lean: 0.25, bend: 0.22, aN: 1.5, aF: 1.4, aNz: -0.3, aFz: -0.3, sq: -0.06 } },   // 吸一大口 → 往前噴
+    susanoo: { w: { sq: -0.1, aN: 0.4, aF: 0.4, head: 0.1 }, s: { aN: 0.35, aF: 0.35, aNz: 0.5, aFz: 0.5, head: -0.2, sq: 0.06 } },   // 站著不動，背後那隻在打
+  },
   dwarf: { ...GEN,
     chop: { w: { aN: 2.8, aF: 2.4, lean: -0.2, head: -0.2 }, s: { aN: 0.7, aF: 0.6, lean: 0.4, bend: 0.3 } },   // 鎬子從頭上劈下來
     uppick: { w: { aN: -0.4, sq: -0.25 }, s: { aN: 2.9, aF: 2.0, head: -0.35, sq: 0.15 } },
@@ -340,7 +349,7 @@ function attackPose(f, m, t, clock) {
   }
   // 撿、丟重物、喝（地上的東西；f.ik 是手上拿什麼，沒有道具的版本是 undefined）
   if (id === 'pick') {
-    const at = m.it.at, up = f.ik === 2 ? BASE.lift : BASE.idle;
+    const at = m.it ? m.it.at : m.total >> 1, up = f.ik === 2 ? BASE.lift : BASE.idle;   // 點炮（traps.js tFire）也借這個姿勢，沒有 it：彎下去點到一半再起來
     if (t < at) return mix(BASE.idle, BASE.pick, ease(t / at));
     return mix(BASE.pick, up, Math.min(1, (t - at) / Math.max(1, m.total - at)));
   }

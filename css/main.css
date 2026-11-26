@@ -353,6 +353,7 @@ body:not(:has(#menu.title:not([hidden]))) #a2hs { display: none; }   /* 沒按�
 .scard .art.rose { background: linear-gradient(170deg, rgba(255, 220, 235, .14) 0 8%, transparent 8% 14%, rgba(255, 220, 235, .08) 14% 18%, transparent 18%), radial-gradient(ellipse at 50% 28%, #ffc0d4 0, #c0507a 40%, #4a1430 75%, #1a0610 100%); }
 .scard .art.sky { background: linear-gradient(170deg, rgba(255, 255, 255, .14) 0 8%, transparent 8% 14%, rgba(255, 255, 255, .08) 14% 18%, transparent 18%), radial-gradient(ellipse at 50% 30%, #d8f0ff 0, #5aa8e0 38%, #1c4a7a 72%, #08182c 100%); }
 .scard .art.fire { background: linear-gradient(170deg, rgba(255, 230, 200, .14) 0 8%, transparent 8% 14%, rgba(255, 230, 200, .08) 14% 18%, transparent 18%), radial-gradient(ellipse at 50% 70%, #fff0b0 0, #ff6a2a 30%, #8a1a0a 62%, #1a0402 100%); }
+.scard .art.crow { background: linear-gradient(170deg, rgba(235, 220, 255, .12) 0 8%, transparent 8% 14%, rgba(235, 220, 255, .07) 14% 18%, transparent 18%), radial-gradient(circle at 68% 24%, #f4ecff 0 7%, rgba(201, 168, 255, .55) 9%, transparent 22%), radial-gradient(ellipse at 50% 40%, #8a62d8 0, #3e2478 40%, #180c34 75%, #07040f 100%); }   /* 爛熊：紫色夜空、一顆月亮 */
 .scard .art .mcircle { width: 92%; height: auto; color: rgba(255, 255, 255, .5); opacity: .55; animation-duration: 90s; }
 /* 羊皮紙說明欄 */
 .scard .desc { position: absolute; left: 14px; right: 14px; top: 326px; bottom: 12px; padding: 8px 12px 6px; display: flex; flex-direction: column; color: var(--brown); background: var(--noise), var(--parchbg); border: 1px solid #5a4424; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .55), inset 0 0 14px rgba(120, 80, 20, .25); }
@@ -429,6 +430,8 @@ body:not(:has(#menu.title:not([hidden]))) #a2hs { display: none; }   /* 沒按�
 .cmd b { font-size: 1.2em; letter-spacing: .05em; }
 .cmd small { font-size: .7em; color: var(--dim); margin-left: 2px; }
 .movelist .sysgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px 24px; }
+.movelist .sysgrid section { display: flex; flex-direction: column; gap: 6px; }
+.movelist .sysgrid h4 { margin: 0 0 2px; padding: 10px 0 4px; font-weight: 500; font-size: 12px; color: var(--dim); border-bottom: 1px solid rgba(210, 181, 122, .22); }
 .movelist .sysgrid div { display: flex; gap: 12px; align-items: baseline; }
 .movelist .sysgrid div span:last-child { color: var(--dim); font-size: 14px; }
 .keyhelp { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 36px; }
@@ -474,6 +477,16 @@ body:not(:has(#menu.title:not([hidden]))) #a2hs { display: none; }   /* 沒按�
 #hud .pops .pop.on { display: block; }
 #hud .thint { position: absolute; left: 0; top: 0; translate: -50% -100%; padding: 3px 12px 2px; font-size: 16px; font-weight: 700; letter-spacing: .1em; color: var(--ivoryc); background: rgba(13, 10, 12, .82); border: 1px solid #b9a06a; border-radius: 3px; opacity: 0; transition: opacity .2s; white-space: nowrap; }
 #hud .thint.on { opacity: 1; }
+/* 撿東西的提示（頭上）：電腦＝小鍵帽＋一個字，手機＝一顆跟蹲鈕一樣發亮的小圓鈕 */
+#hud .pcue { position: absolute; left: 0; top: 0; translate: -50% -100%; display: flex; align-items: center; gap: 5px; padding: 2px 8px 2px 3px; pointer-events: none; white-space: nowrap;
+  font-size: 14px; font-weight: 700; line-height: 1; letter-spacing: .06em; color: var(--ivoryc); text-shadow: 0 1px 0 #000;
+  background: rgba(13, 10, 12, .82); border: 1px solid #b9a06a; border-radius: 999px; box-shadow: 0 2px 6px rgba(0, 0, 0, .5); opacity: 0; transition: opacity .1s; }
+#hud .pcue.on { opacity: 1; }
+#hud .pcue kbd { min-width: 18px; padding: 2px 4px; font: 700 12px/1 'Cinzel', serif; text-align: center; color: #1a1210; background: linear-gradient(#f4e6c0, #c7a565); border-radius: 3px; box-shadow: 0 1px 0 #4a3416; }
+#hud .pcue.touch { padding: 0; background: none; border: 0; box-shadow: none; }
+#hud .pcue.touch b { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; font-size: 14px; color: color-mix(in srgb, var(--gem) 45%, #fff);
+  border: 1.5px solid transparent; background: radial-gradient(circle at 50% 30%, rgba(62, 46, 40, .9), rgba(13, 10, 12, .9) 72%) padding-box, var(--goldframe) border-box;
+  box-shadow: 0 0 0 1px #0a0604, 0 0 0 2px color-mix(in srgb, var(--gem) 60%, transparent), 0 0 8px var(--gem); }
 #hud .tide { position: absolute; left: 50%; top: 128px; translate: -50% 0; display: flex; align-items: center; gap: 12px; opacity: 0; transition: opacity .3s; }
 #hud .tide.on { opacity: 1; }
 #hud .tide.warn { animation: tideBlink .5s steps(2) infinite; }

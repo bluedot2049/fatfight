@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import { BUILD, recolor, aimTrunk } from './models.js';
 import { markOf, isAlt, footMark, placeMark } from './mark.js';
 import { poseOf, applyPose, ZERO } from './poses.js';
-import { FX, starSprite, bubbleMesh, beamMesh, shapeBeam, fireballMesh, ringMesh, soundMesh } from './fx.js';
+import { FX, starSprite, bubbleMesh, beamMesh, shapeBeam, fireballMesh, ringMesh, soundMesh, VIOLET } from './fx.js';
 import { Stage } from './stage.js';
 import { SeaStage } from './sea.js';
 import { TunnelStage } from './tunnel.js';
@@ -144,7 +144,7 @@ export class View {
       this.fighters[i] = this.make(p, key, m, alt);
     });
   }
-  drop(f) { this.scene.remove(f.model.root, f.shadow, f.beam, ...f.stars); if (f.herd) for (const g of f.herd.g) this.scene.remove(g.m.root, g.d.root); if (f.mark) this.scene.remove(f.mark.arc, ...(f.mark.lab ? [f.mark.lab] : [])); }
+  drop(f) { this.scene.remove(f.model.root, f.shadow, f.beam, ...f.stars); if (f.herd) for (const g of f.herd.g) this.scene.remove(g.m.root, g.d.root); if (f.ghost) this.scene.remove(f.ghost.m.root, f.ghost.d.root); if (f.mark) this.scene.remove(f.mark.arc, ...(f.mark.lab ? [f.mark.lab] : [])); }
   make(p, key, mk, alt) {
     const model = BUILD[p.ch]();
     if (p.mini && !CHARS[p.ch].npc) shade(model.root);
@@ -445,6 +445,7 @@ export class View {
         break;
       }
       case 'fizzle': if (e.fire) { this.fx.smoke(e.x * U, 0.1, z, 5); break; } else { const x = e.x * U; this.fx.dust(x, 0, 5, null, z); this.fx.shards(x, 0.1, ROCK, 4, 2, z); this.fx.bolts(x, 0.15, col(e.s), 1, 0.5, z); break; }
+      case 'crow': this.fx.shards(e.x * U, 1.0, '#2a2430', 8, 2.5, z); this.fx.glow(e.x * U, 1.0, '#9b6cff', 0.8, z, 0.2); break;   // 烏鴉從對手背後飛來（出發的地方掉幾根羽毛）
       case 'grab': { const p = S.p[e.s]; this.fx.spark((p.x + p.face * 300) * U, CHARS[p.ch].h * U * 0.6, 0, '#ffffff', p.z * U); break; }
       case 'dizzy': { const p = S.p[e.s]; this.fx.shards(p.x * U, CHARS[p.ch].h * U, '#ffe98a', 8, 2.5, p.z * U); break; }
       case 'land':
@@ -563,6 +564,7 @@ export class View {
     } else v.beam.visible = false;
     this.fireFx(S, p, v, m, C);
     this.dogFx(S, p, v, m);
+    this.bearFx(S, p, v, m);
     // 海牛吐舌頭：出必殺技時伸長一點
     if (v.model.tongue) v.model.tongue.scale.y = m && m.kind !== 'n' ? 1.5 : 1;
     // 舌頭、觸鬚（青蛙、鬚臉）：姿勢是 lash 的招，出手前 3 幀彈出去、打完 5 幀收回來；長度照打擊框最遠那格
@@ -607,6 +609,7 @@ export class View {
       live.add(q.id);
       let m = this.projs.get(q.id);
       if (q.gr) { this.crackFx(S, q, m); continue; }
+      if (q.look) { this.lookProj(S, q, m); continue; }          // 爛熊的苦無、大火球、烏鴉
       if (q.lob || q.aim) { this.fireProj(S, q, m); continue; }
       const shot = CHARS[S.p[q.o]?.ch]?.shot, ball = !!shot, arrow = ball && shot[2] === 'arrow';   // shot 第三格寫 'arrow' 的畫成一支箭（精靈弓箭手）
       if (q.pierce && !ball) { this.soundProj(S, q, m); continue; }
@@ -695,6 +698,111 @@ export class View {
         mm.root.scale.set(p.face * g.s, g.s, g.s);
       }
       if (run && v.fxT % 3 === g.i) this.fx.dust(g.m.root.position.x, 0, 1, null, g.m.root.position.z);
+    }
+  }
+  // 爛熊：幻術一道紫光沿著地板竄過去、竄到的那排人腳下亮一圈；豪火球起手嘴前一團火越吸越大；
+  // 須左能乎背後站起一隻大的紫色半透明爛熊（同一個模型）兩手輪流往下拍，全場地上冒紫火
+  bearFx(S, p, v, m) {
+    const id = m && (m.pose || m.id), x = p.x * U, z = p.z * U, dt = this.dt || 0.016;
+    if (id === 'genjutsu') {
+      const h = m.hits[0], a0 = h.on[0], key = S.f - p.t;
+      if (p.t >= 3 && p.t < a0) {
+        const k = (p.t - 3) / Math.max(1, a0 - 3), d = (h.box[0] + (h.box[2] - h.box[0]) * k) * U;
+        this.fx.groundRing(x + p.face * d, z, '#9b6cff', 0.9, 0.3);
+        if (v.fxT % 2 === 0) this.fx.speck(x + p.face * d, 0.1, '#2a2430', 1.2, z, -1);
+      }
+      if (p.t >= a0 && v.gjK !== key) {                 // 發動：那一排每個人腳下一圈、黑羽毛往上飄
+        v.gjK = key;
+        for (const o of S.p) {
+          if (o.team === p.team || o.hp <= 0 || o.gone === 2) continue;
+          const dx = (o.x - p.x) * p.face;
+          if (dx < h.box[0] || dx > h.box[2] + 400 || Math.abs(o.z - p.z) > h.zr) continue;
+          this.fx.groundRing(o.x * U, o.z * U, '#9b6cff', 2.2, 0.5); this.fx.groundRing(o.x * U, o.z * U, '#ffffff', 1.0, 0.3);
+          this.fx.motes(o.x * U, 0.3, '#c9a8ff', 6, o.z * U, 0.5); this.fx.shards(o.x * U, 0.4, '#2a2430', 10, 2.5, o.z * U);
+        }
+      }
+    }
+    if (id === 'fireball' && p.t < m.proj.at && v.fxT % 2 === 0) {
+      const k = p.t / m.proj.at, mx = x + p.face * 0.45;
+      this.fx.glow(mx, 1.0, '#ffb347', 0.3 + k * 1.3, z, 0.14);
+      this.fx.flame(mx, 1.0, z, 0.2 + k * 0.4, -p.face * 0.6, 0.3, 0.25);
+    }
+    if (id === 'kick' && p.t >= m.hits[0].on[0] && v.kkK !== S.f - p.t) { v.kkK = S.f - p.t; this.fx.dust(x - p.face * 0.2, 0, 5, null, z); }
+    // 須左能乎的大熊：開始那一下脹起來，打完縮回去
+    const on = id === 'susanoo';
+    v.gk = Math.max(0, Math.min(1, (v.gk || 0) + (on ? dt * 3.2 : -dt * 2.2)));
+    if (v.gk > 0 && !v.ghost) v.ghost = this.makeGhost(p);
+    if (!v.ghost) return;
+    const G = v.ghost, k = 1 - (1 - v.gk) * (1 - v.gk), sc = 2.2 * k;
+    G.mat.uniforms.a.value = v.gk * (0.85 + 0.15 * Math.sin(this.clock * 9));
+    const swing = on && p.t >= m.hits[0].on[0] - 3 ? Math.sin(this.clock * 13) : 0;
+    const pose = { ...ZERO, lean: 0.12 + 0.12 * Math.abs(swing), head: -0.1, aN: 1.6 + 1.2 * swing, aF: 1.6 - 1.2 * swing, aNz: 0.3, aFz: 0.3, sq: 0.03 * Math.sin(this.clock * 4) };
+    for (const mm of [G.m, G.d]) {
+      mm.root.visible = v.gk > 0.01;
+      applyPose(mm, pose);
+      mm.root.position.set(x - p.face * 0.8, -0.05, z - 1.5);
+      mm.root.scale.set(p.face * sc, sc, sc);
+    }
+    if (!on || v.gk < 0.3) return;
+    if (v.fxT % 2 === 0) this.fx.flame(x - p.face * 0.8 + (Math.random() - 0.5) * 2.0, 0.2 + Math.random() * 2.8 * k, z - 1.5, 0.9, 0, 1.2, 0.45, VIOLET);   // 大熊身上冒紫火
+    const a0 = m.hits[0].on[0] - 4, a1 = m.hits[m.hits.length - 1].on[1];
+    if (p.t < a0 || p.t > a1) return;
+    for (const o of S.p) {                               // 全場地上的敵人腳下冒紫火（跳起來的不冒：躲掉了）
+      if (o.team === p.team || o.hp <= 0 || o.gone === 2 || o.y > 400) continue;
+      for (let i = 0; i < 2; i++) this.fx.flame(o.x * U + (Math.random() - 0.5) * 0.9, 0.08, o.z * U + (Math.random() - 0.5) * 0.4, 0.7, 0, 2.4, 0.4, VIOLET);
+    }
+    if (v.fxT % 3 === 0) {                               // 地板上一片紫火往兩邊鋪
+      const cx = this.cam?.x ?? x;
+      for (let i = 0; i < 4; i++) this.fx.flame(cx + (Math.random() - 0.5) * 16, 0.05, (Math.random() - 0.5) * 2.6, 0.5, 0, 0.8, 0.35, VIOLET);
+    }
+  }
+  // 須左能乎的大熊：同一個模型兩份（先寫深度的、再畫顏色的只留最前面那層），紫色、疊亮；中間淡、輪廓亮（像一團紫火的靈）
+  makeGhost(p) {
+    const mat = new THREE.ShaderMaterial({
+      uniforms: { c: { value: new THREE.Color(CHARS[p.ch].pal[0]) }, a: { value: 0 } },
+      vertexShader: `varying vec3 vN; varying vec3 vV;
+        void main() { vec4 mv = modelViewMatrix * vec4(position, 1.0); vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz); gl_Position = projectionMatrix * mv; }`,
+      fragmentShader: `uniform vec3 c; uniform float a; varying vec3 vN; varying vec3 vV;
+        void main() { float r = 1.0 - abs(dot(normalize(vN), normalize(vV))); float k = 0.16 + pow(r, 2.0) * 1.5; gl_FragColor = vec4(mix(c, vec3(1.0), pow(r, 4.0) * 0.5) * k * a, 1.0); }`,
+      transparent: true, depthWrite: false, depthFunc: THREE.LessEqualDepth, blending: THREE.AdditiveBlending,
+    });
+    const pre = new THREE.MeshBasicMaterial({ colorWrite: false });
+    const one = (mt, ro) => {
+      const m = BUILD[p.ch]();
+      m.root.traverse((o) => { if (o.isMesh) { o.material = mt; o.renderOrder = ro; } });
+      m.root.visible = false;
+      this.scene.add(m.root);
+      return m;
+    };
+    return { m: one(mat, 11), d: one(pre, 10), mat };
+  }
+  // 爛熊的飛行道具：苦無（黑鐵小刀，刀尖照飛的方向）、大火球（越滾越大、一路掉火）、烏鴉（一群黑鳥拍翅膀）
+  lookProj(S, q, m) {
+    const x = q.x * U, y = q.y * U, z = q.z * U;
+    if (!m) {
+      m = q.look === 'kunai' ? kunaiMesh() : q.look === 'crow' ? crowMesh() : fireballMesh();
+      m.userData.gr = 1;                                 // 消失的時候不冒泡泡
+      this.projs.set(q.id, m); this.scene.add(m);
+    }
+    m.position.set(x, y, z);
+    if (q.look === 'kunai') {
+      m.rotation.y = Math.atan2(-q.vz, q.vx);
+      if (q.t % 3 === 0) this.fx.speck(x, y, '#d8d0e8', 0.3, z, 0);
+      if (q.t % 4 === 0) this.fx.trail(x - Math.sign(q.vx || 1) * 0.15, y, '#c9a8ff', 0.5, z, 0.05);
+    } else if (q.look === 'crow') {
+      const dir = Math.sign(q.vx) || 1;
+      m.scale.set(dir * 1.3, 1.3, 1.3);
+      m.children.forEach((b, i) => {
+        const w = Math.sin(this.clock * 24 + i * 1.9);
+        b.userData.l.rotation.x = -(0.15 + 0.55 * w); b.userData.r.rotation.x = 0.15 + 0.55 * w;
+        b.position.y = b.userData.y0 + 0.05 * w;
+      });
+      if (q.t % 5 === 0) this.fx.speck(x - dir * 0.3, y, '#2a2430', 0.6, z, 1.5);
+    } else {
+      m.scale.setScalar(q.w * U * 1.15);
+      m.userData.outer.material.rotation += 0.15;
+      for (let i = 0; i < 2; i++) this.fx.flame(x + (Math.random() - 0.5) * q.w * U, y + (Math.random() - 0.5) * q.h * U * 0.8, z, 0.5 + q.w * U * 0.4, -Math.sign(q.vx) * 0.8, 0.6, 0.35);
+      if (q.t % 3 === 0) this.fx.embers(x, y, z, 2, q.w * U);
     }
   }
   // 萬象奔騰的象群：三隻同一個模型的半透明剪影（自己的顏色），跟在後面前後錯開。
@@ -925,6 +1033,30 @@ function shade(root) {
   repaint(root, (h) => '#' + shadeTo.set('#' + h).lerp(SHADE, 0.62).getHexString(), 'shade');
 }
 
+// 苦無（朝 +x，長約 0.33）：刀身、握柄、尾巴的環
+function kunaiMesh() {
+  const g = new THREE.Group();
+  const k = kit(g);
+  k.cone(0.042, 0.2, '#5a5664', 0.1, 0, 0, { rz: -Math.PI / 2, sz: 0.35 });
+  k.box(0.11, 0.026, 0.026, '#2a2430', -0.05, 0, 0);
+  k.ball(0.03, '#2a2430', -0.13, 0, 0, { sx: 0.4 });
+  return merge({ root: g }).root;
+}
+// 一群烏鴉（朝 +x）：五隻，每隻身體、頭、嘴、兩片翅膀（view 拍）
+function crowMesh() {
+  const g = new THREE.Group(), C = '#1e1a24';
+  for (const [bx, by, bz, s] of [[0, 0, 0, 1], [-0.35, 0.16, 0.22, 0.85], [-0.3, -0.12, -0.26, 0.9], [-0.68, 0.05, 0.06, 0.8], [-0.58, 0.24, -0.12, 0.75]]) {
+    const b = new THREE.Group(), k = kit(b);
+    k.ball(0.07, C, 0, 0, 0, { sx: 1.7, sy: 0.85, sz: 0.85 });
+    k.ball(0.048, C, 0.11, 0.035, 0);
+    k.cone(0.02, 0.07, '#4a4452', 0.17, 0.03, 0, { rz: -Math.PI / 2, line: false });
+    const wing = (sd) => { const j = new THREE.Group(); j.position.set(0, 0.02, sd * 0.03); kit(j).ball(0.12, C, -0.03, 0, sd * 0.11, { sx: 1.25, sy: 0.12, sz: 0.95 }); b.add(j); return j; };
+    b.userData.l = wing(1); b.userData.r = wing(-1); b.userData.y0 = by;
+    b.position.set(bx, by, bz); b.scale.setScalar(s); b.rotation.y = -0.6;   // 斜斜往鏡頭飛，翅膀才看得到面（正側面飛的話從前面看是一根根棍子）
+    g.add(b);
+  }
+  return g;
+}
 // 飛行道具的球（半徑 1，view 照判定框縮放）：角色表的 shot [主色, 中間那條帶子的顏色或 null]
 // 箭（朝 +x，長約 1；view 照飛的方向左右翻）：箭桿、箭頭、兩片箭羽
 function arrowMesh([c, wood]) {

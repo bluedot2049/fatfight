@@ -79,7 +79,7 @@ export const KIT = {};
 for (const C of ALL) {
   const R = (REACH[C.id] = {});
   for (const [id, m] of Object.entries(MOVES[C.id])) R[id] = reachOf(m);
-  const kind = (s) => (s.m.proj ? 'far' : s.m.hurl ? 'hurl' : s.m.inv && s.d === 'u' ? 'air' : 'rush');   // 對空：上＋起手打不到（往上跳的、企鵝原地踩火的）
+  const kind = (s) => (s.m.inv && s.d === 'u' ? 'air' : s.m.proj ? 'far' : s.m.hurl ? 'hurl' : 'rush');   // 對空：上＋起手打不到（往上跳的、企鵝原地踩火的、爛熊噴大火球的）
   KIT[C.id] = {
     far: C.specials.filter((s) => kind(s) === 'far'),
     air: C.specials.filter((s) => kind(s) === 'air'),
@@ -544,6 +544,11 @@ function react(S, f, A, L, K, tw, aw, sx) {
       if (!facing || ex > r.far + 300 || ez > r.zr + 150) continue;
       A.seen = key;
       const k = r.first - e.t + e.stop;                    // 幾幀後打到
+      // 擋不住的（須左能乎）：算好時間跳起來躲
+      if (m.hits.some((h) => h.ub)) {
+        if (k >= 0 && rnd(A) < L.dodge * 3) { A.q = [...Array(Math.max(0, k - 12)).fill(0), BJ]; return A.q.shift(); }
+        return -1;
+      }
       // 格檔：打到前 2 幀按，故意偏 ±3（會失手）；超必殺、吹飛不格
       if (L.parry && k >= 0 && !m.flash && m !== CHARS[e.ch].normals.CD && rnd(A) < L.parry) {
         const wait = Math.max(0, k - 2 + (rnd(A) % 7) - 3);

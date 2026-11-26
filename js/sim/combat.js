@@ -88,6 +88,8 @@ function parry(S, a, d, isProj, gain, ex, ey, ez, i) {
 // 一下打到：a 出手的人（飛行道具就是主人）、d 被打的人、fromX 攻擊從哪個 x 來；m 出手那招（飛行道具、撞人、爆炸沒有）
 function applyHit(S, a, d, h, kind, fromX, isProj, m = null) {
   if (a.pow !== 100) h = { ...h, dmg: (h.dmg * a.pow / 100) | 0 };   // 雜兵打人打折（關卡表的 pow）
+  const fr = CHARS[d.ch].frail;
+  if (fr) h = { ...h, dmg: (h.dmg * fr / 100) | 0 };                  // 挨打比較痛（爛熊）
   const dir = d.x > fromX ? 1 : d.x < fromX ? -1 : a.face;
   const ex = (d.x + fromX) >> 1, ey = Math.min(d.y + 900, h.box ? a.y + ((h.box[1] + h.box[3]) >> 1) : h.y), ez = d.z;
   const gain = kind === 'su' ? 0 : (h.dmg / MP_GAIN) | 0;   // 打中回魔（超必殺不回）
@@ -102,7 +104,7 @@ function applyHit(S, a, d, h, kind, fromX, isProj, m = null) {
     S.ev.push({ k: 'burst', s: d.i, x: d.x, y: d.y + 700, z: d.z });
     return;
   }
-  if (guards(d, fromX)) {
+  if (!h.ub && guards(d, fromX)) {
     if (jd && jd.fresh >= 0 && !jd.lock) {
       // 格到吹飛：破防（吹飛專門剋一直想格檔的人）
       if (m && m === CHARS[a.ch].normals.CD) {
@@ -167,7 +169,7 @@ function applyHit(S, a, d, h, kind, fromX, isProj, m = null) {
     launch(d, dir, h.dvx, h.dvy, a);
     d.jug++;
     if (h.fire) d.burn = 1;
-  } else if (d.fallv >= DIZZY && !gang && !d.dz) {
+  } else if ((h.daze || d.fallv >= DIZZY) && !gang && !d.dz) {      // daze：幻術、須左能乎直接打暈
     setAct(d, 'dizzy'); d.dz = 1;
     d.slide = 120; d.sdir = dir;
     S.ev.push({ k: 'dizzy', s: d.i });
@@ -271,7 +273,7 @@ export function resolveHits(S, booms = []) {
       a.hold = d.i;
       continue;
     }
-    applyHit(S, a, d, h, kind, a.x, false, m);
+    applyHit(S, a, d, h, kind, h.rear ? d.x - d.face * 100 : a.x, false, m);   // rear：從被打的人背後打來（幻術）
     if (m.wpn) wear(S, a, WEAR_HIT);
   }
   bodyHits(S);
@@ -302,7 +304,7 @@ export function resolveHits(S, booms = []) {
       if (!hurtBoxes(d).some((b) => overlap(qb, box(d, b)))) continue;
       if (q.pierce) {                                    // 聲波：穿過去，每個人打一次
         q.hl.push(d.i);
-        applyHit(S, S.p[q.o], d, { dmg: q.dmg, fall: q.fall, bdef: 30, hs: 19, stop: 5, dvx: q.dvx ?? 16, dvy: q.dvy ?? 50, kd: q.kd ?? 0, y: q.y }, 'sp', q.x - q.vx, true);
+        applyHit(S, S.p[q.o], d, { dmg: q.dmg, fall: q.fall, bdef: 30, hs: 19, stop: q.kd ? 9 : 5, dvx: q.dvx ?? 16, dvy: q.dvy ?? 50, kd: q.kd ?? 0, fire: q.fire, y: q.y }, 'sp', q.x - q.vx, true);
         continue;
       }
       q.life = 0;
@@ -331,6 +333,7 @@ function crackHits(S, q) {
   }
 }
 
+const CURL = [3, -2, 1, -3, 2, -1, 3, -2];
 export function moveProjectiles(S) {
   for (const q of S.pr) {
     if (q.gr) {
@@ -352,7 +355,12 @@ export function moveProjectiles(S) {
       continue;
     }
     if (q.bt) { q.bt--; q.t++; q.life--; continue; }   // 地上的火、火柱：燒完就沒了
-    q.x += q.vx; q.t++; q.life--;
+    if (q.cu >= 0 && q.t >= 6) {                        // 苦無：飛一小段之後開始亂彎，照編號錯開、每 8 幀換一個彎的方向（速度轉一點點角度）
+      const k = CURL[(q.cu + (q.t >> 3)) & 7], vx = q.vx;
+      q.vx -= (q.vz * k) >> 6; q.vz += (vx * k) >> 6;
+    }
+    if (q.gw) { q.w += q.gw; q.h += q.gw; }             // 越滾越大（豪火球）
+    q.x += q.vx; q.z += q.vz || 0; q.t++; q.life--;
     if (q.lob) {
       q.y += q.vy; q.vy -= q.g;
       if (q.y <= 0) { q.y = 0; crackBoom(S, q, MOVES[S.p[q.o].ch][q.mv].proj.boom); continue; }

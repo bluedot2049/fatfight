@@ -6,7 +6,8 @@
 
 import { HP, MP, CONT_TIME } from '../sim/const.js';
 import { QUESTS } from '../sim/quests/index.js';
-import { btnName } from './keys.js';
+import { btnName, keyName, KEYMAP, device } from './keys.js';
+import { pickKind } from '../sim/item.js';
 import { CHARS, MOVES } from '../sim/chars/index.js';
 import { cmdHtml, withKeys } from './menu.js';
 import { gt, gtSet } from './gt.js';
@@ -14,6 +15,8 @@ import { setPal, seal, ROMAN, studs } from './arcane.js';
 import { portraitURL } from '../view/portrait.js';
 import { markOf, isAlt } from '../view/mark.js';
 import { frame } from './ornate.js';
+
+const FREE_CUE = new Set(['stand', 'walk', 'crouch']);   // 這幾個動作按蹲才會撿
 
 const $ = (s, el = document) => el.querySelector(s);
 const N = ['一', '二', '三', '四', '五'];
@@ -49,6 +52,7 @@ export class Hud {
       <div class="ebars">${'<i class="eb"><b></b></i>'.repeat(16)}</div>
       <div class="pops">${'<i class="pop"></i>'.repeat(12)}</div>
       <div class="thint"></div>
+      <div class="pcue"></div><div class="pcue"></div>
       <div class="flash"></div>
       <div class="net"></div>`;
     this.el = [0, 1].map((i) => {
@@ -63,6 +67,8 @@ export class Hud {
     this.cdmg = [0, 0];
     this.annT = 0;
     this.ebars = [...root.querySelectorAll('.ebars .eb')];
+    this.cues = [...root.querySelectorAll('.pcue')].map((el) => ({ el, t: 0, txt: '', ch: '' }));   // 本機玩家頭上：腳邊有東西寫按哪顆撿
+    this.locals = null;   // main 給：() => [[自己那隻, 第幾組鍵]]
     this.pops = [...root.querySelectorAll('.pops .pop')].map((el) => ({ el, t: 9 }));   // 打法分的浮字（闖關）
     this.popN = 0;
     this.view = null;              // main 給：敵人頭上的血條要知道畫面位置
@@ -142,6 +148,7 @@ export class Hud {
     for (const b of this.ebars) b.classList.remove('on');
     for (const o of this.pops) { o.t = 9; o.el.classList.remove('on'); }
     $('.tide', this.root).className = 'tide'; $('.thint', this.root).classList.remove('on');
+    for (const c of this.cues) { c.t = 0; c.el.classList.remove('on'); }
   }
 
   update(S, dt) {
@@ -190,6 +197,7 @@ export class Hud {
       }
     });
     if (S.quest) this.questHud(S, ps, dt);
+    this.pickCue(S, dt);
     const rd = S.opt.train ? '∞' : ROMAN[S.round - 1] || String(S.round);
     if (rd !== this.rd) { this.rd = rd; $('.round small', this.root).textContent = S.opt.train ? 'TRAIN' : 'ROUND'; gtSet($('.round b', this.root), rd, 0.05, 0.05); }
     const fz = S.freeze > 0;
@@ -276,6 +284,25 @@ export class Hud {
       o.el.style.transform = `translate(${x | 0}px, ${y | 0}px)`;
       o.el.style.opacity = o.t < 0.75 ? 1 : (1.1 - o.t) / 0.35;
     }
+  }
+
+  // 撿東西的提示：本機玩家空手、能動、腳邊有撿得起來的東西，站穩一下頭上浮「鍵 撿」（重的「舉」）；手機畫一顆跟蹲鈕一樣的小圓鈕
+  pickCue(S, dt) {
+    const ls = (this.view && this.locals?.()) || [];
+    this.cues.forEach((c, i) => {
+      const [f, pad] = ls[i] || [];
+      const k = f && S.ph === 'fight' && f.hp > 0 && !f.mv && !f.y && FREE_CUE.has(f.act) ? pickKind(S, f) : 0;
+      c.t = k ? c.t + dt : 0;
+      const on = c.t >= 0.1;
+      if (on !== c.el.classList.contains('on')) c.el.classList.toggle('on', on);
+      if (!on) return;
+      const w = k === 2 ? '舉' : '撿';
+      const txt = device.touch ? `<b>${w}</b>` : `<kbd>${keyName(KEYMAP[pad]['S'][0])}</kbd>${w}`;
+      if (txt !== c.txt) { c.txt = txt; c.el.innerHTML = txt; c.el.classList.toggle('touch', device.touch); }
+      if (f.ch !== c.ch) { c.ch = f.ch; setPal(c.el, f.ch); }
+      const [x, y] = this.view.toScreen(f.x / 1000, CHARS[f.ch].h / 1000 + 0.08, f.z / 1000);
+      c.el.style.transform = `translate(${x | 0}px, ${y | 0}px)`;
+    });
   }
 
   // 字卡。kind：round 緞帶、go 金字＋光芒、ko 血紅的字＋光芒、win 緞帶（不收）

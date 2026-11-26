@@ -165,6 +165,7 @@ const T = { aura: 0, soft: 1, star: 2, ring: 3, streak: 4, seam: 5, wave: 6, ray
 const WHITE = '#ffffff';
 // 火的三段顏色：芯、焰、尾。中間的顏色照原本的算法在線性空間裡混，再換回畫面上的顏色
 const FIRE = ['#fff0b0', '#ffa236', '#d8341a'].map((c) => new THREE.Color(c));
+export const VIOLET = ['#f3e8ff', '#b07cff', '#4a1e9a'].map((c) => new THREE.Color(c));   // 紫火（爛熊的須左能乎）：flame 最後一個參數
 const enc = (v) => (v <= 0.0031308 ? v * 12.92 : 1.055 * Math.pow(v, 1 / 2.4) - 0.055);
 function fireColor(o, a, b, t) {
   o.r = enc(a.r + (b.r - a.r) * t); o.g = enc(a.g + (b.g - a.g) * t); o.b = enc(a.b + (b.b - a.b) * t);
@@ -308,14 +309,14 @@ export class FX {
     this.sp(T.soft, color, x, y, z + 0.3, 0.35 + Math.random() * 0.3, (o, k, dt) => { vy -= grav * dt; o.x += vx * dt; o.y = Math.max(0.02, o.y + vy * dt); o.sx = o.sy = sz * (1 - k); o.a = 1 - k; });
   }
   // 火（企鵝）：一團火從亮黃變橘紅再淡掉，邊飄邊往上竄、先脹後縮。vx vy 每秒多少公尺
-  flame(x, y, z = 0, size = 0.4, vx = 0, vy = 0.8, life = 0.38) {
+  flame(x, y, z = 0, size = 0.4, vx = 0, vy = 0.8, life = 0.38, pal = FIRE) {
     const rot = Math.random() * 6.28;
     const sz = size * (0.75 + Math.random() * 0.5), L = life * (0.8 + Math.random() * 0.4);
     let ux = vx, uy = vy;
     this.sp(T.soft, '#fff0b0', x, y, z + 0.32, L, (o, k, dt) => {
       uy += 2.2 * dt; ux *= 1 - 2.5 * dt;
       o.x += ux * dt; o.y += uy * dt;
-      if (k < 0.3) fireColor(o, FIRE[0], FIRE[1], k / 0.3); else fireColor(o, FIRE[1], FIRE[2], (k - 0.3) / 0.7);
+      if (k < 0.3) fireColor(o, pal[0], pal[1], k / 0.3); else fireColor(o, pal[1], pal[2], (k - 0.3) / 0.7);
       o.sx = o.sy = sz * (k < 0.25 ? 0.5 + k * 2 : 1 - (k - 0.25) * 0.9);
       o.a = k < 0.6 ? 0.95 : 0.95 * (1 - k) / 0.4;
     }).rot = rot;

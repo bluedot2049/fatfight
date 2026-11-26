@@ -68,6 +68,14 @@ export const DEMOS = {
     { id: 'earspin', name: '甩耳旋風', kind: 'sp', ...antiAir() },
     { id: 'longdog', name: '長長長臘腸', kind: 'su', d: 3500, in: cmd(UP, BJ), len: 140 },
   ],
+  bear: [
+    ...normals({ cw: 7, combo: 800, crouch: 800, cd: 900, run: 2600, runN: 5, jump: 1600, jumpN: 7, dash: 3200, dashN: 4 }),
+    { id: 'kunai', name: '苦無發射', kind: 'sp', d: 2200, in: cmd(RIGHT, BA), len: 80 },
+    { id: 'genjutsu', name: '幻術', kind: 'sp', d: 3600, in: cmd(RIGHT, BJ), foe: 'guard', len: 90 },
+    { id: 'kick', name: '踹', kind: 'sp', d: 1500, in: cmd(DOWN, BA), len: 110 },
+    { id: 'fireball', name: '豪火球之術', kind: 'sp', ...antiAir(1900, 0) },
+    { id: 'susanoo', name: '須左能乎', kind: 'su', d: 3000, in: cmd(UP, BJ), foe: 'guard', len: 140 },
+  ],
 };
 
 // 對手預設是胖鼠，胖鼠自己的示範對灰牛

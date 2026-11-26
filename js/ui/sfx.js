@@ -61,7 +61,12 @@ function applyMode() {
   sfxBus.gain.value = mode === 2 ? 0 : 1;
   musicBus.gain.value = mode === 0 ? 0.42 : 0;
 }
-export function unlockAudio() { if (init() && ctx.state === 'suspended') ctx.resume(); }
+// 解開聲音：瀏覽器要「使用者動作」當下才准開。手機上手指按下不算、放開才算（Chrome 手機），所以按下、放開、click、按鍵都叫一次。
+// 被系統暫停（切 App、來電，iOS 會是 interrupted）回來也靠這裡接回去
+export function unlockAudio() {
+  if (!init() || ctx.state === 'running' || ctx.state === 'closed') return;
+  ctx.resume().catch(() => {});
+}
 export function soundMode() { return mode; }
 export function setSoundMode(m) {
   mode = ((m % 3) + 3) % 3;
@@ -292,6 +297,27 @@ KIT.dog = {
     noise(t, 0.05, 3200, 1.5, 0.4); tone(t, 0.08, 380, 160, 0.3, 'square');   // 咬下去喀一聲
     if (big) { tone(t, 0.25, 150, 50, 0.5); noise(t, 0.2, 600, 0.8, 0.3, 'lowpass'); }
     if (su) noise(t + 0.03, 0.04, 4200, 1.5, 0.3);
+  },
+};
+// 爛熊：苦無破風（細細的咻一把撒出去）、幻術（往下沉的嗡＋烏鴉）、踹（悶的一腳）、豪火球（吸一口、轟）；超必殺須左能乎是低沉的和聲鼓起來、紫火轟
+KIT.bear = {
+  sp: {
+    kunai(t) { for (let i = 0; i < 6; i++) noise(t + i * 0.025, 0.07, 3200 + i * 300, 3, 0.16, 'bandpass', 1400); clink(t + 0.02, 0.5, 1900); },
+    genjutsu(t) { theremin(t, 0.6, 520, 260, 0.9); caw(t + 0.25, 0.6); },
+    kick(t) { noise(t, 0.3, 300, 1.2, 0.2, 'bandpass', 1400); },
+    fireball(t) { noise(t, 0.35, 900, 0.8, 0.18, 'bandpass', 300); roar(t + 0.36, 1.0, 1.3); tone(t + 0.36, 0.3, 110, 50, 0.4); crackle(t + 0.4, 0.7, 24, 2600, 0.16, 0.5); },
+  },
+  shot(t) { for (let i = 0; i < 3; i++) noise(t + i * 0.03, 0.06, 3600, 3, 0.14, 'bandpass', 1500); },
+  super(t) {
+    rumble(t, 0.5, 0.5, 70, 1);
+    via(lp(900), () => { for (const f of [55, 82.5, 110]) tone(t, 0.55, f, f * 1.02, 0.18, 'sawtooth', 0.3); });
+    const r = t + 0.5;
+    boom(r, 0.9); roar(r, 1.4, 1.2); theremin(r, 1.0, 330, 165, 0.8); crackle(r + 0.1, 1.2, 40, 2200, 0.16, 0.6);
+  },
+  hit(t, big, su) {
+    if (su) { tone(t, 0.35, 70, 35, 0.6); roar(t, 0.3, 0.7); return; }
+    if (big) { tone(t, 0.3, 120, 40, 0.65); noise(t, 0.18, 500, 0.8, 0.35, 'lowpass'); }
+    else { clink(t, 0.6, 1600); noise(t, 0.04, 3800, 2, 0.25); }
   },
 };
 // ---------- 其他角色各自一套（使用者 2026-11-25：聲音每隻都做）----------
@@ -575,6 +601,8 @@ function beep(t, f) { tone(t, 0.06, f, f, 0.14, 'square', 0.002); }
 // 顫音（小灰人）：兩個差一點點的正弦波
 function theremin(t, dur, f0, f1, p = 1) { tone(t, dur, f0, f1, 0.18 * p, 'sine', 0.03); tone(t, dur, f0 * 1.013, f1 * 1.013, 0.14 * p, 'sine', 0.03); }
 // 電一下（小灰人）
+// 烏鴉叫：沙啞的「啊——」兩聲
+function caw(t, p = 1) { via(crush(3), () => { for (const d of [0, 0.22]) { tone(t + d, 0.16, 620, 470, 0.22 * p, 'sawtooth', 0.01); noise(t + d, 0.16, 1500, 2, 0.18 * p, 'bandpass', 900); } }); }
 function zap(t, p = 1) { via(crush(4), () => tone(t, 0.12, 1800, 200, 0.22 * p, 'sawtooth')); noise(t, 0.04, 4200, 1, 0.3 * p, 'highpass'); }
 // 汪：短的方波往下掉，前面一點氣音
 function woof(t, p = 1) {
@@ -628,6 +656,7 @@ const SND = {
   // 地裂：拍地一下悶響，裂縫竄的那半秒鑽頭＋電弧劈啪；炸開是土裡的爆炸＋往上的電；被打斷只剩碎石
   crack() { const t = ctx.currentTime; tone(t, 0.16, 150, 45, 0.55); noise(t, 0.12, 700, 0.8, 0.35, 'lowpass'); drill(t + 0.03, 0.5, 0.6); crackle(t + 0.03, 0.5, 22, 2400, 0.2, 0.6); },
   erupt() { const t = ctx.currentTime; boom(t, 0.8); via(crush(5), () => tone(t, 0.22, 180, 1300, 0.16, 'sawtooth')); crackle(t, 0.3, 18, 3400, 0.3); noise(t + 0.02, 0.25, 900, 0.7, 0.3, 'bandpass', 300); },
+  crow() { const t = ctx.currentTime; caw(t, 0.9); flap(t + 0.05, 5, 0.6); },
   fizzle() { const t = ctx.currentTime; noise(t, 0.12, 900, 1, 0.18, 'bandpass', 300); crackle(t, 0.12, 4, 2000, 0.1); },
   // 火球落地、火柱衝上來
   pool() { const t = ctx.currentTime; roar(t, 0.45, 0.9); tone(t, 0.15, 140, 60, 0.35); crackle(t + 0.05, 0.4, 14, 2600, 0.18); },
@@ -776,6 +805,7 @@ export function sfxEvent(e, pan = 0, S = null) {
     case 'round': play('round'); break;
     case 'fight': play('fight'); break;
     case 'clash': play('clash', e, pan); break;
+    case 'crow': play('crow', e, pan); break;
     case 'over': if (e.w >= 0) play('win'); break;
     case 'tlight': play('fuse', e, pan); break;
     case 'tfire': play('cannon', e, pan); break;

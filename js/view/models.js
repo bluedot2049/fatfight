@@ -501,6 +501,36 @@ export function buildDog() {
   return { root, turn, J: { body, upper, head, aN, aF, tail, lN, lF }, tongue: null, ears, stretch: { upper, mid, z0: 0.22, m0: -0.04, len: 0.72 }, grip: mouth, gripRot: [Math.PI / 2 + 0.25, 0, 0], h: 1.0 };
 }
 
+// 爛熊（朋友的角色，長相照煉金畫廊的爛熊種族 G:\煉金畫廊 js/avatar/lanxiong.js）：全白、頭身一體像一顆大饅頭、小圓耳、
+// 眼睛兩條短橫線、黑點鼻、一字嘴（經典厭世臉），粗短手腳。
+// 頭不另外做一顆：上身那顆蛋就是頭，頭的關節放在蛋的中心，臉、耳朵貼在蛋的表面——點頭的時候五官沿著表面滑，不會浮起來或陷進去
+export function buildBear() {
+  const { root, turn, body } = rig();
+  const C = '#f3f1ec';
+  const k = kit(body);
+  k.ball(0.43, C, 0, 0.5, 0, { sx: 1.0, sy: 0.95, sz: 0.9 });                     // 屁股、肚子
+  const lN = joint(body, -0.17, 0.2, 0.02), lF = joint(body, 0.17, 0.2, 0.02);
+  for (const l of [lN, lF]) kit(l).ball(0.135, C, 0, -0.07, 0.03, { sy: 0.98, sz: 1.15 });
+  const tail = joint(body, 0, 0.34, -0.37);
+  kit(tail).ball(0.07, C, 0, 0, -0.02);
+  const upper = joint(body, 0, 0.78, 0);
+  const R = [0.342, 0.353, 0.317];                                                  // 上身（頭）那顆蛋的三個半徑
+  kit(upper).ball(0.36, C, 0, 0.2, 0, { sx: R[0] / 0.36, sy: R[1] / 0.36, sz: R[2] / 0.36 });
+  const head = joint(upper, 0, 0.2, 0);
+  const h = kit(head);
+  const onEgg = (x, y) => R[2] * Math.sqrt(Math.max(0, 1 - (x / R[0]) ** 2 - (y / R[1]) ** 2));   // 臉上 (x, y) 那點的表面 z
+  for (const s of [-1, 1]) {
+    h.box(0.078, 0.017, 0.02, INK, s * 0.088, 0.065, onEgg(0.088, 0.065), { line: false, ry: s * 0.28, rz: s * -0.07 });   // 短橫線眼
+    h.ball(0.085, C, s * 0.205, 0.255, -0.03, { sx: 1.0, sy: 0.9, sz: 0.62, rz: s * -0.35 });                            // 小圓耳
+  }
+  h.ball(0.025, INK, 0, -0.015, onEgg(0, -0.015), { sx: 1.35, sy: 0.9, sz: 0.6, line: false });                         // 黑點鼻
+  h.box(0.056, 0.012, 0.02, INK, 0.004, -0.088, onEgg(0, -0.088) - 0.002, { line: false, rx: 0.27, rz: -0.04 });        // 一字嘴
+  const aN = joint(upper, -0.3, 0.04, 0.06), aF = joint(upper, 0.3, 0.04, 0.06);
+  kit(aN).ball(0.1, C, -0.02, -0.17, 0.02, { sx: 0.95, sy: 1.75, sz: 0.95, rz: -0.12 });
+  kit(aF).ball(0.1, C, 0.02, -0.17, 0.02, { sx: 0.95, sy: 1.75, sz: 0.95, rz: 0.12 });
+  return { root, turn, J: { body, upper, head, aN, aF, tail, lN, lF }, tongue: null, h: 1.35 };
+}
+
 // 第二套色（同角色對打時第二隻穿）：主色換掉、眼睛嘴巴描邊不動。明暗跟本來的差一截，遠遠看也分得出來；沒寫的角色不換
 export const ALT = {
   manatee: { '#8fa8b2': '#a88e84', '#aac0c8': '#c8b0a4' },                                   // 灰藍 → 粉褐
@@ -508,6 +538,7 @@ export const ALT = {
   elephant: { '#f2b8ac': '#a9adbf', '#cf8a82': '#868aa0', '#e48c98': '#eaa6b8' },           // 粉紅肉色 → 灰紫
   penguin: { '#f3efe6': '#7d90a6', '#eadcbc': '#e8c87a', '#d9cdb8': '#e0b868' },            // 白 → 石板藍、嘴腳偏黃
   dog: { '#f6c93c': '#b8673a', '#d9a62a': '#8e4826', '#e6b232': '#a3552e' },                 // 黃 → 紅棕（真的臘腸狗那種）
+  bear: { '#f3f1ec': '#c49a72' },                                                            // 白 → 蜂蜜棕（棕熊）
 };
 export function recolor(root, ch) {
   const map = ALT[ch];
@@ -516,7 +547,7 @@ export function recolor(root, ch) {
   repaint(root, (h) => to[h], 'alt:' + ch);
 }
 
-const MAKE = { manatee: buildManatee, marmot: buildMarmot, elephant: buildElephant, penguin: buildPenguin, dog: buildDog, sealion: buildSealion, hammer: buildHammer, squid: buildSquid, frog: buildFrog, mushroom: buildMushroom, moss: buildMoss, dwarf: buildDwarf, ...FOREST, ...MOON };
+const MAKE = { manatee: buildManatee, marmot: buildMarmot, elephant: buildElephant, penguin: buildPenguin, dog: buildDog, bear: buildBear, sealion: buildSealion, hammer: buildHammer, squid: buildSquid, frog: buildFrog, mushroom: buildMushroom, moss: buildMoss, dwarf: buildDwarf, ...FOREST, ...MOON };
 // 建好之後身體和上身接成一層（kit.js 的 fuse）；身體會拉長的（臘腸狗）不接。每個關節發一個內線編號（inkline.js）
 // 再把同一個關節底下的零件合成一個網格（kit.js 的 merge，描邊一起畫）
 // ?nomerge 不合（對照用；OPT.merge 也可以在頁面裡切）

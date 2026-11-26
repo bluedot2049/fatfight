@@ -25,22 +25,22 @@ const N = {
 const FLAME = [150, 0, 1600, 700];
 const puff = (t) => hit([t, t + 1], FLAME, 'S', { dmg: 16, fall: 0, hs: 16, stop: 2, bdef: 3, dvx: 3, zr: 300, fire: 1 });
 const SP = [
-  { id: 'breath', name: '吐火', yomi: 'fuka', d: 'f', btn: 'A', note: '貼地往前噴火；按住攻一直噴、按上下擺頭',
+  { id: 'breath', name: '吐火', yomi: 'fuka', d: 'f', btn: 'A', note: '貼地火焰。長按攻持續，上下調方向',
     m: mv('breath', '吐火', 36, { kind: 'sp', mp: 120, pose: 'breath', keep: { at: 22, to: 10, n: 4, mp: 30 }, aim: [10, 900],
       hits: [puff(8), puff(12), puff(16), puff(20),
         hit([25, 27], FLAME, 'S', { dmg: 30, kd: 1, dvx: 24, dvy: 52, stop: 8, bdef: 8, zr: 300, fire: 1 })] }) },
   // 火球：拋出去，落地（或打到人）變成一片地上的火，燒一下才熄。拋物線越過前面的人
-  { id: 'fireball', name: '火球', yomi: 'kakyu-', d: 'f', btn: 'J', note: '拋一顆火球，落地留一片火',
+  { id: 'fireball', name: '火球', yomi: 'kakyu-', d: 'f', btn: 'J', note: '拋物線火球，落地留火',
     m: mv('fireball', '火球', 34, { kind: 'sp', mp: 130, pose: 'toss',
       proj: { at: 12, x: 300, y: 1200, vx: 40, w: 130, h: 130, dmg: 60, fall: 70, life: 90, kd: 1, dvx: 30, dvy: 70, fire: 1,
         lob: { vy: 50, g: 3 }, boom: { w: 420, h: 160, t: 60, dmg: 40, kd: 1, dvx: 14, dvy: 60, fire: 1 } } }) },
   // 火焰爆擊：翅膀一彈，最近的敵人腳下先亮一圈，半秒後火柱衝上來。看到的人走開就躲掉；彈完企鵝就能動，但亮著的時候企鵝被打到就散掉
-  { id: 'blast', name: '火焰爆擊', yomi: 'kaen bakugeki', d: 'd', btn: 'A', note: '最近的敵人腳下先亮，半秒後火柱衝上來',
+  { id: 'blast', name: '火焰爆擊', yomi: 'kaen bakugeki', d: 'd', btn: 'A', note: '最近敵人腳下延遲火柱',
     m: mv('blast', '火焰爆擊', 30, { kind: 'sp', mp: 150, pose: 'snap',
       proj: { at: 10, x: 1500, y: 0, vx: 0, w: 300, h: 300, dmg: 90, fall: 80, life: 2, aim: { r: 6000, wait: 28 },
         boom: { w: 300, h: 1000, t: 12, dmg: 90, kd: 1, dvx: 8, dvy: 110, fire: 1 } } }) },
   // 對空：不跳，用力踩地板，身前的地上噴出火來往上衝
-  { id: 'firestomp', name: '踏火衝天', yomi: 'to-ka sho-ten', d: 'u', btn: 'A', note: '對空，踩地板從地上噴火；起手打不到',
+  { id: 'firestomp', name: '踏火衝天', yomi: 'to-ka sho-ten', d: 'u', btn: 'A', note: '對空火柱。出招無敵',
     m: mv('firestomp', '踏火衝天', 34, { kind: 'sp', mp: 150, pose: 'firestomp', inv: [1, 8], quake: [5],
       hits: [hit([5, 8], [100, 0, 760, 1800], 'S', { dmg: 40, fall: 0, hs: 22, stop: 6, dvx: 4, dvy: 70, fire: 1 }),
         hit([11, 15], [100, 0, 760, 2100], 'S', { dmg: 66, kd: 1, dvx: 10, dvy: 120, stop: 12, fire: 1 })] }) },
@@ -49,7 +49,7 @@ const SP = [
 // 地獄之門：身前立起一扇門，面無表情打開，裡面噴出一整排火往前推（整排都高，跳不過；前後比海牛的浪窄）。被擋也一下一下鎖住
 const GATE = [500, 0, 900, 1500];
 const SU = [
-  { id: 'hellgate', name: '地獄之門', yomi: 'jigoku no mon', d: 'u', btn: 'J', note: '開一扇門噴出整排火往前推，被擋也鎖住；連按攻多燒幾下',
+  { id: 'hellgate', name: '地獄之門', yomi: 'jigoku no mon', d: 'u', btn: 'J', note: '前方火牆推進，被防仍鎖住。連打攻追加',
     m: mv('hellgate', '地獄之門', 100, { kind: 'su', mp: 400, flash: 1, inv: [0, 18], mash: { at: 56, to: 40, n: 2, mp: 60 },
       sweep: { on: [20, 50], to: 6000, near: 6000, low: 1500 },
       hits: multi(20, 8, 5, GATE, 37, 90, { zr: 500, fire: 1 }).map((h) => ({ ...h, on: [h.on[0], h.on[0] + 7] })) }) },

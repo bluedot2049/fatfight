@@ -28,19 +28,19 @@ const N = {
 // 鼻子捲、踏地、拔石頭前段霸體（挨一下輕拳不停）
 const SP = [
   // 指令投：鼻子伸出去捲（擋不住、空中和倒地的抓不到），捲回身前往背後甩；捲住的時候按攻改成掄人。揮空收得慢
-  { id: 'trunk', name: '鼻子捲', yomi: 'hana maki', d: 'f', btn: 'A', note: '鼻子伸兩公尺捲人往背後甩，捲住時按攻掄一圈打周圍；擋不住，跳起來的抓不到',
+  { id: 'trunk', name: '鼻子捲', yomi: 'hana maki', d: 'f', btn: 'A', note: '遠距離投，甩向背後。不可防，不抓空中。捲住時攻：掄人迴旋',
     m: mv('trunk', '鼻子捲', 42, { kind: 'sp', mp: 150, pose: 'lash', then: 'trunkT', armor: [0, 9],
       hits: [hit([9, 13], [200, 250, 1900, 1300], 'S', { grab: 1, dmg: 0, zr: 300 })] }) },
   // 抬腳踩下去，震兩圈：裡圈震倒，外圈不倒但站不穩（硬直長，接得上鼻子捲）。框很矮，跳得過；按住攻把腳抬高，圈更大、更痛
-  { id: 'stomp', name: '象腳踏地', yomi: 'zo-kyaku tatchi', d: 'd', btn: 'A', note: '踩地震兩圈，外圈站不穩接得上鼻子捲；按住攻抬高腳圈更大；跳起來就躲掉',
+  { id: 'stomp', name: '象腳踏地', yomi: 'zo-kyaku tatchi', d: 'd', btn: 'A', note: '兩圈震波，可跳過。外圈可接鼻子捲，長按攻擴大範圍',
     m: mv('stomp', '象腳踏地', 40, { kind: 'sp', mp: 150, pose: 'stomp', cancel: 1, armor: [0, 12], charge: { at: 8, max: 36 }, quake: [12],
       hits: [hit([12, 15], [-1300, 0, 1300, 320], 'S', { dmg: 80, kd: 1, dvx: 12, dvy: 90, zr: 900, bdef: 50 }),
         hit([12, 15], [-2500, 0, 2500, 320], 'S', { dmg: 24, fall: 0, hs: 44, stop: 6, dvx: 2, zr: 1500, bdef: 40, skip: 0 })] }) },
   // 鼻子從地上拔起一塊石頭往前丟：丟得低、落地會滾（打腳）；沒打到人的石頭留在地上，鼻象隔得遠也撿得起來再丟
-  { id: 'rock', name: '拔石頭', yomi: 'iwa nuki', d: 'f', btn: 'J', note: '拔起一塊石頭丟出去，落地會滾；石頭留在地上可以撿起來再丟',
+  { id: 'rock', name: '拔石頭', yomi: 'iwa nuki', d: 'f', btn: 'J', note: '投石，落地滾動。石頭留在場上可撿',
     m: mv('rock', '拔石頭', 42, { kind: 'sp', mp: 150, pose: 'rock', armor: [0, 10], hurl: { at: 14, k: 'erock', vx: 76, vy: 20, y: 1000 } }) },
   // 對空：不跳，鼻子直直往頭上伸，捲住空中的人拖下來往地上砸（彈地，旁邊地上的人也震到）。只抓得到空中的
-  { id: 'skygrab', name: '鼻子撈天', yomi: 'hana sukui', d: 'u', btn: 'A', note: '對空，鼻子往上捲住跳起來的人往地上砸；只抓空中的，起手打不到',
+  { id: 'skygrab', name: '鼻子撈天', yomi: 'hana sukui', d: 'u', btn: 'A', note: '對空投，只抓空中。出招無敵',
     m: mv('skygrab', '鼻子撈天', 40, { kind: 'sp', mp: 150, pose: 'skygrab', inv: [1, 10], then: 'skyT',
       hits: [hit([6, 14], [-100, 600, 800, 2700], 'S', { grab: 2, dmg: 0, zr: 450 })] }) },
 ];
@@ -48,7 +48,7 @@ const SP = [
 // 萬象奔騰：衝過去，碰到的第一個貼著踩（stick），旁邊前後的也踩得到；最後連踩三下地，前後一圈都震倒
 const STAMP = [-150, 0, 720, 1300], QUAKE = [-900, 0, 1000, 420];
 const SU = [
-  { id: 'stampede', name: '萬象奔騰', yomi: 'banzo- honto-', d: 'u', btn: 'J', note: '衝過去一路踩，最後連踩地，前後很寬；連按攻多踩幾下',
+  { id: 'stampede', name: '萬象奔騰', yomi: 'banzo- honto-', d: 'u', btn: 'J', note: '突進踩踏，前後範圍大。連打攻追加',
     m: mv('stampede', '萬象奔騰', 96, { kind: 'su', mp: 400, flash: 1, inv: [0, 16], stick: 1, vx: [[0, 0], [12, 80], [40, 0]], zm: 6,
       mash: { at: 66, to: 50, n: 2, mp: 60 }, quake: [44, 51, 58, 65],
       hits: [hit([12, 40], STAMP, 'S', { dmg: 50, fall: 0, hs: 30, stop: 4, dvx: 2, zr: 900 }),

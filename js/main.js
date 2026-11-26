@@ -32,6 +32,8 @@ const qs = new URLSearchParams(location.search);
 const view = new View(document.getElementById('c'));
 const hud = new Hud(document.getElementById('hud'));
 hud.view = view;
+// 頭上提示要標的：本機的玩家（線上只有自己，練習的木樁、電腦接手的不算）和他用哪組鍵
+hud.locals = () => (G.kind === 'online' ? [[mine(), 0]] : G.S.p.filter((f) => f.pad >= 0 && !f.ai && !(G.kind === 'train' && f.pad === 1)).map((f) => [f, f.pad]));
 const keys = new Keyboard();
 const menu = new Menu(document.getElementById('menu'), keys);
 const overlay = document.getElementById('overlay');
@@ -114,7 +116,7 @@ view.onEvent = (e, S) => {
   else if (e.k === 'contask') music.level(0.4, 0.4);
 };
 const soundItem = () => ({ label: '聲音', value: () => SOUND_NAMES[soundMode()], on: () => setSoundMode(soundMode() + 1), cycle: (d) => setSoundMode(soundMode() + d) });
-addEventListener('pointerdown', unlockAudio);
+for (const k of ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown']) addEventListener(k, unlockAudio, { capture: true, passive: true });
 
 // ---------- 主迴圈 ----------
 let last = performance.now(), acc = 0;
@@ -143,6 +145,7 @@ function loop(now) {
     // 結果畫面的鍵盤返回不做事（打完還在連按跳），左上角那顆走 tapBack
     back: !overlay.hidden || (menu.open && (!!menu.cur.tapBack || (!!(menu.cur.back || menu.cur.onKey) && !/result|title/.test(menu.cur.cls || '')))),
     ch: G.mode === 'fight' ? mine()?.ch : '',
+    S: G.S, me: G.mode === 'fight' ? mine() : null,
   });
   requestAnimationFrame(loop);
 }
