@@ -467,7 +467,7 @@ export function buildPenguin() {
 }
 
 // 黃色臘腸狗（照資料夾裡的插圖 33.png）：橫的長身體、短腿、長嘴往下垂、大黑鼻子、垂耳、豆豆眼。
-// 前半身（胸、前腳、頭）在 upper，中間一截身體在 mid：長長長臘腸的時候 view 把 upper 往前推、mid 拉長（model.stretch）
+// 前半身（胸、前腳、頭）在 upper，中間一截身體在 mid：長長臘腸的時候 view 把 upper 往前推、mid 拉長（model.stretch）
 export function buildDog() {
   const { root, turn, body } = rig();
   const C = '#f6c93c', DARK = '#d9a62a', NOSE = '#141210', INSIDE = '#e6b232';

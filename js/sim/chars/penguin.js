@@ -31,8 +31,8 @@ const SP = [
       hits: [puff(8), puff(12), puff(16), puff(20),
         hit([25, 27], FLAME, 'S', { dmg: 36, kd: 1, dvx: 24, dvy: 52, stop: 8, bdef: 8, zr: 300, fire: 1 })] }) },
   // 火球：拋出去，落地（或打到人）變成一片地上的火，燒一下才熄。拋物線越過前面的人（2026-11-26 魔力 130→120，吐火變貴，換火球、火柱多放）
-  { id: 'fireball', name: '火球', yomi: 'kakyu-', tai: 'hue2-kiu5', d: 'f', btn: 'J', note: '拋物線火球，落地留火',
-    m: mv('fireball', '火球', 34, { kind: 'sp', mp: 120, pose: 'toss',
+  { id: 'fireball', name: '猛火球', yomi: 'kakyu-', tai: 'Mé-hue2-kiu5', d: 'f', btn: 'J', note: '拋物線火球，落地留火',
+    m: mv('fireball', '猛火球', 34, { kind: 'sp', mp: 120, pose: 'toss',
       proj: { at: 12, x: 300, y: 1200, vx: 40, w: 130, h: 130, dmg: 60, fall: 70, life: 90, kd: 1, dvx: 30, dvy: 70, fire: 1,
         lob: { vy: 50, g: 3 }, boom: { w: 420, h: 160, t: 60, dmg: 40, kd: 1, dvx: 14, dvy: 60, fire: 1 } } }) },
   // 火焰爆擊：翅膀一彈，最近的敵人腳下先亮一圈，半秒後火柱衝上來。看到的人走開就躲掉；彈完企鵝就能動，但亮著的時候企鵝被打到就散掉（2026-11-26 魔力 150→130）
@@ -41,8 +41,8 @@ const SP = [
       proj: { at: 10, x: 1500, y: 0, vx: 0, w: 300, h: 300, dmg: 90, fall: 80, life: 2, aim: { r: 6000, wait: 28 },
         boom: { w: 300, h: 1000, t: 12, dmg: 90, kd: 1, dvx: 8, dvy: 110, fire: 1 } } }) },
   // 對空：不跳，用力踩地板，身前的地上噴出火來往上衝
-  { id: 'firestomp', name: '踏火衝天', yomi: 'to-ka sho-ten', tai: 'tah8-hue2 tshiong1-thian1', d: 'u', btn: 'A', note: '對空火柱。出招無敵',
-    m: mv('firestomp', '踏火衝天', 34, { kind: 'sp', mp: 150, pose: 'firestomp', inv: [1, 11], quake: [5],
+  { id: 'firestomp', name: '火衝天', yomi: 'to-ka sho-ten', tai: 'hue2-tshiong1-thian1', d: 'u', btn: 'A', note: '對空火柱。出招無敵',
+    m: mv('firestomp', '火衝天', 34, { kind: 'sp', mp: 150, pose: 'firestomp', inv: [1, 11], quake: [5],
       hits: [hit([5, 8], [-200, 0, 950, 1800], 'S', { dmg: 40, fall: 0, hs: 22, stop: 6, dvx: 4, dvy: 70, fire: 1 }),
         hit([11, 15], [-200, 0, 950, 2100], 'S', { dmg: 66, kd: 1, dvx: 30, dvy: 120, stop: 12, fire: 1 })] }) },   // 2026-11-26：被貼上的脫身招，前面 760→950、背後也燒得到、無敵 1–8→1–11、最後一下把人往外燒開
 ];
@@ -64,6 +64,6 @@ export default {
   w: 320, h: 1550, hc: 980,
   walkX: 16, walkZ: 11, run: 44, runZ: 9,   // 2026-11-26 14→16、40→44（原本跟鼻象一樣全場最慢，遠攻的要能換位置）
   jumpV: 146, jumpX: 17, jumpZ: 11, dashV: 98, dashX: 54,
-  ai: { style: 'zone', esc: 'firestomp' },   // 電腦的打法：遠攻（ai.js STYLE）；被貼上用踏火衝天頂開
+  ai: { style: 'zone', esc: 'firestomp' },   // 電腦的打法：遠攻（ai.js STYLE）；被貼上用火衝天頂開
   normals: N, specials: SP, supers: SU,
 };

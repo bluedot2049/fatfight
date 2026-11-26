@@ -165,7 +165,7 @@ const T = { aura: 0, soft: 1, star: 2, ring: 3, streak: 4, seam: 5, wave: 6, ray
 const WHITE = '#ffffff';
 // 火的三段顏色：芯、焰、尾。中間的顏色照原本的算法在線性空間裡混，再換回畫面上的顏色
 const FIRE = ['#fff0b0', '#ffa236', '#d8341a'].map((c) => new THREE.Color(c));
-export const VIOLET = ['#f3e8ff', '#b07cff', '#4a1e9a'].map((c) => new THREE.Color(c));   // 紫火（爛熊的須左能乎）：flame 最後一個參數
+export const VIOLET = ['#f3e8ff', '#b07cff', '#4a1e9a'].map((c) => new THREE.Color(c));   // 紫火（爛熊的修羅護法身）：flame 最後一個參數
 const enc = (v) => (v <= 0.0031308 ? v * 12.92 : 1.055 * Math.pow(v, 1 / 2.4) - 0.055);
 function fireColor(o, a, b, t) {
   o.r = enc(a.r + (b.r - a.r) * t); o.g = enc(a.g + (b.g - a.g) * t); o.b = enc(a.b + (b.b - a.b) * t);

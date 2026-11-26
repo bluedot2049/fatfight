@@ -96,7 +96,7 @@ for (const C of ALL) {
     air: C.specials.filter((s) => kind(s) === 'air'),
     rush: C.specials.filter((s) => kind(s) === 'rush'),
     su: C.supers,
-    grab: C.specials.filter((s) => s.m.hits.some((h) => h.grab === 1)),   // 指令投（鼻象鼻子捲）：對方在擋的時候用（象鼻號角是對空，算 air）
+    grab: C.specials.filter((s) => s.m.hits.some((h) => h.grab === 1)),   // 指令投（鼻象象鼻拉）：對方在擋的時候用（捲落是對空，算 air）
     hurl: C.specials.filter((s) => kind(s) === 'hurl'),             // 拔東西丟（鼻象拔石頭）：中距離、前後對齊了丟
     heal: C.specials.filter((s) => s.m.spawn),                       // 放吃的（臘腸狗埋骨頭）：血少、離得遠的時候放，之後撿起來吃（itemAI）
     jump: C.ai?.jump ?? 0,           // 愛跳多少（想下一步時「跳」的份量多這麼多；青蛙）
@@ -117,7 +117,7 @@ function zoneOf(o) {
 // 怕的機率（/256）：FEAR + 難度 × FEAR_LV、雜兵 FEAR_MOB；怕的時候想下一步「跳進去」多 FEAR_JUMP 的份量
 const ESCAPE = 700, ESCAPE_GAP = 50;  // 遠攻的被貼到身體之間這麼近，就想放起手打不到的招頂開（每次隔 ESCAPE_GAP 幀才想一次）
 const FEAR = 70, FEAR_LV = 14, FEAR_MOB = 120, FEAR_JUMP = 24;
-// 抓地上的指令投（鼻子捲、象王大掄）：對方在空中、倒著就別出（一定揮空）
+// 抓地上的指令投（象鼻拉、象王風車）：對方在空中、倒著就別出（一定揮空）
 const grabMiss = (s, o) => s.m.hits.some((h) => h.grab === 1) && (o.air || o.y > 0 || LYING.has(o.act));
 
 // 道具（items.js）：回傳要按的鍵，-1＝不管道具照平常打
@@ -574,7 +574,7 @@ function react(S, f, A, L, K, tw, aw, sx) {
       if (!facing || ex > r.far + 300 || ez > r.zr + 150) continue;
       A.seen = key;
       const k = r.first - e.t + e.stop;                    // 幾幀後打到
-      // 擋不住的（須左能乎）：算好時間跳起來躲
+      // 擋不住的（修羅護法身）：算好時間跳起來躲
       if (m.hits.some((h) => h.ub)) {
         if (k >= 0 && rnd(A) < L.dodge * 3) { A.q = [...Array(Math.max(0, k - 12)).fill(0), BJ]; return A.q.shift(); }
         return -1;

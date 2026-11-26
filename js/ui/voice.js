@@ -146,18 +146,22 @@ export function speak(ctx, out, noiseBuf, text, o = {}, t0 = ctx.currentTime) {
 
 // ── 台語（台羅，數字調）──────────────────────────────
 // 'tshim1-hai2 pa3-khi3'：- 連在一起的是一組，一組裡最後一個字念本調、前面的變調；空白＝一組念完停一下。
-// 調號沒寫的話：-p -t -k -h 結尾算 4，其他算 1。oo、nn（鼻化）、ng、m 照台羅寫。
+// 調號寫數字（hai2）或符號（hái）都可以；都沒寫的話：-p -t -k -h 結尾算 4，其他算 1。oo、nn（鼻化）、ng、m 照台羅寫，大小寫不管。
 
 const INI = ['tsh', 'ph', 'th', 'kh', 'ng', 'ts', 'p', 'b', 'm', 't', 'n', 'l', 'k', 'g', 'h', 's', 'j'];
 // 每個調的音高：[起, 迄]，1 最低 5 最高（台北腔）
 const TONE = { 1: [5, 5], 2: [5, 1.6], 3: [2.3, 1], 4: [3, 2.4], 5: [2, 4.3], 7: [3.3, 3], 8: [4.4, 5], 9: [3, 5] };
 // 變調：1→7、2→1、3→2、5→7、7→3；入聲 4→8（-h 的 4→2）、8→3
 const SANDHI = { 1: 7, 2: 1, 3: 2, 5: 7, 7: 3, 8: 3, 9: 9 };
+// 台羅調號符號（拆開後的附加符號）→ 第幾調
+const MARK = { '\u0301': 2, '\u0300': 3, '\u0302': 5, '\u030c': 6, '\u0304': 7, '\u030d': 8, '\u0306': 9 };
 
 export function parseTai(s) {
   return s.toLowerCase().trim().split(/\s+/).filter(Boolean).map((g) => g.split('-').filter(Boolean).map((w) => {
     let tone = 0;
     const m = /([1-9])$/.exec(w); if (m) { tone = +m[1]; w = w.slice(0, -1); }
+    const d = w.normalize('NFD').replace(/o\u0358/g, 'oo'), mk = /[\u0300-\u036f]/.exec(d);   // 調號符號：拆開看是哪一種，再拿掉
+    if (mk) { tone = tone || MARK[mk[0]] || 0; w = d.replace(/[\u0300-\u036f]/g, ''); }
     let ini = '';
     if (w !== 'm' && w !== 'ng') for (const c of INI) if (w.startsWith(c) && w.length > c.length) { ini = c; break; }
     let r = w.slice(ini.length), coda = '', nas = 0;

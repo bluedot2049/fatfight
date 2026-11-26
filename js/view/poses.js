@@ -7,7 +7,7 @@
 import { MOVES, CHARS } from '../sim/chars/index.js';
 import { paceLen } from '../sim/moves.js';
 
-// 象王大掄的掄法（sim 的 orbitStep，這裡算到小數讓身體轉得順）
+// 象王風車的掄法（sim 的 orbitStep，這裡算到小數讓身體轉得順）
 const swing = (fast) => ({ sq: 0.08 - 0.08 * fast, lean: -0.12 - 0.1 * fast, bend: -0.1, head: -0.45, aN: 2.3, aF: 2.1, aNz: 0.6 + 0.4 * fast, aFz: 0.6 + 0.4 * fast });
 const KING_SLAP = { sq: -0.14, by: -0.03, lean: 0.28, bend: 0.2, head: 0.5, aN: 0.6, aF: 0.5, aNz: 0.9, aFz: 0.9, lN: -0.1 };   // 鼻子拍地
 function paceSteps(G, t) {
@@ -344,7 +344,7 @@ function attackPose(f, m, t, clock) {
     const k = t - at;
     return { aN: 2.8, aF: 2.6, sq: 0.15, spin: Math.max(0, 3 * Math.PI * 2 * (1 - k / 14)), head: -0.3 };
   }
-  if (id === 'earspin') {                            // 甩耳旋風：整隻往上轉（耳朵往外甩，view 那邊）
+  if (id === 'earspin') {                            // 耳旋風：整隻往上轉（耳朵往外甩，view 那邊）
     const k = Math.min(1, t / 4);
     if (t > m.total - 6) return mix({ spin: 0, aN: 0.8, aF: 0.8 }, BASE.idle, (t - m.total + 6) / 6);
     return { spin: t * 0.9 * k, aN: 1.6, aF: 1.6, aNz: 0.6, aFz: 0.6, sq: 0.1, head: -0.2 };
@@ -393,7 +393,7 @@ function attackPose(f, m, t, clock) {
     if (t <= at) return { spin: -((t + 64 - at) / 2) * (Math.PI / 4), lean: -0.12, sq: -0.06, aN: 1.4, aF: 1.3, aNz: 0.5, aFz: 0.5, head: 0.1, lN: 0.2 * Math.sin(t * 0.8) };
     return mix({ spin: 0, lean: 0.4, bend: 0.3, head: 0.3, aN: 1.8, aF: 1.6 }, BASE.idle, Math.min(1, (t - at) / Math.max(1, m.total - at)));
   }
-  if (id === 'kingspin') {                           // 象王大掄：定格時仰頭鼻子朝天（t 停在 0）→ 鼻子往地上一拍（地上一圈往外擴，掃到人換成 kingT）→ 揮空的話趴著愣在那裡
+  if (id === 'kingspin') {                           // 象王風車：定格時仰頭鼻子朝天（t 停在 0）→ 鼻子往地上一拍（地上一圈往外擴，掃到人換成 kingT）→ 揮空的話趴著愣在那裡
     const a0 = m.hits[0].on[0], a1 = m.hits[0].on[1] + 3;
     const call = { sq: 0.12, lean: -0.32, bend: -0.2, head: -0.75, aN: 2.5, aF: 2.3, aNz: 0.5, aFz: 0.5, lN: 0.35 };
     const slap = KING_SLAP;

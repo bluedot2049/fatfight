@@ -7,7 +7,7 @@ import { ITEMS } from '../sim/items.js';
 import { MOVES, CHARS } from '../sim/chars/index.js';
 import { speak, speakTai, grunt } from './voice.js';
 const JP = typeof location !== 'undefined' && new URLSearchParams(location.search).has('jp');   // ?jp 念回日語，對照用
-const TAI_SP = 0.8;   // 台語念必殺比超必殺快兩成（一拍的秒數乘這個）
+export const TAI_SP = 0.8;   // 台語念必殺比超必殺快兩成（一拍的秒數乘這個）
 
 let ctx = null, master = null, sfxBus = null, musicBus = null, echoIn = null, verbIn = null, hallIn = null, noiseBuf = null;
 const HALL = { gap: 0.3, fb: 0.5 };   // 大招回音：每一聲隔幾秒、每彈一次剩多少
@@ -301,7 +301,7 @@ KIT.dog = {
     if (su) noise(t + 0.03, 0.04, 4200, 1.5, 0.3);
   },
 };
-// 爛熊：苦無破風（細細的咻一把撒出去）、幻術（往下沉的嗡＋烏鴉）、踹（悶的一腳）、豪火球（吸一口、轟）；超必殺須左能乎是低沉的和聲鼓起來、紫火轟
+// 爛熊：苦無破風（細細的咻一把撒出去）、幻術（往下沉的嗡＋烏鴉）、踹（悶的一腳）、豪火球（吸一口、轟）；超必殺修羅護法身是低沉的和聲鼓起來、紫火轟
 KIT.bear = {
   sp: {
     kunai(t) { for (let i = 0; i < 6; i++) noise(t + i * 0.025, 0.07, 3200 + i * 300, 3, 0.16, 'bandpass', 1400); clink(t + 0.02, 0.5, 1900); },

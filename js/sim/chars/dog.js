@@ -23,7 +23,7 @@ const N = {
 
 const SP = [
   // 汪汪聲波（2026-11-26 使用者：更遠、更有特色、三發散射）：一吠三道，正前一道、往前後斜斜各一道，越遠分越開，都穿過一整排人。
-  // 每道不痛、不打倒、倒值 16：貼臉吠三道疊在一起一次中三下＝直接頭暈（三拳接聲波打暈，再接衝咬、長長長臘腸）；遠的只中一道，吠三聲才暈。約 5.5 公尺
+  // 每道不痛、不打倒、倒值 16：貼臉吠三道疊在一起一次中三下＝直接頭暈（三拳接聲波打暈，再接衝咬、長長臘腸）；遠的只中一道，吠三聲才暈。約 5.5 公尺
   { id: 'bark', name: '汪汪聲波', yomi: 'wan wan', tai: 'ong1-ong1 siann1-pho1', d: 'f', btn: 'A', note: '三道散射貫穿。近距離全中頭暈。追加攻再發',
     m: mv('bark', '汪汪聲波', 30, { kind: 'sp', mp: 120, pose: 'bark', mash: { at: 20, to: 6, n: 2, mp: 50 },
       proj: { at: 8, x: 450, y: 650, vx: 70, w: 160, h: 300, dmg: 22, fall: 16, life: 48, pierce: 1, fan: [[1000, 0], [940, 340], [940, -340]] } }) },
@@ -36,19 +36,19 @@ const SP = [
   // 攻＋防丟出去、蹲放下（隊友撿去吃）。一次只能有一根
   { id: 'bone', name: '埋骨頭', yomi: 'hone', tai: 'tai5-kut4-thau5', d: 'd', btn: 'A', note: '挖出骨頭叼著。攻食用回血，蹲放下給隊友',
     m: mv('bone', '埋骨頭', 40, { kind: 'sp', mp: 150, pose: 'dig', spawn: { at: 22, k: 'bone', x: 800, hold: 1 } }) },
-  // 甩耳旋風：對空，兩隻耳朵甩成螺旋槳往上轉，前兩下帶上去、最後一下打飛
-  { id: 'earspin', name: '甩耳旋風', yomi: 'mimi senpu-', tai: 'sut4-hinn7 suan5-hong1', d: 'u', btn: 'A', note: '對空。出招無敵',
-    m: mv('earspin', '甩耳旋風', 30, { kind: 'sp', mp: 150, pose: 'earspin', inv: [1, 8], jump: [3, 8, 104], land: 4, landW: 11, hang: 6,
+  // 耳旋風：對空，兩隻耳朵甩成螺旋槳往上轉，前兩下帶上去、最後一下打飛
+  { id: 'earspin', name: '耳旋風', yomi: 'mimi senpu-', tai: 'hinn7 suan5-hong1', d: 'u', btn: 'A', note: '對空。出招無敵',
+    m: mv('earspin', '耳旋風', 30, { kind: 'sp', mp: 150, pose: 'earspin', inv: [1, 8], jump: [3, 8, 104], land: 4, landW: 11, hang: 6,
       hits: [hit([3, 5], [-200, 200, 560, 1500], 'S', { dmg: 30, fall: 0, carry: 1, stop: 5, hs: 24 }),
         hit([7, 9], [-200, 200, 560, 1500], 'S', { dmg: 30, fall: 0, carry: 1, stop: 5, hs: 24 }),
         hit([11, 15], [-200, 200, 600, 1550], 'S', { dmg: 62, kd: 1, dvx: 18, dvy: 100, stop: 13 })] }) },
 ];
 
-// 長長長臘腸：身體一直拉長，頭伸到 5 公尺外一口一口咬（咬到人頭就停在那裡）；拉長的時候整條身體都挨得到打。被擋也一口一口鎖住
+// 長長臘腸：身體一直拉長，頭伸到 5 公尺外一口一口咬（咬到人頭就停在那裡）；拉長的時候整條身體都挨得到打。被擋也一口一口鎖住
 const BITE = [0, 150, 600, 850];
 const SU = [
-  { id: 'longdog', name: '長長長臘腸', yomi: 'naga naga nagai', tai: 'tng5-tng5-tng5 lah8-tshiang5', d: 'u', btn: 'J', note: '伸長連咬。伸長中全身有受擊判定',
-    m: mv('longdog', '長長長臘腸', 80, { kind: 'su', mp: 400, flash: 1, inv: [0, 14],
+  { id: 'longdog', name: '長長臘腸', yomi: 'naga naga nagai', tai: 'tng5-tng5 lah8-tshiang5', d: 'u', btn: 'J', note: '伸長連咬。伸長中全身有受擊判定',
+    m: mv('longdog', '長長臘腸', 80, { kind: 'su', mp: 400, flash: 1, inv: [0, 14],
       sweep: { on: [14, 30], to: 5000, near: 5000, low: 900, head: 700, hurt: 1, back: [58, 72] },
       hits: multi(16, 6, 7, BITE, 32, 90, { zr: 450 }).map((h) => ({ ...h, on: [h.on[0], h.on[0] + 5] })) }) },
 ];

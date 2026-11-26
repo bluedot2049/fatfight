@@ -519,7 +519,7 @@ export function crackBoom(S, q, b) {
   S.ev.push({ k: q.aim ? 'pillar' : q.lob ? 'pool' : 'erupt', s: q.o, x: q.x, z: q.z, id: q.id });
 }
 
-// 掄人（鼻子捲按攻）：抓著的人繞一圈的八個位置（往前、往前後，× 1000）
+// 掄人（象鼻拉按攻）：抓著的人繞一圈的八個位置（往前、往前後，× 1000）
 const ORBIT = [[1000, 0], [707, 707], [0, 1000], [-707, 707], [-1000, 0], [-707, -707], [0, -1000], [707, -707]];
 function pinStage(S, o) {
   const w = CHARS[o.ch].w;
@@ -560,7 +560,7 @@ function atkStep(S, f, C) {
   if (m.hang && f.air && f.hang === 0 && f.vy <= 0) f.hang = m.hang;
   if (m.it && f.t === m.it.at) itemAct(S, f, m);
   if (m.flip === f.t) f.face = -f.face;              // 鑽過去之後回頭
-  // 長長長臘腸咬到人：頭跟著咬到的那個（被咬退一點也咬得到下一口）
+  // 長長臘腸咬到人：頭跟著咬到的那個（被咬退一點也咬得到下一口）
   if (m.sweep && m.sweep.head && f.con && f.hitList.length) {
     const o = S.p[f.hitList[f.hitList.length - 1] & 15];
     const want = (o.x - f.x) * f.face - CHARS[o.ch].w + 250;

@@ -22,7 +22,7 @@ export function hurtBoxes(f) {
   if (isUnder(f)) return [];
   const C = CHARS[f.ch], m = moveOf(f);
   if (m && m.hurt) return [m.hurt];
-  if (m && m.sweep && m.sweep.hurt) return [[-C.w, 0, Math.max(C.w, hitBoxes(m, m.hits[0], f.t, f.sf)[0][2]), C.hc]];   // 長長長臘腸：拉長的整條都挨得到
+  if (m && m.sweep && m.sweep.hurt) return [[-C.w, 0, Math.max(C.w, hitBoxes(m, m.hits[0], f.t, f.sf)[0][2]), C.hc]];   // 長長臘腸：拉長的整條都挨得到
   if (f.act === 'fall') return [[-C.w, 100, C.w, (C.h * 0.6) | 0]];
   if (f.air) return [[-C.w, 0, C.w, (C.h * 0.85) | 0]];
   if (f.cr) return [[-C.w, 0, C.w, C.hc]];
@@ -170,7 +170,7 @@ function applyHit(S, a, d, h, kind, fromX, isProj, m = null) {
     launch(d, dir, h.dvx, h.dvy, a);
     d.jug++;
     if (h.fire) d.burn = 1;
-  } else if ((h.daze || d.fallv >= DIZZY) && !gang && !d.dz) {      // daze：幻術、須左能乎直接打暈
+  } else if ((h.daze || d.fallv >= DIZZY) && !gang && !d.dz) {      // daze：幻術、修羅護法身直接打暈
     setAct(d, 'dizzy'); d.dz = 1;
     d.slide = 120; d.sdir = dir;
     S.ev.push({ k: 'dizzy', s: d.i });
@@ -222,7 +222,7 @@ function explode(S, booms) {
   }
 }
 
-// 吸人的必殺（深海漩渦）：把身前那點附近的敵人一幀一幀拉過去；擋著的拉一半
+// 吸人的必殺（深海渦）：把身前那點附近的敵人一幀一幀拉過去；擋著的拉一半
 export function pullStep(S) {
   for (const a of S.p) {
     const m = moveOf(a);
