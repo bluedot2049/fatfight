@@ -19,6 +19,7 @@ const POSE = {
   penguin: { aF: 1.35, aFz: 0.15, aN: 2.15, aNz: -0.55, head: 0.18, lean: 0.05 },                                           // 一鰭托火、一鰭掩面
 };
 const WALK = { lean: 0.42, bend: 0.12, aN: 1.1, aF: -0.8, lN: 0.9, lF: -0.7, head: -0.12 };   // 朝鏡頭衝（一手前一手後）
+const DOGWALK = { ...WALK, lean: 0.04, bend: 0, head: -0.25 };   // 臘腸狗身體長又低，一前傾鼻子就插進地板：不傾、頭抬起來
 
 // 位置（公尺）、大小、轉向（0＝正對鏡頭，正的往畫面右轉）、背後的邊光顏色
 const CAM = { pos: [0.2, 0.85, 5.2], at: [0, 1.35, 0], fov: 40 };
@@ -101,7 +102,7 @@ export class Poster {
       m.root.rotation.y = a.yaw;
       S.add(m.root);
       this.keep.add(m.root);
-      const o = { ...a, m, i, base: a.walk ? WALK : (POSE[a.id] || {}), pose: { ...ZERO } };
+      const o = { ...a, m, i, base: a.id === 'dog' ? DOGWALK : a.walk ? WALK : (POSE[a.id] || {}), pose: { ...ZERO } };
       const pl = new THREE.PointLight(a.rim, 7 * a.s, 2.6 * a.s, 1.6);
       pl.position.set(a.x + (a.x < 0 ? -0.9 : 0.9), (a.y || 0) + 1.5 * a.s, a.z - 0.9);
       S.add(pl);

@@ -3,7 +3,8 @@
 // 場地「海底沉船」（闖關第一關）：往右捲的一長條海底。沙地上晃的水光、後面一排礁岩和海草、上面斜照下來的光柱、飄的海雪和氣泡，最後一段是半埋在沙裡的大沉船（頭目在這）。全部程式畫，不載圖。
 
 import * as THREE from 'three';
-import { Z_NEAR, Z_FAR } from '../sim/const.js';
+import { QZ } from '../sim/const.js';
+const Z_NEAR = QZ, Z_FAR = -QZ;   // 闖關的地板前後（sim 的 S.zn、S.zf）
 
 export const SEA_BG = '#0a2a36';
 
@@ -111,7 +112,7 @@ export class SeaStage {
     scene.add(this.root);
     const add = (...o) => this.root.add(...o);
     this.bg = new THREE.Color(SEA_BG);
-    this.fog = new THREE.Fog(SEA_BG, 9, 30);
+    this.fog = new THREE.Fog(SEA_BG, 12, 34);
     const x0 = span[0] / 1000 - 12, x1 = span[1] / 1000 + 12, len = x1 - x0, cx = (x0 + x1) / 2;
     const r = rng(9);
 
@@ -274,7 +275,7 @@ export class SeaStage {
       const p = k.m.geometry.attributes.position;
       for (let i = 0; i < p.count; i++) {
         const y = k.base[i * 3 + 1], f = y / k.h;
-        p.setX(i, k.base[i * 3] + Math.sin(clock * 0.9 + k.ph + y * 0.9) * k.amp * f * f);
+        p.setX(i, k.base[i * 3] + Math.sin(clock * 0.9 + k.ph + y * 0.9) * k.amp * f * f + (this.flow || 0) * 0.5 * k.h * f * f);   // 洋流：海草往那邊倒
         p.setZ(i, Math.cos(clock * 0.7 + k.ph + y * 0.6) * k.amp * 0.5 * f * f);
       }
       p.needsUpdate = true;
@@ -286,7 +287,8 @@ export class SeaStage {
       let y = a.getY(i) - dt * (0.08 + (i % 4) * 0.03);
       if (y < 0) y = 6;
       a.setY(i, y);
-      a.setX(i, a.getX(i) + Math.sin(clock * 0.5 + i) * dt * 0.05);
+      a.setX(i, a.getX(i) + Math.sin(clock * 0.5 + i) * dt * 0.05 + (this.flow || 0) * dt * (2.2 + (i % 3) * 0.8));   // 洋流（traps.js 的 flow）：海雪整片往那邊漂
+      if (this.flow) { const x = a.getX(i); if (x > this.x0 + this.len) a.setX(i, this.x0); else if (x < this.x0) a.setX(i, this.x0 + this.len); }
     }
     a.needsUpdate = true;
     const b = this.bubbles.geometry.attributes.position;

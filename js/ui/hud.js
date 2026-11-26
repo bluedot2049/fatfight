@@ -43,9 +43,12 @@ export class Hud {
         <div class="moves" hidden></div>
         <div class="boss"><div class="bn"><b></b></div><div class="hp"><i class="trail"></i><i class="fill"></i></div></div>
         <div class="goarrow"><b>前進</b><i></i></div>
+        <div class="tide"><i class="l"></i><b>洋流</b><i class="r"></i></div>
         <div class="cont"><h3>接關</h3><b class="n"></b><p></p></div>
       </div>
       <div class="ebars">${'<i class="eb"><b></b></i>'.repeat(16)}</div>
+      <div class="pops">${'<i class="pop"></i>'.repeat(12)}</div>
+      <div class="thint"></div>
       <div class="flash"></div>
       <div class="net"></div>`;
     this.el = [0, 1].map((i) => {
@@ -60,6 +63,8 @@ export class Hud {
     this.cdmg = [0, 0];
     this.annT = 0;
     this.ebars = [...root.querySelectorAll('.ebars .eb')];
+    this.pops = [...root.querySelectorAll('.pops .pop')].map((el) => ({ el, t: 9 }));   // 打法分的浮字（闖關）
+    this.popN = 0;
     this.view = null;              // main 給：敵人頭上的血條要知道畫面位置
     this.fit();
     addEventListener('resize', () => this.fit());
@@ -135,6 +140,8 @@ export class Hud {
     $('.announce', this.root).className = 'announce';
     for (const c of ['.boss', '.goarrow', '.cont']) $(c, this.root).classList.remove('on');
     for (const b of this.ebars) b.classList.remove('on');
+    for (const o of this.pops) { o.t = 9; o.el.classList.remove('on'); }
+    $('.tide', this.root).className = 'tide'; $('.thint', this.root).classList.remove('on');
   }
 
   update(S, dt) {
@@ -232,11 +239,42 @@ export class Hud {
     }
     for (; n < this.ebars.length; n++) this.ebars[n].classList.remove('on');
     $('.goarrow', this.root).classList.toggle('on', !!S.go && S.ph === 'fight');
+    this.trapHud(S, ps, dt);
     const cont = S.ph === 'cont', cel = $('.cont', this.root);
     if (cont !== q.cont) { q.cont = cont; cel.classList.toggle('on', cont); $('p', cel).textContent = `按 ${btnName('A')} 繼續　分數歸零`; }
     if (cont) {
       const left = Math.max(0, Math.ceil((CONT_TIME - S.pt) / 60));
       if (left !== q.left) { q.left = left; gtSet($('.n', cel), String(left), 0.05, 0.05); }
+    }
+  }
+
+  // 場地機關：洋流的預告和方向（上面中間）、甲板炮能點的時候站旁邊的玩家頭上寫按哪顆；打法分的浮字跟著打中的地方往上飄
+  trapHud(S, ps, dt) {
+    const tr = S.tr || [], cur = tr.find((t) => t.k === 'current');
+    const tc = !cur || !cur.on || S.ph !== 'fight' ? 'tide' : `tide on ${cur.on === 1 ? 'warn' : ''} ${cur.dir > 0 ? 'right' : 'left'}`;
+    const tel = $('.tide', this.root);
+    if (tel.className !== tc) tel.className = tc;
+    let hint = null;
+    for (const t of tr) {
+      if (t.k !== 'gun' || t.cd > 0 || t.fire > 0) continue;
+      const p = ps.find((f) => f && f.hp > 0 && f.item < 0 && Math.abs(f.x - t.x) - CHARS[f.ch].w <= 420 && Math.abs(f.z - t.z) <= 420);   // 跟 traps.js 的 use、zu 一樣
+      if (p) { hint = t; break; }
+    }
+    const h = $('.thint', this.root);
+    h.classList.toggle('on', !!hint && S.ph === 'fight');
+    if (hint && this.view) {
+      if (!h.textContent) h.textContent = `${btnName('A')} 點炮`;
+      const [x, y] = this.view.toScreen(hint.x / 1000, 1.25, hint.z / 1000);
+      h.style.transform = `translate(${x | 0}px, ${y | 0}px)`;
+    }
+    for (const o of this.pops) {
+      if (o.t > 1.1) continue;
+      o.t += dt;
+      if (o.t > 1.1) { o.el.classList.remove('on'); continue; }
+      if (!this.view) continue;
+      const [x, y] = this.view.toScreen(o.x / 1000, o.y / 1000 + 0.3 + o.t * 0.9, o.z / 1000);
+      o.el.style.transform = `translate(${x | 0}px, ${y | 0}px)`;
+      o.el.style.opacity = o.t < 0.75 ? 1 : (1.1 - o.t) / 0.35;
     }
   }
 
@@ -275,6 +313,20 @@ export class Hud {
       case 'stage': this.announce(`第${N[e.n - 1] || e.n}關`, 2.2, 'round', e.name); break;
       case 'boss': this.callout(1, e.name || CHARS[S.p[e.s].ch].full, e.say || '頭目'); break;      // 關卡表的 bossSay：頭目進場說的一句話
       case 'clear': this.announce('過關', 3.5, 'go'); this.flash(0.4); break;
+      case 'bonus': {                                 // 打法分：打中的地方浮「＋150 炮擊」
+        const o = this.pops[this.popN++ % this.pops.length];
+        o.t = 0; o.x = e.x; o.y = e.y ?? 900; o.z = e.z ?? 0;
+        o.el.textContent = `+${e.v} ${e.tag}`;
+        o.el.classList.remove('on'); void o.el.offsetWidth; o.el.classList.add('on');
+        break;
+      }
+      case 'grade': {                                 // 一段打完的評價（最後一段跟著過關一起，不另外出字卡）
+        if (e.n >= QUESTS[S.quest].secs.length - 1) break;
+        const ps = this.players(S).filter(Boolean), G = 'SABC';
+        const txt = ps.map((f) => (ps.length > 1 ? `${f.pl + 1}P ` : '') + (G[S.grade[f.pl][e.n]] || '')).join('　');
+        this.announce(txt, 1.6, 'round', '這段評價');
+        break;
+      }
       case 'out': if (this.players(S).filter(Boolean).length > 1) this.callout(this.players(S).indexOf(S.p[e.s]) === 1 ? 1 : 0, `按 ${btnName('A')} 接關`, '出局'); break;
       case 'round': if (!S.opt.train) this.announce(`第${N[e.n - 1] || e.n}回合`, 1.5, 'round', `ROUND ${ROMAN[e.n - 1] || e.n}`); else this.announce('練習', 1.2); break;
       case 'fight': this.announce('開打', 0.8, 'go'); break;

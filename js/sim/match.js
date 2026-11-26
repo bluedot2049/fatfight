@@ -9,6 +9,7 @@ import { resolveHits, moveProjectiles, pullStep } from './combat.js';
 import { newAI, aiBits } from './ai.js';
 import { questStep } from './quest.js';
 import { itemsStep, arenaDrop } from './item.js';
+import { trapsStep } from './trap.js';
 
 // 對戰：兩隻，隊伍 0 和 1。opt：{ train: 練習模式（血會回、魔力無限）, cpu: 難度（有給的話 2P 換電腦）}
 export function newMatch(ch0, ch1, opt = {}) {
@@ -81,6 +82,7 @@ export function step(S, b0, b1) {
 export function world(S, ko) {
   for (const f of S.p) think(S, f, ko || f.hp <= 0);
   for (const f of S.p) advance(S, f);
+  if (S.tr) trapsStep(S);                 // 闖關的場地機關（洋流推人、甲板炮轟出炮彈）
   pullStep(S);
   pushApart(S);
   keepTogether(S);

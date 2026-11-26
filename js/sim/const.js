@@ -6,6 +6,10 @@ export const M = 1000;              // 1 公尺
 export const STAGE_HALF = 11000;    // 場地左右牆（離中心）：22 公尺，大約三個畫面寬
 export const Z_NEAR = 1500;         // 地板最靠鏡頭那邊（z 往鏡頭為正）
 export const Z_FAR = -1500;         // 地板最裡面
+// 闖關的地板前後（使用者 2026-11-26：闖關擠，地板加深、鏡頭拉遠）。前後邊界看狀態的 S.zn、S.zf（對戰沒寫就是 Z_NEAR、Z_FAR）
+export const QZ = 2300;
+export const zNear = (S) => S.zn ?? Z_NEAR;
+export const zFar = (S) => S.zf ?? Z_FAR;
 export const START_X = 2000;        // 開場兩人各離中心多遠
 export const MAX_SEP = 9000;        // 兩個玩家左右最遠拉開多少（鏡頭框得住）
 export const GRAV = 7;              // 每幀往下加的速度（整體慢 20% 後：往上速度 ×4/5、重力 ×16/25，跳的高度不變）

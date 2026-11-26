@@ -13,22 +13,22 @@ const boss = (ch, hp, side = 'R') => ({ ch, lv: 3, hp, pow: 125, side, boss: 1, 
 export default {
   id: 'forest', no: 3, name: '黑森林', scene: 'forest', bossName: '營火三冒險者', bossSay: '第四個人終於來了。不是？',
   food: ['mushroom', 'redpot'],   // 雜兵每倒四隻掉一個（照順序輪）
-  span: [-8000, 38000],
+  span: [-10000, 52000],
   secs: [
-    { lo: -6000, hi: 6000, items: [['sword', 5000, 300], ['crate', 8500, -600]], waves: [
+    { lo: -8000, hi: 8000, items: [['sword', 6700, 400], ['crate', 11300, -800]], waves: [
       [m('fox', 0, 150), m('fox', 0, 150, 'L'), m('boar', 0, 230)],
       [m('owl', 0, 120), m('fox', 1, 150), m('owl', 0, 120, 'L')],
     ] },
-    { lo: 4000, hi: 16000, items: [['torch', 5500, -400], ['boulder', 7500, 600], ['crate', 9500, 0]], waves: [
+    { lo: 6000, hi: 22000, items: [['torch', 7300, -600], ['boulder', 10000, 800], ['crate', 12700, 0]], waves: [
       [m('boar', 1, 240), m('fox', 1, 160, 'L'), m('owl', 1, 130)],
       [m('owl', 1, 130), m('fox', 1, 160), m('boar', 1, 240, 'L'), el('fox', 200, 'L')],
     ] },
-    { lo: 14000, hi: 26000, items: [['sword', 6000, 700], ['boulder', 7000, -500], ['mushroom', 9000, 200]], waves: [
+    { lo: 20000, hi: 36000, items: [['sword', 8000, 1000], ['boulder', 9300, -700], ['mushroom', 12000, 300]], waves: [
       [m('fox', 2, 170), m('owl', 1, 130, 'L'), m('boar', 1, 250), m('fox', 2, 170, 'L')],
       [m('boar', 2, 260), m('owl', 2, 140), m('fox', 2, 170, 'L'), m('owl', 2, 140, 'L'), el('boar', 300)],
     ] },
-    { lo: 24000, hi: 36000, items: [['torch', 4800, -700], ['mushroom', 6200, 800], ['crystal', 4300, 0], ['sword', 7000, -200]], waves: [
-      [boss('warrior', 470), boss('archer', 380), boss('mage', 350, 'L'), m('fox', 2, 170, 'L')],
+    { lo: 34000, hi: 50000, items: [['torch', 6400, -1000], ['mushroom', 8300, 1100], ['crystal', 5700, 0], ['sword', 9300, -300]], waves: [
+      [boss('warrior', 440), boss('archer', 355), boss('mage', 330, 'L'), m('fox', 2, 170, 'L')],
     ] },
   ],
 };

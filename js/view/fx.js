@@ -289,6 +289,10 @@ export class FX {
   trail(x, y, color, len = 1.2, z = 0, th = 0.16) {
     this.sp(T.streak, color, x, y, z - 0.05, 0.22, (o, k) => { o.sx = len * (1 - k * 0.3); o.sy = th * (1 - k); o.a = 0.7 * (1 - k); });
   }
+  // 武器揮過的殘影：沿著武器一道光，很快變細消失（view/items.js 揮武器的有效幀每幀留一道，連起來是一個弧）
+  ghost(x, y, rot, len, color = WHITE, z = 0) {
+    this.sp(T.streak, color, x, y, z + 0.05, 0.13, (o, k) => { o.sx = len; o.sy = 0.16 * (1 - k); o.a = 0.6 * (1 - k); }).rot = rot;
+  }
   // 擋住：念力護罩，一面扁扁的光殼閃一下、外緣亮，中間一點白
   block(x, y, z = 0, color = '#bfe6ff') {
     this.sp(T.star, WHITE, x, y, z + 0.4, 0.1, (o, k) => { o.sx = o.sy = 0.45 + k * 0.3; o.a = 1 - k; });

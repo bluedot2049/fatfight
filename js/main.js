@@ -47,7 +47,7 @@ const G = {
   S: newMatch('manatee', 'marmot'),
   chars: ['manatee', 'marmot'],
   paused: false,
-  dummy: 0,               // 練習對手：0 站著 1 蹲著 2 防禦 3 蹲防 4 一直跳 5 P2 操作 6 電腦
+  dummy: 0,               // 練習對手：0 站著 1 蹲著 2 防禦 3 一直跳 4 P2 操作 5 電腦
   cpuLv: 1,               // 對電腦的難度：贏了往上一級（0–LV_MAX），回標題重來
   rb: null, net: null, side: 0, overT: 0,
   room: null,             // 線上的房間：{ code, mode: fight／quest, stage 闖關從哪一關 }
@@ -93,7 +93,7 @@ function setMovesOn(on) {
   movesOn = on; hud.showMoves(on);
   try { localStorage.setItem(MOVES_KEY, on ? '1' : '0'); } catch {}
 }
-const DUMMY = ['站著', '蹲著', '防禦', '蹲防', '一直跳', '由 P2 操作', '電腦'];
+const DUMMY = ['站著', '蹲著', '防禦', '一直跳', '由 P2 操作', '電腦'];
 const TRAIN_CPU = 3;        // 練習的電腦對手用幾級
 const MATE_LV = LV_MAX;     // 線上闖關朋友斷線，電腦接手用幾級
 // 聲音偏左偏右：場上的 x（公釐）離鏡頭中心多遠
@@ -169,9 +169,9 @@ function dummyBits() {
   const toward = me.x < d.x ? LEFT : RIGHT;
   switch (G.dummy) {
     case 1: return BS;
-    case 2: case 3: return (G.dummy === 3 ? BS : 0) | (d.face === (toward === RIGHT ? 1 : -1) ? BD : (G.S.f & 1 ? toward : 0));
-    case 4: return d.act === 'air' || d.act === 'pre' ? 0 : (G.S.f & 1 ? BJ : 0);
-    case 5: return keys.bits(1);
+    case 2: return d.face === (toward === RIGHT ? 1 : -1) ? BD : (G.S.f & 1 ? toward : 0);
+    case 3: return d.act === 'air' || d.act === 'pre' ? 0 : (G.S.f & 1 ? BJ : 0);
+    case 4: return keys.bits(1);
     default: return 0;
   }
 }
@@ -258,7 +258,7 @@ function startFight(c0, c1) {
   view.camOffset = 0; view.marks = true;
   G.chars = [c0, c1];
   G.S = newMatch(c0, c1, { train: G.kind === 'train', cpu: G.kind === 'cpu' ? G.cpuLv : undefined, items: itemsOn });
-  if (G.kind === 'train' && G.dummy === 6) setCpu(G.S, 1, TRAIN_CPU);
+  if (G.kind === 'train' && G.dummy === 5) setCpu(G.S, 1, TRAIN_CPU);
   G.mode = 'fight'; G.paused = false; acc = 0; G.overShown = false;
   hud.show(true); hud.setNames(G.S); hud.setMoves(G.S, 0); hud.showMoves(movesOn);
   hud.net(G.wait ? (G.wait.quick ? '找對手中' : `房間開著等人・${G.wait.code}`) : '');
@@ -293,7 +293,7 @@ function pauseMenu() {
     { label: device.touch ? '小招式表' : '左下招式表', value: () => (movesOn ? '顯示' : '不顯示'), on: () => setMovesOn(!movesOn), cycle: () => setMovesOn(!movesOn) },
   ].filter(Boolean);
   if (G.kind === 'train') {
-    const setDummy = (n) => { G.dummy = (n + DUMMY.length) % DUMMY.length; setCpu(G.S, 1, G.dummy === 6 ? TRAIN_CPU : -1); hud.setNames(G.S); };
+    const setDummy = (n) => { G.dummy = (n + DUMMY.length) % DUMMY.length; setCpu(G.S, 1, G.dummy === 5 ? TRAIN_CPU : -1); hud.setNames(G.S); };
     items.push({ label: '對手', value: () => DUMMY[G.dummy], on: () => setDummy(G.dummy + 1), cycle: (d) => setDummy(G.dummy + d) });
   }
   if (G.kind !== 'quest') items.push({ label: '道具', value: () => (itemsOn ? '會掉' : '不掉'), on: () => setItemsOn(!itemsOn), cycle: () => setItemsOn(!itemsOn) });
@@ -313,7 +313,8 @@ function showResult() {
       : [vote('again', '再來一場'), { label: '換角色', on: () => { G.net.ctl({ t: 'reselect' }); toSelect('online', G.side); } }];
     items.push({ label: '回房間', on: () => toRoom(true) }, { label: '離開', on: toTitle });
     const sc = (k) => (G.S.score[k] | 0).toLocaleString('en-US');
-    G.resultSub = Q ? `1P ${sc(0)}　2P ${sc(1)}${G.S.conts ? `　接關 ${G.S.conts} 次` : ''}${won && !next ? '　下一關還在蓋' : ''}<br>掉命 1P ${G.S.dead[0]}　2P ${G.S.dead[1]}` : '';
+    const gr = (k) => (G.S.grade?.[k] || []).map((g) => 'SABC'[g] || '－').join(' ');   // 每段評價（quest.js grade）
+    G.resultSub = Q ? `1P ${sc(0)}　2P ${sc(1)}${G.S.conts ? `　接關 ${G.S.conts} 次` : ''}${won && !next ? '　下一關還在蓋' : ''}<br>評價 1P ${gr(0)}　2P ${gr(1)}<br>掉命 1P ${G.S.dead[0]}　2P ${G.S.dead[1]}` : '';
     menu.show({ title: Q ? (won ? '過關' : '結束') : '比賽結束', cls: 'result', sub: G.resultSub, items, back: () => {}, tapBack: () => toRoom(true) });
     if (G.otherVote) voteLine(`對方想${G.otherVote === 'next' ? '打下一關' : '再來'}`);
     return;
@@ -328,7 +329,7 @@ function showResult() {
     const items = [{ label: '再打一次', on: () => startQuest(G.chars[0], G.quest) }, { label: '換角色', on: () => toSelect('quest') }, { label: '回標題', on: toTitle }];
     if (next) items.unshift({ label: '下一關', on: () => startQuest(G.chars[0], next, carry) });
     menu.show({
-      title: won ? '過關' : '結束', sub: `分數 ${sc}${G.S.conts ? `　接關 ${G.S.conts} 次` : ''}${won && !next ? '　下一關還在蓋' : ''}<br>${toll}`, cls: 'result',
+      title: won ? '過關' : '結束', sub: `分數 ${sc}${G.S.conts ? `　接關 ${G.S.conts} 次` : ''}${won && !next ? '　下一關還在蓋' : ''}<br>每段評價 ${(G.S.grade?.[k] || []).map((g) => 'SABC'[g] || '－').join(' ')}<br>${toll}`, cls: 'result',
       items, back: () => {}, tapBack: toTitle,
     });
     return;

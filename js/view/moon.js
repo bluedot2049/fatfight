@@ -3,7 +3,8 @@
 // 場地「月球工廠」（闖關第四關）：往右捲的一長條廠房。一格一格的白漆地板、後面一條會動的輸送帶、白牆和大窗（窗外是月面、星星、不動的地球）、管線、機台的小燈；最後一段停著一架飛碟
 
 import * as THREE from 'three';
-import { Z_NEAR, Z_FAR } from '../sim/const.js';
+import { QZ } from '../sim/const.js';
+const Z_NEAR = QZ, Z_FAR = -QZ;   // 闖關的地板前後（sim 的 S.zn、S.zf）
 import { rng, canvasTex, dot } from './sea.js';
 
 export const MOON_BG = '#05070c';
@@ -53,7 +54,7 @@ export class MoonStage {
     scene.add(this.root);
     const add = (...o) => this.root.add(...o);
     this.bg = new THREE.Color(MOON_BG);
-    this.fog = new THREE.Fog('#1a2028', 14, 40);
+    this.fog = new THREE.Fog('#1a2028', 17, 44);
     const x0 = span[0] / 1000 - 12, x1 = span[1] / 1000 + 12, len = x1 - x0, cx = (x0 + x1) / 2;
     const zFar = Z_FAR / 1000, bx = boss / 1000;
     const r = rng(41);

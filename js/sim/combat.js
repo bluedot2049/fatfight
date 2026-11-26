@@ -178,7 +178,7 @@ function applyHit(S, a, d, h, kind, fromX, isProj, m = null) {
   d.stop = h.stop;
   if (!isProj) { a.stop = h.stop; a.con = 1; }
   if (d.item >= 0 && (d.ik !== 1 || d.act === 'fall' || h.fall >= WPN_KNOCK || kind === 'sp' || kind === 'su')) dropItem(S, d, dir);   // 被打：重物、吃的一定掉，武器被重擊、必殺、打飛才掉
-  S.ev.push({ k: 'hit', s: a.i, d: d.i, x: ex, y: ey, z: ez, big: h.fall >= KNOCK || kind === 'su' || h.kd ? 1 : 0, dmg: h.dmg, combo: d.combo, kind, stop: h.stop });
+  S.ev.push({ k: 'hit', s: a.i, d: d.i, x: ex, y: ey, z: ez, big: h.fall >= KNOCK || kind === 'su' || h.kd ? 1 : 0, dmg: h.dmg, combo: d.combo, kind, stop: h.stop, src: h.src });   // src：丟的東西 item、炸的 boom、撞的 body、甲板炮 shot（闖關的打法分看）
 }
 
 // 打飛：a 是打的人（飛出去撞到別人算他的）
@@ -200,7 +200,7 @@ function bodyHits(S) {
       if (d === b || d.team === own.team || ((b.bh >> d.i) & 1) || !hittable(d) || Math.abs(d.z - b.z) > PUSH_Z) continue;
       if (!hurtBoxes(d).some((x) => overlap(bb, box(d, x)))) continue;
       b.bh |= 1 << d.i;
-      applyHit(S, own, d, { ...BODY, fire: b.burn, y: b.y + 500 }, 'n', b.x - b.vx, true);   // 著火的撞到人也點著
+      applyHit(S, own, d, { ...BODY, fire: b.burn, y: b.y + 500, src: 'body' }, 'n', b.x - b.vx, true);   // 著火的撞到人也點著
       b.vx = ((b.vx * 3) / 4) | 0;
       S.ev.push({ k: 'bump', s: b.i, d: d.i, x: (b.x + d.x) >> 1, y: b.y + 500, z: d.z });
     }
@@ -213,7 +213,7 @@ function explode(S, booms) {
     for (const d of S.p) {
       if ((b.own && d.team === b.own.team) || !hittable(d)) continue;
       if (Math.abs(d.x - b.x) > b.boom.r || Math.abs(d.z - b.z) > b.boom.r >> 1) continue;
-      const h = { dmg: b.boom.dmg, fall: 80, kd: 1, dvx: 40, dvy: 95, stop: 10, hs: 20, bdef: 60, y: d.y + 500 };
+      const h = { dmg: b.boom.dmg, fall: 80, kd: 1, dvx: 40, dvy: 95, stop: 10, hs: 20, bdef: 60, y: d.y + 500, src: 'boom' };
       applyHit(S, b.own || d, d, h, 'n', b.x, true);
     }
   }

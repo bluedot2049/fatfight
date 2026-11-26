@@ -274,7 +274,7 @@ export function selectScreen({ mode, side = 0, coop = false, done, back, onPick,
 // 觸控的按法跟鍵盤不一樣的那幾條（照 SYS_LIST 的指令那欄對）：菱形＝旁邊兩顆一起按
 const TOUCH_SYS = {
   '→→': ['搖桿推到外圈', '跑（放開就停；撥兩下也可以）'], '攻跳 同按': ['攻◆跳', '吹飛（打飛很遠）'], '跳防 同按': ['防◆跳', '翻滾（往推著的方向）'],
-  '蹲＋攻': ['蹲◆攻', '下段攻擊，打到再按接短手、再按掃腿'], '蹲＋防': ['防◆蹲', '蹲防'],
+  '蹲＋攻': ['蹲→攻', '下段攻擊（蹲滑到攻、或蹲放開馬上按攻），打到再按攻接短手、再按掃腿'],
 };
 const sysList = () => (device.touch ? SYS_LIST.map((r) => TOUCH_SYS[r[0]] || r) : SYS_LIST);
 
@@ -310,9 +310,9 @@ export function moveListTab(root, to) {
 export function keysHtml() {
   if (device.touch) {
     const rows = [['搖桿', '左半邊哪裡按下去都可以；上下是往裡、往外走'], ['跑', '搖桿推到外圈，放開就停'], ['防、蹲', '按住'], ['必殺', '搖桿推著方向，防接著按攻或跳'],
-      ['◆', '兩顆中間的菱形＝兩顆一起按'], ['翻滾', '防◆跳'], ['吹飛', '攻◆跳'], ['下段', '蹲◆攻']];
+      ['◆', '兩顆中間的菱形＝兩顆一起按'], ['翻滾', '防◆跳'], ['吹飛', '攻◆跳'], ['下段', '蹲滑到攻'], ['撿', '站在東西上按蹲']];
     return `<div class="keyhelp touchhelp"><section><h3><i class="gem"></i>觸控</h3><table>${rows.map(([a, b]) => `<tr><td>${a}</td><td>${b}</td></tr>`).join('')}</table></section>
-      <p class="foot">手指可以在按鈕之間滑，不用抬起來。搖桿可以在暫停選單換邊。${needsHomeScreen() ? '<br>全螢幕：iPhone 要加到主畫面，從主畫面圖示開。' : ''}</p></div>`;
+      <p class="foot">手指可以在按鈕之間滑，不用抬起來。搖桿旁邊的小圓鈕可以把搖桿換到右邊。${needsHomeScreen() ? '<br>全螢幕：iPhone 要加到主畫面，從主畫面圖示開。' : ''}</p></div>`;
   }
   const kn = (p, a) => KEYMAP[p][a].map((c) => `<kbd>${keyName(c)}</kbd>`).join(' ');
   const t = (p) => `<table>${[['up', '上（往裡走）'], ['down', '下（往外走）'], ['left', '左'], ['right', '右'], ['A', '攻擊'], ['J', '跳'], ['D', '防禦'], ['S', '蹲']].map(([a, l]) => `<tr><td>${l}</td><td>${kn(p, a)}</td></tr>`).join('')}</table>`;

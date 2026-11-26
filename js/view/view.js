@@ -19,6 +19,7 @@ import { STAGE_HALF, Z_NEAR } from '../sim/const.js';
 import { QUESTS } from '../sim/quests/index.js';
 import { hurtBoxes } from '../sim/combat.js';
 import { ItemView, handAnchor } from './items.js';
+import { TrapView } from './traps.js';
 import { ITEMS } from '../sim/items.js';
 import { InkLines } from './inkline.js';
 
@@ -37,6 +38,10 @@ function trunkAim(m, p) {
   if (id === 'rock') { const at = m.hurl.at; return t <= at ? { k: Math.min(1, t / 4), x: 650, y: 0 } : { k: Math.max(0, 1 - (t - at) / 8), x: 450, y: 1700 }; }   // 插進土裡 → 甩上去
   if (id === 'skyT') return { k: Math.max(0, 1 - (t - m.grip.at) / 8), x: 650, y: 150 };     // 砸完鼻子還按在地上一下
   if (id === 'trunkS' || id === 'trunkT') return { k: Math.max(0, 1 - (t - m.grip.at) / 6), x: 800, y: 900 };
+  if (m.wpn) {                                       // 鼻子捲著武器揮：起手鼻子往上往後提，打出去往前送（武器的方向 items.js 另外算）
+    const a0 = m.hits[0].on[0], a1 = m.hits[m.hits.length - 1].on[1], up = t < a0, k = Math.min(1, (t + 1) / 3) * (t > a1 + 2 ? Math.max(0, 1 - (t - a1 - 2) / 8) : 1);
+    return { k: 0.75 * k, x: up ? 380 : 760, y: up ? 1500 : 950 };
+  }
   if (m.tr && m.hits.length) { const h = m.hits[0]; return { k: ramp(t, h.on[0], h.on[1], 6), ...front(h) }; }   // 普通技用鼻子打的（角色表寫 tr）
   return null;
 }
@@ -59,6 +64,7 @@ export class View {
     this.sceneName = 'arena';
     this.fx = new FX(this.scene);
     this.items = new ItemView(this.scene);
+    this.traps = new TrapView(this.scene);   // 闖關的場地機關（甲板炮、洋流）
     this.fighters = [];
     this.projs = new Map();
     this.seen = new Set();
@@ -127,6 +133,7 @@ export class View {
       this.projs.clear();
       this.seen.clear();
       this.items.clear();
+      this.traps.clear();
     }
     S.p.forEach((p, i) => {
       const m = markOf(S, p), alt = isAlt(S, p);
@@ -194,7 +201,9 @@ export class View {
 
     S.p.forEach((p, i) => this.updateFighter(S, p, this.fighters[i]));
     this.updateProjectiles(S);
-    this.items.update(S, this.fighters, this.clock, dt);
+    this.items.update(S, this.fighters, this.clock, dt, this.fx);
+    this.traps.update(S, dt, this.clock, this.cam.x);
+    this.stage.flow = this.traps.flow;            // 洋流：海雪、海草跟著偏（只有海底場景看）
     this.stage.update(dt, this.clock, [0, 1].map((t) => Math.max(0, ...this.fighters.filter((v, i) => S.p[i].team === t).map((v) => v.flash * 0.6))));
     this.fx.update(dt);
     this.updateCamera(S, dt);
@@ -296,6 +305,15 @@ export class View {
         if (e.wall) { this.fx.spark(e.x * U, e.y * U, 0, '#fff1c8', z); this.fx.shards(e.x * U, e.y * U, ROCK, 8, 3, z); this.fx.pop(e.x * U, e.y * U, '#bfeaff', z); break; }   // 岩塊擋下飛行道具
         this.fx.shards(e.x * U, e.y * U, '#b07a44', 6, 3, z); this.fx.dust(e.x * U, 0, 2, null, z); break;
       case 'ibreak': this.fx.shards(e.x * U, e.y * U, ITEMS[e.ik]?.cat === 'light' ? '#d6aa6c' : '#b07a44', 16, 5, z); this.fx.dust(e.x * U, 0, 8, null, z); this.fx.shock(e.x * U, e.y * U, '#fff1c8', 1.4, z, 0.2); break;
+      case 'tlight': this.fx.embers(e.x * U - e.dir * 0.45, 0.8, z, 4, 0.2); this.fx.glow(e.x * U - e.dir * 0.45, 0.8, '#ffd27a', 0.5, z, 0.2); break;   // 甲板炮點火
+      case 'tfire': {                                 // 甲板炮轟出去：炮口一團火光和煙，往前一道衝擊
+        const x = e.x * U + e.dir * 0.3, y = 0.62;
+        this.traps.fired(e.id);
+        this.fx.flare(x, y, '#ffd27a', 4, z, 0.3); this.fx.burst(x, y, '#ff9a3a', 1.6, z); this.fx.shock(x, y, '#fff1c8', 1.8, z, 0.3);
+        this.fx.smoke(x, y, z, 10); this.fx.trail(x + e.dir * 0.8, y, '#fff1c8', 2.4, z, 0.22);
+        this.shake = Math.max(this.shake, 0.12); this.punch = Math.max(this.punch, 0.5);
+        break;
+      }
       case 'boom': {
         const x = e.x * U, y = 0.5, r = (e.r || 1500) * U;
         this.fx.burst(x, y, '#ff8a2a', r * 1.6, z); this.fx.flare(x, y, '#ffd27a', 7, z, 0.4); this.fx.shock(x, y, '#fff1c8', r * 1.8, z, 0.45);
@@ -507,6 +525,7 @@ export class View {
       for (let i = 0; i < (su ? 2 : 1); i++) this.fx.trail(p.x * U - Math.sign(dx) * 0.5, p.y * U + C.h * U * (0.25 + Math.random() * 0.5), C.color, su ? 2.2 : 1.4, p.z * U, su ? 0.22 : 0.14);
     }
     if (p.act === 'run' && (S.f + p.i * 3) % 7 === 0) this.fx.dust(p.x * U - p.face * 0.3, 0, 1, null, p.z * U);
+    if (p.mv === 'runS' && Math.abs(dx) > 0.02 && (S.f + p.i) % 3 === 0) this.fx.dust(p.x * U + p.face * 0.2, 0, 2, p.ch === 'marmot' ? '#4a3f26' : null, p.z * U);   // 滑行：貼地揚土
     // 集氣：嘴前光點往內吸、白芯越來越大；漩渦：身前一直往中間捲
     v.fxT += 1;
     if (m && m.charge && p.chg > 0 && p.t >= m.charge.at - 1 && p.t <= m.charge.at && m.proj) {   // 集氣中 sim 把 t 停在 at 前一幀
@@ -809,9 +828,11 @@ export class View {
     const xs = live.map((p) => p.x * U), zs = live.map((p) => p.z * U);
     const x0 = Math.min(...xs), x1 = Math.max(...xs);
     let cx = (x0 + x1) / 2;
-    let cz = Math.max(-0.5, Math.min(0.5, (Math.min(...zs) + Math.max(...zs)) / 2 * 0.4));
-    let d = 7.6 + Math.max(0, x1 - x0 - 2.6) * 0.75;
-    d = Math.min(d, 12.6);                 // 兩個玩家最遠 9 公尺（MAX_SEP），這個距離框得住
+    // 闖關鏡頭比對戰遠（使用者 2026-11-26：闖關擠，視野放寬、人物小一點；地板也比較深，見 const.js 的 QZ）
+    const far = S.quest ? 1.5 : 1, czMax = S.quest ? 0.8 : 0.5;
+    let cz = Math.max(-czMax, Math.min(czMax, (Math.min(...zs) + Math.max(...zs)) / 2 * 0.4));
+    let d = 7.6 * far + Math.max(0, x1 - x0 - 2.6 * far) * 0.75;
+    d = Math.min(d, 12.6 * far);           // 兩個玩家最遠 9 公尺（MAX_SEP），這個距離框得住
     this.punch *= Math.pow(0.004, dt);
     if (S.freeze > 0 && S.fwho >= 0) {
       const p = S.p[S.fwho];

@@ -467,3 +467,20 @@ body:not(:has(#menu.title:not([hidden]))) #a2hs { display: none; }   /* 沒按�
 #hud .ebars .eb.elite { width: 84px; margin-left: -42px; height: 9px; border-color: #e8c868; }   /* 精英雜兵：長一點、金邊 */
 #hud .ebars .eb.elite b { background: linear-gradient(#ffd88a, #c8762a); }
 #hud .ebars .eb b { display: block; height: 100%; background: linear-gradient(#ff8a7a, var(--blood)); }
+/* 闖關的場地機關（2026-11-26）：打法分的浮字、甲板炮的按鍵提示、洋流的預告（上面中間，箭頭指流的方向） */
+#hud .pops, #hud .thint { pointer-events: none; }
+#hud .pops { position: absolute; inset: 0; }
+#hud .pops .pop { position: absolute; left: 0; top: 0; display: none; white-space: nowrap; translate: -50% -50%; font-style: normal; font-size: 17px; font-weight: 700; letter-spacing: .08em; color: #ffe7a8; text-shadow: 0 2px 0 #000, 0 0 6px rgba(0, 0, 0, .9); }
+#hud .pops .pop.on { display: block; }
+#hud .thint { position: absolute; left: 0; top: 0; translate: -50% -100%; padding: 3px 12px 2px; font-size: 16px; font-weight: 700; letter-spacing: .1em; color: var(--ivoryc); background: rgba(13, 10, 12, .82); border: 1px solid #b9a06a; border-radius: 3px; opacity: 0; transition: opacity .2s; white-space: nowrap; }
+#hud .thint.on { opacity: 1; }
+#hud .tide { position: absolute; left: 50%; top: 128px; translate: -50% 0; display: flex; align-items: center; gap: 12px; opacity: 0; transition: opacity .3s; }
+#hud .tide.on { opacity: 1; }
+#hud .tide.warn { animation: tideBlink .5s steps(2) infinite; }
+#hud .tide b { font-size: 24px; font-weight: 700; letter-spacing: .3em; color: #d4fff6; text-shadow: 0 2px 0 #000, 0 0 10px rgba(0, 0, 0, .9); }
+#hud .tide i { width: 0; height: 0; border-top: 13px solid transparent; border-bottom: 13px solid transparent; visibility: hidden; filter: drop-shadow(0 2px 0 #000); }
+#hud .tide i.l { border-right: 20px solid #8fe8da; }
+#hud .tide i.r { border-left: 20px solid #8fe8da; }
+#hud .tide.left i.l, #hud .tide.right i.r { visibility: visible; }
+@keyframes tideBlink { 50% { opacity: .35; } }
+body.touch #hud .tide { top: 222px; scale: 1.5; }   /* 手機：上面中間是暫停鈕，放在它底下、字放大 */

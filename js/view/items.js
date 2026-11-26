@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { kit, merge } from './kit.js';
 import { tagInkAll } from './inkline.js';
 import { ITEMS, ITEM_LIFE } from '../sim/items.js';
+import { MOVES } from '../sim/chars/index.js';
 
 const U = 1 / 1000;
 
@@ -98,6 +99,56 @@ function flask(k, c) {
   k.ball(0.03, '#ffffff', -0.05, 0.18, 0.08, { line: false });
 }
 
+// 揮武器的時候武器往哪指（世界方向 [往前, 往上, 往鏡頭]；手臂怎麼擺是 poses.js 的 WPN）：
+// 起手轉到 w，有效幀一兩幀內經過 mid 甩出去，最後指向打擊框前緣、框高 at 那一點（從哪裡拿都對得到框：臘腸狗叼得低就往上指），
+// 打完停一下再回到平常拿著的樣子
+const SWING = {
+  wSlash: { w: [-0.55, 0.35, 0.75], mid: [0.1, 0.1, 1], at: 0.45 },   // 橫砍：從背後經過鏡頭這邊掃到前面
+  wChop: { w: [-0.45, 0.9, 0.1], mid: [0.75, 0.75, 0.1], at: 0.3 },   // 劈：舉過頭往前往下
+  wThrust: { w: [0.85, 0.12, 0.45], at: 0.5 },                        // 刺：收著往前送
+};
+const _Y = new THREE.Vector3(0, 1, 0), _d = new THREE.Vector3(), _e = new THREE.Vector3(), _s1 = new THREE.Vector3(), _p = new THREE.Vector3(), _s = new THREE.Vector3();
+const _qh = new THREE.Quaternion(), _qd = new THREE.Quaternion(), _m = new THREE.Matrix4(), _mi = new THREE.Matrix4();
+const ease = (x) => x * x * (3 - 2 * x);
+function dirOf(a, face, out) { return out.set(a[0] * face, a[1], a[2]).normalize(); }
+// 這一幀武器的方向（寫進 out）；回傳揮的方向佔多少（跟拿著的樣子混）。g：手拿的位置（世界）
+function swingDir(f, m, K, g, out) {
+  const t = Math.max(0, f.t), h = m.hits[0], a0 = h.on[0], a1 = m.hits[m.hits.length - 1].on[1];
+  const b = h.box, end = _s1.set((f.x + f.face * b[2]) * U - g.x, (f.y + b[1] + K.at * (b[3] - b[1])) * U - g.y, 0);
+  end.z = end.length() * 0.08;
+  end.normalize();
+  if (t < a0) { dirOf(K.w, f.face, out); return ease(Math.min(1, (t + 1) / Math.max(1, a0))); }
+  if (t <= a1 + 2) {
+    const u = Math.min(1, (t - a0 + 1) / 2);
+    if (K.mid) { if (u < 0.5) dirOf(K.w, f.face, out).lerp(dirOf(K.mid, f.face, _e), u * 2); else dirOf(K.mid, f.face, out).lerp(end, u * 2 - 1); }
+    else dirOf(K.w, f.face, out).lerp(end, u);
+    out.normalize();
+    return 1;
+  }
+  out.copy(end);
+  return 1 - ease(Math.min(1, (t - a1 - 2) / Math.max(1, m.total - a1 - 2)));
+}
+const TIP = { sword: 0.96, harpoon: 1.29, pick: 0.78, torch: 0.85 };   // 握的地方到尖端（公尺，跟 LOOK 對）
+// 手上的武器在揮：把武器轉到 SWING 的方向（g 掛在手上，算出相對手的轉法；面向左整隻是鏡像，鏡像的手配鏡像的武器）
+// 回傳 true＝正在甩出去（有效幀附近，要留殘影；_p 握的地方、_d 方向）
+function aimHeld(f, v, g) {
+  const m = f.act === 'atk' ? MOVES[f.ch][f.mv] : null, K = m && m.wpn && SWING[m.pose];
+  if (!K) return false;
+  v.model.root.updateMatrixWorld(true);
+  g.matrixWorld.decompose(_p, _qh, _s);              // 平常拿著的樣子（世界）
+  const k = swingDir(f, m, K, _p, _d);
+  if (k <= 0.001) return false;
+  _g.copy(_p);
+  _qd.setFromUnitVectors(_Y, _d);
+  _qh.slerp(_qd, k);
+  _m.compose(_p, _qh, _s);                           // _s 鏡像的時候 x 是負的，跟手一樣
+  _mi.copy(g.parent.matrixWorld).invert().multiply(_m);
+  _mi.decompose(_p, g.quaternion, _s);
+  const t = f.t, a0 = m.hits[0].on[0];
+  return t >= a0 - 1 && t <= m.hits[m.hits.length - 1].on[1];
+}
+const _g = new THREE.Vector3();
+
 // 手的位置：手臂關節底下那顆的最下面（模型剛建好、還沒擺姿勢的時候量一次）
 // 單獨一個東西的模型（首頁海報上鼻象舉的岩塊）
 export function itemMesh(k) {
@@ -107,6 +158,12 @@ export function itemMesh(k) {
 }
 
 export function handAnchor(model) {
+  if (model.grip) {                                 // 用鼻子、嘴拿的（鼻象、臘腸狗）：模型自己給拿東西的地方
+    const g = new THREE.Group();
+    model.grip.add(g);
+    g.userData.rot = model.gripRot;
+    return g;
+  }
   const a = model.J.aN;
   model.root.updateMatrixWorld(true);
   const box = new THREE.Box3();
@@ -139,7 +196,7 @@ export class ItemView {
   }
 
   // fighters：view.js 每一格的模型（hand 掛手上的東西）
-  update(S, fighters, clock, dt) {
+  update(S, fighters, clock, dt, fx) {
     const live = new Set();
     for (const q of S.it) {
       const key = q.id + q.k;                       // 換一場編號會重來，連種類一起當鑰匙
@@ -150,8 +207,17 @@ export class ItemView {
       const inHand = v && v.hand && I.cat !== 'heavy';
       if (inHand) {
         if (o.g.parent !== v.hand) v.hand.add(o.g);
-        o.g.position.set(0, I.cat === 'food' ? -0.1 : 0, 0);
-        o.g.rotation.set(I.cat === 'light' ? Math.PI - 0.6 : 0, 0, 0);
+        const r = v.hand.userData.rot;               // 鼻子、嘴拿的：模型給的擺法
+        o.g.position.set(0, I.cat === 'food' && !r ? -0.1 : 0, 0);
+        if (I.cat === 'light') {
+          if (r) o.g.rotation.set(...r); else o.g.rotation.set(Math.PI - 0.6, 0, 0);
+          if (aimHeld(S.p[q.hold], v, o.g) && fx && o.gf !== S.f) {   // 甩出去：沿著武器留一道殘影（同一幀畫兩次、暫停的時候不重留）
+            o.gf = S.f;
+            const L = TIP[q.k] || 0.9, c = _g.addScaledVector(_d, L * 0.55);
+            fx.ghost(c.x, c.y, Math.atan2(_d.y, _d.x), L * 0.95, q.k === 'torch' ? '#ffd27a' : '#ffffff', c.z);
+          }
+        }
+        else o.g.rotation.set(0, 0, 0);
         o.sh.visible = false;
       } else {
         if (o.g.parent !== this.scene) this.scene.add(o.g);

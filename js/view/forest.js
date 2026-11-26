@@ -3,7 +3,8 @@
 // 場地「黑森林」（闖關第三關）：往右捲的一長條林間路。落葉和苔的泥地、後面三排一排比一排遠的樹幹、壓下來的樹冠、月光、螢火蟲、發光的小蘑菇；最後一段是營火和三頂帳篷
 
 import * as THREE from 'three';
-import { Z_NEAR, Z_FAR } from '../sim/const.js';
+import { QZ } from '../sim/const.js';
+const Z_NEAR = QZ, Z_FAR = -QZ;   // 闖關的地板前後（sim 的 S.zn、S.zf）
 import { rng, canvasTex, dot, shaftTex } from './sea.js';
 
 export const FOREST_BG = '#0c1618';
@@ -45,7 +46,7 @@ export class ForestStage {
     scene.add(this.root);
     const add = (...o) => this.root.add(...o);
     this.bg = new THREE.Color(FOREST_BG);
-    this.fog = new THREE.Fog(FOREST_BG, 9, 26);
+    this.fog = new THREE.Fog(FOREST_BG, 12, 30);
     const x0 = span[0] / 1000 - 12, x1 = span[1] / 1000 + 12, len = x1 - x0, cx = (x0 + x1) / 2;
     const zFar = Z_FAR / 1000, bx = boss / 1000;
     const r = rng(29);

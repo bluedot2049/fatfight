@@ -667,6 +667,8 @@ const SND = {
   land({ hard }) { const t = ctx.currentTime; if (hard) { noise(t, 0.12, 180, 0.8, 0.5, 'lowpass'); tone(t, 0.14, 110, 45, 0.5); } else noise(t, 0.05, 260, 0.9, 0.2, 'lowpass'); },
   jump() { const t = ctx.currentTime; tone(t, 0.09, 260, 560, 0.1, 'triangle'); noise(t, 0.07, 900, 1.5, 0.08, 'bandpass', 2200); },
   dash() { const t = ctx.currentTime; noise(t, 0.14, 500, 1.5, 0.16, 'bandpass', 1800); },
+  // 滑行：貼地磨過去的沙沙聲（胖鼠在土裡，低一點、悶一點）
+  slide({ ch }) { const t = ctx.currentTime, dirt = ch === 'marmot'; noise(t, 0.42, dirt ? 520 : 1400, 0.9, 0.2, 'bandpass', dirt ? 260 : 700, 0.03); tone(t, 0.12, 150, 90, 0.08, 'triangle'); },
   roll() { const t = ctx.currentTime; noise(t, 0.26, 380, 1.2, 0.2, 'bandpass', 1300); tone(t, 0.2, 180, 120, 0.1, 'triangle'); },
   // 格檔：清脆的金屬「叮」加一下往上滑的亮音（跟被擋的悶聲分得開）
   parry() { const t = ctx.currentTime; noise(t, 0.04, 6000, 1.2, 0.5, 'highpass'); tone(t, 0.5, 1568, 1560, 0.2, 'triangle', 0.002); tone(t, 0.42, 2349, 2340, 0.12, 'sine', 0.002); tone(t, 0.08, 700, 2400, 0.12, 'sine', 0.002); tone(t, 0.1, 220, 120, 0.3); },
@@ -676,6 +678,13 @@ const SND = {
   // 打在打不動的身上（機器人）：悶悶的一聲鐵皮，跟格檔的「叮」分得開
   clank() { const t = ctx.currentTime; noise(t, 0.05, 1800, 3, 0.35); tone(t, 0.16, 310, 290, 0.22, 'square', 0.002); tone(t, 0.1, 620, 560, 0.1, 'triangle', 0.002); },
   tell() { const t = ctx.currentTime; tone(t, 0.12, 180, 240, 0.12, 'square', 0.004); noise(t, 0.06, 1400, 2, 0.06); },
+  // 闖關的場地機關：甲板炮點火（引信嘶嘶）、轟（悶的大炮聲＋水裡的咕嚕）、洋流來之前一陣往上湧的水聲
+  fuse() { const t = ctx.currentTime; noise(t, 0.28, 4200, 1.5, 0.22, 'bandpass', 2600); crackle(t, 0.28, 12, 3800, 0.14); },
+  cannon() { const t = ctx.currentTime; boom(t, 1.1); tone(t, 0.6, 90, 30, 0.9); noise(t, 0.5, 260, 0.7, 0.6, 'lowpass', 90); bloops(t + 0.12, 4, 160, 0.8); },
+  tide() { const t = ctx.currentTime; surf(t, 1.6, 0.9); tone(t, 1.4, 55, 70, 0.25, 'sine', 0.4); },
+  // 打法分：小小一聲亮的（不搶打中的聲音）；一段的評價：兩個音
+  bonus() { const t = ctx.currentTime; tone(t, 0.12, 1760, 1760, 0.06, 'triangle', 0.002); tone(t + 0.05, 0.14, 2349, 2349, 0.05, 'triangle', 0.002); },
+  grade() { const t = ctx.currentTime; tone(t, 0.18, 784, 784, 0.12, 'triangle'); tone(t + 0.12, 0.35, 1175, 1175, 0.12, 'triangle'); noise(t + 0.12, 0.2, 6000, 0.6, 0.08, 'highpass'); },
   guard() { const t = ctx.currentTime; noise(t, 0.03, 2200, 2, 0.12); tone(t, 0.04, 520, 480, 0.06, 'square'); },
   grab() { const t = ctx.currentTime; noise(t, 0.07, 1200, 2, 0.4); tone(t, 0.08, 200, 120, 0.25); },
   clash() { const t = ctx.currentTime; noise(t, 0.08, 3800, 2, 0.5); tone(t, 0.3, 1480, 1400, 0.16, 'triangle'); tone(t, 0.3, 2217, 2100, 0.1, 'triangle'); tone(t, 0.12, 300, 90, 0.4); },
@@ -768,6 +777,11 @@ export function sfxEvent(e, pan = 0, S = null) {
     case 'fight': play('fight'); break;
     case 'clash': play('clash', e, pan); break;
     case 'over': if (e.w >= 0) play('win'); break;
+    case 'tlight': play('fuse', e, pan); break;
+    case 'tfire': play('cannon', e, pan); break;
+    case 'trap': if (e.ph === 1) play('tide'); break;
+    case 'bonus': play('bonus', e, pan); break;
+    case 'grade': if (S?.quest && e.n < (S.grade[0]?.length ?? 0) - 1 && e.pl === 0) play('grade'); break;   // 最後一段跟著過關，不另外響
   }
 }
 
@@ -781,6 +795,7 @@ export function sfxState(S, panOf = () => 0) {
     if (f.act === 'atk' && (o.act !== 'atk' || o.mv !== f.mv)) {
       const m = MOVES[f.ch][f.mv];
       if (f.mv === 'roll') play('roll', {}, pan);
+      else if (f.mv === 'runS') play('slide', { ch: f.ch }, pan);
       else if (m && (m.kind === 'n' || !m.kind)) play('swing', { heavy: (m.hits?.[0]?.dmg || 0) >= 55 }, pan);
     }
     // 招式中途：起跳那幀（鑽地飛出來）

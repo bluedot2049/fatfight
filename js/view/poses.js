@@ -19,7 +19,6 @@ const BASE = {
   hit: { lean: -0.38, bend: -0.35, head: -0.35, aN: 0.5, aF: -0.3 },
   hitLow: { sq: -0.2, lean: -0.35, bend: -0.2, head: -0.3 },
   block: { lean: -0.12, aN: 1.25, aF: 1.1, aNz: 0.25, head: 0.15 },
-  cblock: { sq: -0.24, by: -0.04, lean: 0.05, bend: 0.2, aN: 1.1, aF: 1.0, head: 0.2 },
   lie: { tumble: -1.45, by: 0.05 },
   throw: { aN: 1.5, aF: 1.4, lean: 0.35, bend: 0.2 },
   thrown: { lean: -0.6, by: 0.35, aN: 2.2, aF: 2.0 },
@@ -51,6 +50,7 @@ const ATK = {
     tail: { w: { spin: -0.5, sq: -0.2 }, s: { spin: 3.1, lean: -0.3, tail: 0.8, aN: 1.0 } },
     bubble: { w: { bend: -0.25, head: -0.25 }, s: { bend: 0.25, head: 0.25, lean: 0.12, aN: 0.6, aF: 0.6 } },
     surge: { w: { sq: -0.25, aN: -0.6, aF: -0.6, lean: -0.1 }, s: { aN: 1.6, aF: 1.6, aNz: -0.2, aFz: -0.2, lean: 0.22, sq: 0.1 } },
+    belly: { w: { lean: 0.4, sq: -0.15 }, s: { lean: 1.3, by: 0.32, aN: 0.1, aF: 0.1, head: -0.75, tail: 0.3 } },   // 滑行：趴著用肚子溜（手腳收在身邊，轉到地板下面描邊會透出來）
     vortex: { w: { sq: -0.18, aN: -0.5, aF: -0.5, lean: -0.15, spin: -0.3 }, s: { aN: 1.5, aF: 1.5, aNz: -0.45, aFz: -0.45, lean: 0.2, spin: 0.15 } },   // 兩鰭往前捲水
   },
   marmot: {
@@ -69,6 +69,7 @@ const ATK = {
     jD: { w: {}, s: { sq: -0.22, lean: 0.25, lN: -0.4, lF: -0.4 } },
     CD: { w: { lean: -0.3 }, s: { lean: 0.5, bend: 0.4, bz: 0.2 } },
     tooth: { w: { sq: -0.25 }, s: { aN: 2.8, aF: 2.5, head: -0.35, sq: 0.15 } },
+    runS: { w: { sq: -0.2, lean: 0.2 }, s: { sq: -0.34, by: 0.1, lean: 0.62, bend: 0.2, aN: 1.6, aF: 1.6, head: -0.3, lN: -0.5, lF: -0.5 } },   // 滑行：壓低撲進土裡、兩手往前扒（土是 view 揚的）
   },
   sealion: {
     sA: { w: { aN: -0.4 }, s: { aN: 1.6, lean: 0.15, bend: 0.12 } },
@@ -86,6 +87,21 @@ const ATK = {
     press: { w: { aN: 2.6, aF: 2.6, head: -0.3, sq: 0.05 }, s: { lean: 1.15, sq: -0.15, aN: 1.6, aF: 1.6, tail: 0.5 } },
   },
 };
+// 拿武器揮（items.js 的 w_ 招，大家共用；角色表沒有自己的版本就用這個）：近手（aN）拿著。
+// 武器本身往哪指 view/items.js 的 SWING 另外算（尖端對到打擊框），這裡只管身體和手
+const WPN = {
+  wSlash: { w: { aN: 1.25, aNz: 0.55, spin: -0.6, lean: -0.12 }, s: { aN: 1.5, aNz: -0.15, spin: 0.5, lean: 0.26, bend: 0.12 } },   // 橫砍：轉身帶過去
+  wChop: { w: { aN: 2.9, lean: -0.18, bend: -0.15, sq: 0.06, head: -0.15 }, s: { aN: 1.25, lean: 0.36, bend: 0.3, sq: -0.08, head: 0.15 } },   // 劈：舉過頭往下
+  wThrust: { w: { aN: 0.9, bz: -0.06, lean: -0.14, spin: -0.3 }, s: { aN: 1.6, bz: 0.12, lean: 0.32, spin: 0.15 } },   // 刺：收回來往前送
+};
+// 用鼻子、嘴拿的（模型寫 grip 的：鼻象、臘腸狗）：手不揮，甩頭和身體
+const GRIP_HEAD = new Set(['elephant', 'dog']);
+const WPN_HEAD = {
+  wSlash: { w: { head: -0.35, spin: -0.6, lean: -0.1 }, s: { head: 0.2, spin: 0.5, lean: 0.22 } },
+  wChop: { w: { head: -0.6, lean: -0.25, sq: 0.06 }, s: { head: 0.45, lean: 0.34, bend: 0.2, sq: -0.08 } },
+  wThrust: { w: { head: -0.15, bz: -0.08, lean: -0.12 }, s: { head: 0.12, bz: 0.14, lean: 0.3 } },
+};
+
 // 闖關的雜兵、頭目：大家共用一套普通技姿勢（GEN），各自補自己特別的
 const UPPER = { w: { sq: -0.25 }, s: { aN: 2.8, aF: 2.5, head: -0.35, sq: 0.15 } };   // 對空：兩手往上衝
 const GEN = {
@@ -100,6 +116,7 @@ const GEN = {
   jD: { w: { lean: -0.2 }, s: { lean: 0.9, sq: -0.15, aN: 1.2, aF: 1.2 } },
   CD: { w: { lean: -0.3, bend: -0.3 }, s: { lean: 0.5, bend: 0.4, sq: -0.1, bz: 0.15 } },
   lash: { w: { head: -0.25, lean: -0.1, aN: -0.3 }, s: { head: 0.02, lean: 0.18, aN: 0.9 } },   // 舌頭、觸鬚甩出去（長度 view 照框算）
+  runS: { w: { lean: 0.3, sq: -0.15 }, s: { lean: 1.3, by: -0.34, aN: 2.6, aF: 2.6, head: -0.7 } },   // 滑行：撲下去兩手往前貼地滑
 };
 Object.assign(ATK, {
   hammer: { ...GEN,
@@ -128,18 +145,20 @@ Object.assign(ATK, {
     // 用鼻子打的普通技：甩頭帶鼻子（鼻子怎麼伸 view 照打擊框算），手不揮
     sA: { w: { head: -0.35, lean: -0.1, spin: -0.15 }, s: { head: 0.2, lean: 0.16, spin: 0.2 } },
     crA: { w: { head: -0.2 }, s: { head: 0.3, lean: 0.22 } },
+    tback: { w: { head: -0.3, lean: -0.05, spin: 0.25 }, s: { head: 0.15, lean: 0.14, spin: -0.3 } },   // 鼻子甩回來（跟鼻子甩反方向轉）
     jC: { w: { head: -0.4 }, s: { head: 0.35, lean: 0.3 } },
     chop: { w: { aN: 2.6, aF: 2.2, lean: -0.2, head: -0.45 }, s: { aN: 0.8, aF: 0.6, lean: 0.4, bend: 0.3, head: 0.35 } },   // 鼻子、手舉高往下鎚
     stomp: { w: { lN: 1.5, lean: -0.25, aN: 0.9, aF: 0.9, aNz: 0.4, aFz: 0.4, head: -0.3, sq: 0.08 }, s: { lN: -0.1, sq: -0.26, by: -0.05, lean: 0.12, aN: 0.4, aF: 0.4, head: 0.15 } },   // 抬腳踩下去
     rock: { w: { lean: 0.38, bend: 0.3, head: 0.5, sq: -0.14, aN: 0.5, aF: 0.4, lN: 0.25 }, s: { lean: -0.22, bend: -0.18, head: -0.55, sq: 0.1, aN: 1.7, aF: 1.4, lF: 0.3 } },   // 低頭把鼻子插進土裡 → 仰頭甩出去
     skygrab: { w: { sq: -0.22, head: 0.15, lean: 0.05 }, s: { head: -0.6, lean: -0.22, sq: 0.12, aN: 1.9, aF: 1.6, lN: 0.25 } },                                   // 蹲一下、鼻子直直往上撈
     trunkT: { w: { lean: 0.25, bend: 0.2, head: 0.3, aN: 1.2, aF: 1.1, sq: -0.1 }, s: { lean: -0.45, bend: -0.3, head: -0.6, aN: 2.7, aF: 2.5, sq: 0.08 } },   // 低頭捲住、往後仰把人甩過頭
+    runS: { w: { sq: -0.15, lean: -0.1 }, s: { lean: -0.55, by: -0.28, lN: 1.5, lF: 1.5, aN: 0.9, aF: 0.9, aNz: 0.5, aFz: 0.5, head: -0.35, sq: -0.08 } },   // 滑行：一屁股坐下去、腳往前滑
     stampede: { w: { lean: -0.35, head: -0.6, aN: 2.2, aF: 1.6, sq: 0.1 }, s: { lean: 0.35, aN: 1.3, aF: 1.3, head: 0.2, lN: 0.8, lF: -0.6 } },   // 揚起鼻子叫一聲、衝過去
   },
   penguin: { ...GEN,
     peck: { w: { head: -0.3, lean: -0.1 }, s: { head: 0.4, lean: 0.25, bend: 0.2 } },                     // 長嘴往前啄
     peckH: { w: { head: -0.6, lean: -0.3, bend: -0.25, sq: 0.06 }, s: { head: 0.65, lean: 0.45, bend: 0.4, sq: -0.06 } },
-    belly: { w: { lean: 0.4, sq: -0.15 }, s: { lean: 1.4, by: -0.4, aN: -0.9, aF: -0.9, head: -0.7, lN: -0.6, lF: -0.6 } },   // 趴下去肚子滑
+    belly: { w: { lean: 0.4, sq: -0.15 }, s: { lean: 1.35, by: 0.3, aN: 0.1, aF: 0.1, head: -0.7, lN: 0.15, lF: 0.15 } },   // 趴下去肚子滑（手腳收在身邊，轉到地板下面描邊會透出來）
     breath: { w: { head: -0.45, bend: -0.2, sq: 0.06 }, s: { head: 0.2, lean: 0.12, bend: 0.12, aN: 0.3, aF: 0.3, aNz: 0.5, aFz: 0.5 } },   // 吸一口、低頭往前噴
     toss: { w: { aF: 2.7, lean: -0.2, spin: -0.3 }, s: { aF: 0.9, lean: 0.25, spin: 0.3 } },          // 鰭從頭上拋出去
     snap: { w: { aN: 1.4, aNz: 0.3 }, s: { aN: 2.3, aNz: 0.9, sq: 0.04 } },                            // 舉起一隻鰭彈一下，臉不動
@@ -152,6 +171,7 @@ Object.assign(ATK, {
     bark: { w: { head: -0.55, sq: 0.08, lean: -0.1 }, s: { head: 0.15, lean: 0.18, sq: -0.06 } },    // 仰頭吸氣、往前吠
     tunnel: { w: { sq: -0.2, lean: 0.15 }, s: { sq: -0.38, by: -0.14, lean: 0.12, head: 0.25, aN: -0.6, aF: -0.6, lN: 0.6, lF: 0.6 } },   // 壓低衝過去
     dig: { w: { lean: 0.35, head: 0.45, aN: 1.1, aF: -0.2 }, s: { lean: 0.4, head: 0.5, aN: -0.4, aF: 1.1 } },   // 前腳扒土
+    runS: { w: { sq: -0.25, lean: 0.15 }, s: { sq: -0.42, by: -0.16, lean: 0.15, head: 0.2, aN: 1.4, aF: 1.4, lN: -1.0, lF: -1.0 } },   // 滑行：前腳往前、後腳往後，整條貼地竄
     longdog: { w: { lean: -0.15, head: -0.45 }, s: { head: 0.15, aN: 0.5, aF: 0.5 } },
   },
   dwarf: { ...GEN,
@@ -241,7 +261,7 @@ export function poseOf(f, clock) {
       break;
     }
     case 'brake': p = BASE.brake; break;
-    case 'guard': case 'block': p = f.cr ? BASE.cblock : BASE.block; break;
+    case 'guard': case 'block': p = BASE.block; break;
     case 'pre': p = BASE.pre; break;
     case 'air': p = f.dash ? over(BASE.run, { lN: 0.9, lF: -0.6, lean: 0.5 }) : f.vy > 0 ? BASE.up : BASE.down; break;
     case 'dizzy': { const s = Math.sin(clock * 6 + f.i); p = over(BASE.dizzy, { spin: 0.35 * s, head: 0.2 + 0.15 * Math.cos(clock * 6), lean: -0.15 + 0.1 * s }); break; }
@@ -368,7 +388,7 @@ function attackPose(f, m, t, clock) {
     return { aN: 2.8, aF: 2.6, lN: 1.2, sq: 0.15, head: -0.3 };
   }
 
-  const P = ATK[f.ch][id] || { w: {}, s: {} };
+  const P = ATK[f.ch][id] || (m.wpn && (GRIP_HEAD.has(f.ch) ? WPN_HEAD : WPN)[id]) || { w: {}, s: {} };
   const base = m.air ? (f.vy > 0 ? BASE.up : BASE.down) : m.cr ? BASE.crouch : BASE.idle;
   if (!m.hits.length) {                               // 吐泡泡這種沒有打擊框的：照射出那一幀
     const a0 = m.proj ? m.proj.at : m.hurl ? m.hurl.at : (m.total / 3) | 0;

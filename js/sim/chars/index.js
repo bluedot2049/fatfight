@@ -25,6 +25,7 @@ import worker from './worker.js';
 import alien from './alien.js';
 import { SYS } from '../moves.js';
 import { ITEM_MOVES } from '../items.js';
+import { TRAP_MOVES } from '../traps.js';
 
 export const ALL = [manatee, marmot, elephant, penguin, dog, sealion, hammer, squid, frog, mushroom, moss, dwarf, fox, owl, boar, warrior, archer, mage, robot, worker, alien];
 export const ROSTER = ALL.filter((c) => !c.npc);
@@ -33,9 +34,12 @@ export const CHARS = Object.fromEntries(ALL.map((c) => [c.id, c]));
 // MOVES[角色][招式 id] → 招式物件
 export const MOVES = {};
 for (const c of ALL) {
-  const t = { ...SYS, ...ITEM_MOVES };
+  const t = { ...SYS, ...ITEM_MOVES, ...TRAP_MOVES };
   for (const m of Object.values(c.normals)) t[m.id] = m;
   for (const s of [...c.specials, ...c.supers]) t[s.m.id] = s.m;
   Object.assign(t, c.extra);   // 角色表的 extra：不能直接按出來的招（指令投抓到後接的那招）、換掉大家共用的（小象舉東西比較快）
+  for (const [id, m] of Object.entries(t)) {   // 寫 edge 的（武器）：打擊框的左右從身體邊緣量，照這隻的寬度往前推
+    if (m.edge) t[id] = { ...m, hits: m.hits.map((h) => ({ ...h, box: [h.box[0] + c.w, h.box[1], h.box[2] + c.w, h.box[3]] })) };
+  }
   MOVES[c.id] = t;
 }

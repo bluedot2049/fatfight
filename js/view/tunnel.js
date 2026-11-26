@@ -3,7 +3,8 @@
 // 場地「土撥鼠的地道」（闖關第二關）：往右捲的一長條地道。夯土地、礦車軌道、後面一層層的土牆和木頭支架、掛著晃的油燈、牆腳發青光的蘑菇、垂下來的樹根、飄落的土屑，最後一段是矮人的礦坑營地（圓門、礦車、礦石堆、水晶）。全部程式畫，不載圖。
 
 import * as THREE from 'three';
-import { Z_NEAR, Z_FAR } from '../sim/const.js';
+import { QZ } from '../sim/const.js';
+const Z_NEAR = QZ, Z_FAR = -QZ;   // 闖關的地板前後（sim 的 S.zn、S.zf）
 import { rng, canvasTex, dot, shaftTex } from './sea.js';
 
 export const TUNNEL_BG = '#21170f';
@@ -77,7 +78,7 @@ export class TunnelStage {
     scene.add(this.root);
     const add = (...o) => this.root.add(...o);
     this.bg = new THREE.Color(TUNNEL_BG);
-    this.fog = new THREE.Fog(TUNNEL_BG, 10, 30);
+    this.fog = new THREE.Fog(TUNNEL_BG, 13, 34);
     const x0 = span[0] / 1000 - 12, x1 = span[1] / 1000 + 12, len = x1 - x0, cx = (x0 + x1) / 2;
     const zFar = Z_FAR / 1000, bx = boss / 1000;
     const r = rng(13);

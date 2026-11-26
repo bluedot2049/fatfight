@@ -415,7 +415,8 @@ export function buildElephant() {
     q.ball(0.11, C, s * 0.02, -0.17, 0.03, { sy: 1.9 });
     for (const x of [-0.04, 0.04]) q.ball(0.028, NAIL, s * 0.02 + x, -0.36, 0.09, { sy: 0.7, line: false });
   }
-  return { root, turn, J: { body, upper, head, aN, aF, tail, lN, lF }, tongue: null, trunk, h: 1.45 };
+  // 拿武器、吃的都用鼻子捲著（鼻尖那顆；grip＝拿東西的地方，gripRot＝拿著的時候東西怎麼擺，items.js 的 handAnchor 看）
+  return { root, turn, J: { body, upper, head, aN, aF, tail, lN, lF }, tongue: null, trunk, grip: trunk.tip, gripRot: [Math.PI / 2 + 0.5, 0, 0], h: 1.45 };
 }
 
 // 白企鵝（照使用者 2022 的貼圖）：子彈形的白身體、沒有脖子、小豆豆眼（眼皮壓一半，冷著臉）、長嘴從臉上往前往下垂、長長的鰭貼著身體垂下來。
@@ -494,7 +495,10 @@ export function buildDog() {
     return e;
   });
   for (const s of [-1, 1]) h.ball(0.018, INK, s * 0.08, 0.07, 0.19, { line: false });   // 豆豆眼
-  return { root, turn, J: { body, upper, head, aN, aF, tail, lN, lF }, tongue: null, ears, stretch: { upper, mid, z0: 0.22, m0: -0.04, len: 0.72 }, h: 1.0 };
+  const mouth = new THREE.Group();                                                  // 叼東西的地方：長嘴底下靠鏡頭那邊
+  mouth.position.set(-0.05, -0.3, 0.24);
+  head.add(mouth);
+  return { root, turn, J: { body, upper, head, aN, aF, tail, lN, lF }, tongue: null, ears, stretch: { upper, mid, z0: 0.22, m0: -0.04, len: 0.72 }, grip: mouth, gripRot: [Math.PI / 2 + 0.25, 0, 0], h: 1.0 };
 }
 
 // 第二套色（同角色對打時第二隻穿）：主色換掉、眼睛嘴巴描邊不動。明暗跟本來的差一截，遠遠看也分得出來；沒寫的角色不換
