@@ -633,19 +633,27 @@ function roll(f, who, salt) {
 }
 // 喊的機率（不是每下都喊）、喊完隔多久才能再喊（秒）
 const GRUNT = { eff: 0.3, effBig: 0.55, hurt: 0.35, hurtBig: 0.8, gap: 0.5 };
-const lastGrunt = {};
+const lastGrunt = {}, lastDie = {};
 // 選角卡上的角色才喊（闖關的雜兵、頭目不喊）；正在念招式名稱、剛喊過的不喊
+// 被打死一定喊，而且帶大招那種一聲一聲彈回來的回音（阿阿阿阿）
 function tryGrunt(S, who, kind, big, pan) {
   const f = S?.p[who], c = f && CHARS[f.ch];
   if (!c || c.npc || !ctx || ctx.state !== 'running') return;
-  const salt = kind === 'eff' ? 1 : 2;
-  if (roll(S.f, who, salt) >= GRUNT[kind + (big ? 'Big' : '')]) return;
   const t = ctx.currentTime;
-  if (lastGrunt[who] > t || lastVoice[who] > t) return;
+  if (kind === 'hurt' && f.hp <= 0) {
+    if (lastDie[who] > t) return;
+    kind = 'die';
+  } else {
+    if (roll(S.f, who, kind === 'eff' ? 1 : 2) >= GRUNT[kind + (big ? 'Big' : '')]) return;
+    if (lastGrunt[who] > t || lastVoice[who] > t) return;
+  }
+  const salt = kind === 'eff' ? 1 : kind === 'hurt' ? 2 : 3;
   let n = 0; const r = (m) => roll(S.f + 977 * ++n, who, salt + 4) * m;   // 喊哪個音、高低長短也照雜湊
-  route(pan, 0, 0.08, 0);
+  const die = kind === 'die';
+  route(pan, die ? 0.5 : 0, die ? 0.3 : 0.08, die ? 1 : 0);
   const end = grunt(ctx, dest, noiseBuf, kind, big, { amp: 0.5, ...c.voice }, r, t + 0.01);
   lastGrunt[who] = end + GRUNT.gap;
+  if (die) lastDie[who] = t + 3;
 }
 
 const SND = {
@@ -775,7 +783,7 @@ const SND = {
   // 招式中途的聲音（鑽地飛出來那一下）
   cue({ ch, id, cue }) { KIT[ch]?.cue?.[id]?.[cue]?.(ctx.currentTime); },
   // 喊聲（試聽用：play('grunt', { ch: 'manatee', hurt: 1, big: 1 })）；對戰裡走 tryGrunt
-  grunt({ ch = 'manatee', hurt, big }) { grunt(ctx, dest, noiseBuf, hurt ? 'hurt' : 'eff', big, { amp: 0.5, ...CHARS[ch]?.voice }); },
+  grunt({ ch = 'manatee', hurt, die, big }) { grunt(ctx, dest, noiseBuf, die ? 'die' : hurt ? 'hurt' : 'eff', big, { amp: 0.5, ...CHARS[ch]?.voice }); },
   // 念招式名稱。who 這隻上一句還沒念完就不念（一直吐泡泡不會疊成一團）；force 超必殺一定念
   voice({ ch, id, who = ch, force }) {
     const c = CHARS[ch], e = c && [...c.specials, ...c.supers].find((s) => s.id === id);
@@ -798,7 +806,7 @@ export function play(name, arg = {}, pan = 0) {
   const a = typeof arg === 'object' && arg ? arg : {};
   const small = name === 'hit' && !a.big, power = a.kind === 'sp' || a.kind === 'su';
   // 大招回音：超必殺的蓄力和轟、念超必殺的名字、超必殺最後一下
-  const hall = name === 'super' ? 0.55 : name === 'voice' && a.su ? 0.8 : name === 'hit' && a.big && a.kind === 'su' ? 0.5 : 0;
+  const hall = name === 'grunt' && a.die ? 1 : name === 'super' ? 0.55 : name === 'voice' && a.su ? 0.8 : name === 'hit' && a.big && a.kind === 'su' ? 0.5 : 0;
   route(pan, (ECHO[name] || 0) * (small ? 0 : 1), (VERB[name] || 0) * (small ? (power ? 0.4 : 0) : 1), hall);
   SND[name](a);
 }
