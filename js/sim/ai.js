@@ -42,7 +42,7 @@ const lvOf = (A) => (A.mob ? MOB[Math.min(A.lv, MOB.length - 1)] : LV[A.lv]);
 
 export function newAI(lv, seed, mob = 0) {
   return { lv: Math.max(0, Math.min(LV_MAX, lv | 0)), mob: mob ? 1 : 0, r: (seed >>> 0) || 1, q: [], plan: 'walk', pt: 0, tgt: -1, seen: -1, seenP: -1, seenJ: -1, gt: 0, chain: 0, cx: -1, gc: 0, last: 0, eng: 0, seenF: -1, fg: 0, iw: 0,
-    tok: 0, rest: 0, wk: 0, wkS: -1, pd: 0, bj: -1, bjAt: -1, ig: 0, ib: 0, sx: 1, sxT: -1, fz: 0, esc: 0 };   // tok 攻擊權到第幾幀、rest 退開到第幾幀、wk 躺著要怎麼起來、pd 被格檔過（多用吹飛）、bj 爆氣看過哪一招、ig 正走去撿東西、ib 放棄撿東西到第幾幀、sx 對方在哪一邊（左右差很小時沿用）
+    tok: 0, rest: 0, wk: 0, wkS: -1, pd: 0, bj: -1, bjAt: -1, ig: 0, ib: 0, sx: 1, sxT: -1, fz: 0, esc: 0 };   // tok 攻擊權到第幾幀、rest 退開到第幾幀、wk 躺著要怎麼起來、pd 被格檔過（多用撞飛）、bj 爆氣看過哪一招、ig 正走去撿東西、ib 放棄撿東西到第幾幀、sx 對方在哪一邊（左右差很小時沿用）
 }
 
 // 亂數 0–255
@@ -96,7 +96,7 @@ for (const C of ALL) {
     air: C.specials.filter((s) => kind(s) === 'air'),
     rush: C.specials.filter((s) => kind(s) === 'rush'),
     su: C.supers,
-    grab: C.specials.filter((s) => s.m.hits.some((h) => h.grab === 1)),   // 指令投（鼻象鼻子捲）：對方在擋的時候用（鼻子撈天是對空，算 air）
+    grab: C.specials.filter((s) => s.m.hits.some((h) => h.grab === 1)),   // 指令投（鼻象鼻子捲）：對方在擋的時候用（象鼻號角是對空，算 air）
     hurl: C.specials.filter((s) => kind(s) === 'hurl'),             // 拔東西丟（鼻象拔石頭）：中距離、前後對齊了丟
     heal: C.specials.filter((s) => s.m.spawn),                       // 放吃的（臘腸狗埋骨頭）：血少、離得遠的時候放，之後撿起來吃（itemAI）
     jump: C.ai?.jump ?? 0,           // 愛跳多少（想下一步時「跳」的份量多這麼多；青蛙）
@@ -233,7 +233,7 @@ function flash(S, f, A) {
 
 function decide(S, f, A) {
   const L = lvOf(A), C = CHARS[f.ch], K = KIT[f.ch], R = REACH[f.ch];
-  if (f.act === 'parried') A.pd = 1;                          // 被格檔過：之後多用吹飛
+  if (f.act === 'parried') A.pd = 1;                          // 被格檔過：之後多用撞飛
   if (STUNNED.has(f.act) && f.act !== 'block') {
     A.q.length = 0; A.gt = 0; A.pt = 0; A.chain = 0; A.eng = 0;
     if (A.tok > S.f) yieldTok(S, A);                          // 被打就讓出攻擊權
@@ -434,14 +434,14 @@ function decide(S, f, A) {
 }
 const FREE_RESET = new Set(['stand', 'walk', 'crouch', 'guard', 'run', 'air', 'land']);
 
-// 近身出手：普通連打、蹲攻、吹飛
+// 近身出手：普通連打、蹲攻、撞飛
 function attack(S, f, A, L, K, R, rx, adz, tw) {
   const v = rnd(A);
   A.chain = 0;
-  const o = S.p[A.tgt];                                   // 對方打不動（機器人）：輕拳沒用，夠得到就用吹飛
+  const o = S.p[A.tgt];                                   // 對方打不動（機器人）：輕拳沒用，夠得到就用撞飛
   if (o && CHARS[o.ch].armor && !HELPLESS.has(o.act) && v < 90 + (L.punish >> 1) && inR2(R.CD, rx, adz)) { A.q = [0]; return BA | BJ | tw; }   // 越會打的越常想到
   if (v < 40 && inR2(R.crA, rx, adz)) { A.q = [0]; return BS | BA | tw; }
-  if (v < 62 + (A.pd ? 70 : 0) && inR2(R.CD, rx, adz)) { A.pd = 0; A.q = [0]; return BA | BJ | tw; }   // 被格檔過：用吹飛剋它
+  if (v < 62 + (A.pd ? 70 : 0) && inR2(R.CD, rx, adz)) { A.pd = 0; A.q = [0]; return BA | BJ | tw; }   // 被格檔過：用撞飛剋它
   A.q = [tw];
   return BA | tw;
 }
@@ -579,7 +579,7 @@ function react(S, f, A, L, K, tw, aw, sx) {
         if (k >= 0 && rnd(A) < L.dodge * 3) { A.q = [...Array(Math.max(0, k - 12)).fill(0), BJ]; return A.q.shift(); }
         return -1;
       }
-      // 格檔：打到前 2 幀按，故意偏 ±3（會失手）；超必殺、吹飛不格
+      // 格檔：打到前 2 幀按，故意偏 ±3（會失手）；超必殺、撞飛不格
       if (L.parry && k >= 0 && !m.flash && m !== CHARS[e.ch].normals.CD && rnd(A) < L.parry) {
         const wait = Math.max(0, k - 2 + (rnd(A) % 7) - 3);
         A.q = [f.face !== sx ? tw : 0, ...Array(Math.max(0, wait - 1)).fill(0), ...Array(14).fill(BD)];

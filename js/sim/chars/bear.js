@@ -58,7 +58,7 @@ const SU = [
 export default {
   id: 'bear', name: '爛熊', full: '爛熊', color: '#c9a8ff',
   blurb: '苦無、幻術、烏鴉來亂', stat: [3, 3, 4],
-  pal: ['#9b6cff', '#2a1846'], card: { attr: '水', type: '爛熊之王', lv: 5, art: 'crow' },
+  pal: ['#9b6cff', '#2a1846'], card: { attr: '幻', type: '爛熊之王', lv: 5, art: 'crow' },
   voice: { f0: 104, size: 0.88, mora: 0.12 },
   w: 320, h: 1350, hc: 900,
   walkX: 18, walkZ: 12, run: 48, runZ: 10, jumpV: 150, jumpX: 19, jumpZ: 12, dashV: 102, dashX: 60,

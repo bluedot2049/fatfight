@@ -98,7 +98,7 @@ export class Hud {
     this.mvSlot = Math.max(0, this.players(S).indexOf(f));
     this.el.forEach((e, k) => e.pp.classList.toggle('mine', k === this.mvSlot));
     const row = (s, su) => `<tr data-mp="${s.m.mp}" class="${su ? 'su' : ''}"><td>${s.name}</td><td>${cmdHtml(s.d, s.btn)}</td><td class="mp">${s.m.mp}</td></tr>`;
-    const sys = [['攻跳 同按', '吹飛'], ['跳防 同按', '翻滾'], ['蹲＋攻', '下段']];
+    const sys = [['攻跳 同按', '撞飛'], ['跳防 同按', '翻滾'], ['蹲＋攻', '下段']];
     const el = $('.moves', this.root);
     setPal(el, f.ch);
     el.classList.toggle('r', this.mvSlot === 1);

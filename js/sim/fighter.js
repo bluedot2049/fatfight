@@ -4,7 +4,7 @@
 
 import { MP, MP_REGEN, HP, GRAV, zNear, zFar, SLOW, WALK, WALK_Z, RUN, DASH_X, JUMP_XZ, MAG_X, MAG_Z, TURN_X, AIR_STEER, BOUNCE_V, WALL_V, WAKE_IV, DOWN_T, DOWN_QUICK, Z_REACH, LEFT, RIGHT, BA, BJ, BD, BS } from './const.js';
 import { CHARS, MOVES } from './chars/index.js';
-import { sweepFront } from './moves.js';
+import { sweepFront, orbitStep, paceLen } from './moves.js';
 import { newHistory, record, pressed, pressedBoth, consume, consumeCommand, command, tapTwice, useTap, holding, dirX, dirZ } from './input.js';
 import { ITEMS, WEAR_SWING } from './items.js';
 import { useTrap } from './trap.js';
@@ -179,7 +179,7 @@ function tryToss(S, f) {
   return true;
 }
 
-// 兩鍵同按：攻＋跳＝吹飛、跳＋防＝翻滾（往按著的方向滾）
+// 兩鍵同按：攻＋跳＝撞飛、跳＋防＝翻滾（往按著的方向滾）
 function tryCombo(S, f) {
   const H = f.H;
   let b;
@@ -209,7 +209,7 @@ function whiffCancel(S, f) {
 export function grabStart(S, f, o) {
   if (o.item >= 0) dropItem(S, o, 0);
   setAct(f, 'grab'); f.hold = o.i; f.grabT = GRAB_TIME; f.vx = f.vz = 0; f.mv = '';
-  setAct(o, 'grabbed'); o.hold = f.i; o.face = -f.face; o.mv = ''; o.vx = o.vz = 0; o.vy = 0; o.air = 0;   // 空中抓到的（鼻子撈天）：高度由抓的人管，不受重力
+  setAct(o, 'grabbed'); o.hold = f.i; o.face = -f.face; o.mv = ''; o.vx = o.vz = 0; o.vy = 0; o.air = 0;   // 空中抓到的（grab 2）：高度由抓的人管，不受重力
   S.ev.push({ k: 'grab', s: f.i });
 }
 // 一次抓好幾個（指令投的 all）：第一個照 grabStart，其他的也變成被 f 抓著（f.hold 只記第一個；誰被 f 抓著看 o.hold）
@@ -282,7 +282,7 @@ export function think(S, f, noInput) {
     }
     // 必殺打到人、最後一下打完：再接別的必殺（地上的才行）
     if (m.kind === 'sp' && m.cancel && f.con === 1 && !f.air && f.t > m.hits[m.hits.length - 1].on[1]) { trySpecial(S, f); return; }
-    if (m.kind === 'n' && !m.air && f.t <= 2 && tryCombo(S, f)) return;     // 剛出拳兩幀內補按跳＝吹飛
+    if (m.kind === 'n' && !m.air && f.t <= 2 && tryCombo(S, f)) return;     // 剛出拳兩幀內補按跳＝撞飛
     if (m.kind === 'n' && !m.air && m.cancel && !f.con && f.t >= ((m.total * 2) / 3 | 0) && whiffCancel(S, f)) return;
     if (m.kind !== 'n' || !f.con || !m.cancel) return;
     if (trySpecial(S, f)) return;
@@ -698,8 +698,10 @@ function atkStep(S, f, C) {
         const R = C.w + CHARS[v.ch].w - 80;
         if (f.t < G.at) {
           if (G.orbit) {                                 // 好幾個人的時候平均分在圈上
-            const [cx, cz] = ORBIT[(((f.t + 64 - G.at) >> 1) + ((j * 8) / all.length | 0)) & 7], r = R + 330;
-            v.x = f.x + f.face * ((cx * r) / 1000 | 0); v.z = f.z + ((cz * r * 3) / 4000 | 0); v.y = G.lift || 350;
+            const top = G.top && f.t >= paceLen(G);       // 掄完舉在頭頂上：收近一點、舉高
+            const [cx, cz] = ORBIT[(orbitStep(G, f.t) + ((j * 8) / all.length | 0)) & 7], r = top ? R >> 1 : R + 330;
+            v.x = f.x + f.face * ((cx * r) / 1000 | 0); v.z = f.z + ((cz * r * 3) / 4000 | 0);
+            v.y = top ? G.top : G.lift || 350;
           } else {
             const want = f.x + f.face * R, r = G.reel;
             v.x += Math.max(-r, Math.min(r, want - v.x));
@@ -718,6 +720,7 @@ function atkStep(S, f, C) {
           v.act = 'fall'; v.t = 0; v.air = 1; v.vz = 0; v.fallv = 0;
           if (G.slam) { v.y = Math.max(v.y, 300); v.vx = dir * G.vx; v.vy = -G.vy; }
           else { v.y = G.orbit ? v.y : 10; v.vx = (G.back ? -dir : dir) * G.vx; v.vy = G.vy; }
+          if (G.fan) v.vz = ((v.z - f.z) * G.vx / (R + 330)) | 0;   // 往四周飛：在圈上偏前後的那幾個也往前後散
           v.mv = ''; v.by = f.i; v.bh = 0; v.bnc = 0; v.face = G.back ? dir : -dir;
           for (let i = 0; i < m.hits.length; i++) if (!f.hitList.includes(i * 16 + v.i)) f.hitList.push(i * 16 + v.i);   // 這招自己的打擊（掄、震波）不打被抓的人
           S.ev.push({ k: 'hit', s: f.i, d: v.i, x: v.x, y: G.slam ? 300 : 800, z: v.z, big: 1, dmg: G.dmg, kind: 'sp', stop: 8 });

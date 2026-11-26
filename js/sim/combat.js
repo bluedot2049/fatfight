@@ -93,6 +93,7 @@ function applyHit(S, a, d, h, kind, fromX, isProj, m = null) {
   const dir = d.x > fromX ? 1 : d.x < fromX ? -1 : a.face;
   const ex = (d.x + fromX) >> 1, ey = Math.min(d.y + 900, h.box ? a.y + ((h.box[1] + h.box[3]) >> 1) : h.y), ez = d.z;
   const gain = kind === 'su' ? 0 : (h.dmg / MP_GAIN) | 0;   // 打中回魔（超必殺不回）
+  const own = m && m.nogain ? 0 : gain;                     // 出手的人回多少（nogain 的招不回；格檔的人照回）
   const jd = kind === 'su' ? null : jdPress(S, d);           // 超必殺不能格檔
   // 闖關：被打的硬直中抓準下一拳按防＝爆氣（這一下不算，往四周震開）
   if (jd && jd.fresh >= 0 && !jd.lock && S.quest && (d.act === 'hit' || d.act === 'dizzy') && d.H.t[jd.fresh] > d.lhN) {
@@ -106,7 +107,7 @@ function applyHit(S, a, d, h, kind, fromX, isProj, m = null) {
   }
   if (!h.ub && guards(d, fromX)) {
     if (jd && jd.fresh >= 0 && !jd.lock) {
-      // 格到吹飛：破防（吹飛專門剋一直想格檔的人）
+      // 格到撞飛：破防（撞飛專門剋一直想格檔的人）
       if (m && m === CHARS[a.ch].normals.CD) {
         d.jdu = d.H.t[jd.fresh];
         d.bdef = 0; setAct(d, 'hit'); d.stun = 30;
@@ -118,7 +119,7 @@ function applyHit(S, a, d, h, kind, fromX, isProj, m = null) {
       parry(S, a, d, isProj, gain, ex, ey, ez, jd.fresh);
       return;
     }
-    a.mp = Math.min(MP, a.mp + (gain >> 1));
+    a.mp = Math.min(MP, a.mp + (own >> 1));
     const chip = kind === 'n' ? 0 : (h.dmg / 10) | 0;
     d.hp -= chip;
     d.bdef += jd && jd.lock ? (h.bdef * 3) >> 1 : h.bdef;     // 亂按防：破防值多一半
@@ -135,7 +136,7 @@ function applyHit(S, a, d, h, kind, fromX, isProj, m = null) {
     if (d.hp <= 0) { d.hp = 0; launch(d, dir, 26, 50, a); }
     return;
   }
-  a.mp = Math.min(MP, a.mp + gain);
+  a.mp = Math.min(MP, a.mp + own);
   if (d.hold >= 0) release(S, d);
   // 打不動（機器人，角色表 armor）：站得好好的時候，輕的普通拳只扣血、不硬直、不累積倒值。重的、必殺、丟過來的東西照樣打得動
   if (CHARS[d.ch].armor && kind === 'n' && !isProj && !h.kd && h.fall < ARMOR_FALL && !d.air && d.act !== 'hit' && d.act !== 'dizzy' && d.act !== 'fall' && d.hp > h.dmg) {
@@ -257,6 +258,7 @@ export function resolveHits(S, booms = []) {
         if (d.team === a.team || !hittable(d)) continue;
         if (a.hitList.includes(i * 16 + d.i)) continue;
         if (Math.abs(d.z - az) > zr) continue;
+        if (h.who && (h.who === 'air') !== !!(d.air || d.y > 0)) continue;   // who：只打空中的／只打地上的（鼻象號角）
         if (hurtBoxes(d).some((b) => hbs.some((hb) => overlap(hb, box(d, b))))) found.push([a, d, h, m.kind, i, m]);
       }
     }

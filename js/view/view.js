@@ -14,7 +14,7 @@ import { ForestStage } from './forest.js';
 import { MoonStage } from './moon.js';
 import { kit, repaint, merge } from './kit.js';
 import { CHARS, MOVES } from '../sim/chars/index.js';
-import { hitBoxes } from '../sim/moves.js';
+import { hitBoxes, paceLen } from '../sim/moves.js';
 import { STAGE_HALF, Z_NEAR, Z_REACH } from '../sim/const.js';
 import { QUESTS } from '../sim/quests/index.js';
 import { hurtBoxes } from '../sim/combat.js';
@@ -34,11 +34,14 @@ function trunkAim(m, p) {
   const id = m.pose || m.id, t = p.t;
   const front = (h) => ({ x: h.box[2] - 60, y: (h.box[1] + h.box[3]) >> 1 });
   if (id === 'lash') { const h = m.hits[0]; return { k: ramp(t, h.on[0], m.hits[m.hits.length - 1].on[1]), ...front(h) }; }
-  if (id === 'skygrab') { const h = m.hits[0]; return { k: ramp(t, h.on[0], h.on[1]), x: (h.box[0] + h.box[2]) >> 1, y: h.box[3] - 150 }; }
+  if (id === 'horn') { const h = m.hits[0]; return { k: ramp(t, h.on[0], h.on[1], 8), x: 220, y: 2500 }; }   // 號角：鼻子直直朝天
   if (id === 'rock') { const at = m.hurl.at; return t <= at ? { k: Math.min(1, t / 4), x: 650, y: 0 } : { k: Math.max(0, 1 - (t - at) / 8), x: 450, y: 1700 }; }   // 插進土裡 → 甩上去
-  if (id === 'skyT') return { k: Math.max(0, 1 - (t - m.grip.at) / 8), x: 650, y: 150 };     // 砸完鼻子還按在地上一下
-  if (id === 'kingspin') { const h = m.hits[0]; return { k: ramp(t, h.on[0], h.on[1] + 2, 6), x: 1400, y: 500 }; }   // 象王大掄：鼻子拉直、身體轉一圈掃過去
-  if (id === 'trunkS' || id === 'trunkT') return { k: Math.max(0, 1 - (t - m.grip.at) / 6), x: 800, y: 900 };
+  if (id === 'kingspin') {                            // 象王大掄：定格時鼻子朝天 → 往前拍在地上、按著不動
+    const h = m.hits[0];
+    if (t < h.on[0]) return { k: 1, x: 250 + 800 * t / h.on[0], y: 2500 - 2500 * t / h.on[0] };
+    return { k: Math.max(0, 1 - Math.max(0, t - h.on[1] - 10) / 10), x: 1050, y: 0 };
+  }
+  if (id === 'trunkS' || id === 'trunkT' || id === 'kingT') return { k: Math.max(0, 1 - (t - m.grip.at) / 6), x: 800, y: 900 };
   if (m.wpn) {                                       // 鼻子捲著武器揮：起手鼻子往上往後提，打出去往前送（武器的方向 items.js 另外算）
     const a0 = m.hits[0].on[0], a1 = m.hits[m.hits.length - 1].on[1], up = t < a0, k = Math.min(1, (t + 1) / 3) * (t > a1 + 2 ? Math.max(0, 1 - (t - a1 - 2) / 8) : 1);
     return { k: 0.75 * k, x: up ? 380 : 760, y: up ? 1500 : 950 };
@@ -445,6 +448,10 @@ export class View {
         this.fx.groundRing(x, z, '#d8c8a8', 2.8 * r, 0.45); this.fx.groundRing(x, z, c, 1.4 * r, 0.3); this.fx.wave(x, z, c, 2.6 * r, 0.4);
         this.fx.dust(x, 0, (14 * r) | 0, '#5a4a38', z); this.fx.shards(x, 0.1, ROCK, (10 * r) | 0, 4, z);
         this.shake = Math.max(this.shake, 0.1 * r); this.punch = Math.max(this.punch, 0.3 * r);
+        if (S.p[e.s]?.mv === 'kingT') {                 // 象王大掄踩地甩人：再大一圈、往外的光、鏡頭推更近
+          this.fx.wave(x, z, c, 5, 0.55); this.fx.groundRing(x, z, HOT, 3.6, 0.5); this.fx.rays(x, 0.9, c, 3.5, z, 0.3);
+          this.fx.shards(x, 0.2, ROCK, 14, 6, z); this.shake = Math.max(this.shake, 0.16); this.punch = Math.max(this.punch, 0.55);
+        }
         break;
       }
       case 'fizzle': if (e.fire) { this.fx.smoke(e.x * U, 0.1, z, 5); break; } else { const x = e.x * U; this.fx.dust(x, 0, 5, null, z); this.fx.shards(x, 0.1, ROCK, 4, 2, z); this.fx.bolts(x, 0.15, col(e.s), 1, 0.5, z); break; }
@@ -674,18 +681,34 @@ export class View {
       }
     }
   }
-  // 鼻象：拔石頭前鼻子插進土裡揚土；象王大掄地上一圈、掄人捲起塵土
+  // 鼻象：拔石頭前鼻子插進土裡揚土；號角往上的音波；象王大掄地上一圈、掄人捲起塵土
   elephantFx(S, p, v, m) {
     const id = m && (m.pose || m.id);
     if (id === 'rock' && p.t > 3 && p.t < m.hurl.at && v.fxT % 2 === 0) {
       const x = (p.x + p.face * 650) * U;
       this.fx.dust(x, 0, 2, '#5a4636', p.z * U); this.fx.speck(x, 0.1, '#7a6a5c', 1.4, p.z * U, 5);
     }
+    // 號角：鼻尖一圈一圈往外擴的音波，腳下那圈打地上的時候地上亮一圈、揚一點土
+    if (id === 'horn') {
+      const h = m.hits[0], g = m.hits[1], C = CHARS[p.ch], c = C.pal[0], x = (p.x + p.face * 220) * U, pz = p.z * U;
+      if (p.t >= h.on[0] && p.t <= h.on[1] && v.fxT % 2 === 0) {
+        const k = (p.t - h.on[0]) / Math.max(1, h.on[1] - h.on[0]);
+        this.fx.shock(x, (C.h + 650 + 250 * k) * U, k < 0.5 ? '#fff4e0' : c, 1.6 + 2.4 * k, pz, 0.35);   // 停在鼻尖高度往外擴（再往上會出畫面）
+      }
+      const key = S.f - p.t;                          // 這一招從哪幀開始的：畫面一幀可能跑好幾次、回滾會重來，同一招只冒一次
+      if (p.t >= h.on[0] && v.hornA !== key) { v.hornA = key; this.fx.flare(x, (C.h + 650) * U, '#fff4e0', 2.2, pz, 0.25); this.shake = Math.max(this.shake, 0.05); }
+      if (p.t >= g.on[0] && v.hornG !== key) { v.hornG = key; this.fx.groundRing(p.x * U, pz, c, (g.box[2] + 300) * U, 0.35); this.fx.wave(p.x * U, pz, c, 2.4, 0.4); this.fx.dust(p.x * U, 0, 6, '#5a4a38', pz); }
+    }
     // 象王大掄：鼻子掃一圈的時候地上亮一圈；掄的時候被甩的人底下一圈塵土捲起來
     if (id === 'kingspin' && p.t >= 1 && p.t <= m.hits[0].on[1] + 2 && v.fxT % 2 === 0) this.fx.groundRing(p.x * U, p.z * U, CHARS[p.ch].pal[0], (m.hits[0].box[2] + 300) * U, 0.35);
-    if (m && m.id === 'kingT' && p.t < m.grip.at && v.fxT % 2 === 0) {
-      const a = p.t * 0.8;
-      this.fx.dust((p.x + Math.cos(a) * 1000) * U, 0, 1, '#5a4636', (p.z + Math.sin(a) * 700) * U);
+    // 大掄掄的時候：地上捲起塵土，加速那兩圈塵土多一倍、腳下一圈粉紅；頂上停住那下什麼都不冒（靜一下再踩）
+    if (m && m.id === 'kingT' && p.t < m.grip.at) {
+      const fast = p.t >= m.grip.pace[0][0] * m.grip.pace[0][1], hang = p.t >= paceLen(m.grip);
+      if (!hang && (fast || v.fxT % 2 === 0)) {
+        const a = p.t * (fast ? 1.6 : 0.8);
+        this.fx.dust((p.x + Math.cos(a) * 1100) * U, 0, fast ? 2 : 1, '#5a4636', (p.z + Math.sin(a) * 800) * U);
+        if (fast && v.fxT % 3 === 0) this.fx.groundRing(p.x * U, p.z * U, CHARS[p.ch].pal[0], 2.2, 0.25);
+      }
     }
   }
   // 爛熊：幻術一道紫光沿著地板竄過去、竄到的那排人腳下亮一圈；豪火球起手嘴前一團火越吸越大；

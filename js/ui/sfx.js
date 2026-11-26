@@ -5,7 +5,8 @@
 
 import { ITEMS } from '../sim/items.js';
 import { MOVES, CHARS } from '../sim/chars/index.js';
-import { speak } from './voice.js';
+import { speak, speakTai } from './voice.js';
+const JP = typeof location !== 'undefined' && new URLSearchParams(location.search).has('jp');   // ?jp 念回日語，對照用
 
 let ctx = null, master = null, sfxBus = null, musicBus = null, echoIn = null, verbIn = null, hallIn = null, noiseBuf = null;
 const HALL = { gap: 0.3, fb: 0.5 };   // 大招回音：每一聲隔幾秒、每彈一次剩多少
@@ -331,16 +332,23 @@ KIT.elephant = {
     trunk(t) { noise(t, 0.16, 400, 1.3, 0.3, 'bandpass', 2600); trumpet(t + 0.04, 0.6, 260); },
     stomp(t) { trumpet(t, 0.5, 180); tone(t + 0.2, 0.3, 90, 35, 0.7); rumble(t + 0.2, 0.5, 0.5, 110); },
     rock(t) { noise(t, 0.3, 220, 0.8, 0.4, 'lowpass', 600, 0.2); rumble(t, 0.3, 0.45, 80); tone(t + 0.2, 0.14, 160, 50, 0.55); noise(t + 0.2, 0.18, 1400, 1, 0.3, 'bandpass', 500); trumpet(t + 0.22, 0.35, 230); },   // 鼻子插進土裡拔起來：土裂開、悶悶一聲、短號角
-    skygrab(t) { trumpet(t, 0.7, 340); noise(t, 0.22, 600, 1.2, 0.25, 'bandpass', 3600); },                                // 鼻子往上撈：號角往上衝
+    horn(t) { noise(t, 0.12, 300, 1, 0.2, 'lowpass', 500); trumpet(t + 0.08, 1.2, 300); trumpet(t + 0.12, 0.7, 450); rumble(t + 0.1, 0.35, 0.3, 90); },   // 朝天吹號角：吸一口氣、兩聲疊在一起往上衝，地下悶悶一震
     trunkS(t) { for (let i = 0; i < 3; i++) noise(t + i * 0.16, 0.14, 500, 1.4, 0.3, 'bandpass', 1800); trumpet(t + 0.1, 0.5, 280); },   // 掄人：呼、呼、呼
   },
   super(t) {
-    trumpet(t, 1.1, 220); trumpet(t + 0.22, 0.8, 330);
+    trumpet(t, 1.1, 220); trumpet(t + 0.22, 0.8, 330);                       // 定格：鼻子朝天叫
     rumble(t, 0.5, 0.5, 90, 1);
-    const r = t + 0.5;                                                         // 定格結束：鼻子掃一圈、掄兩圈（呼呼呼）、砸地
-    for (let i = 0; i < 6; i++) noise(r + i * 0.13, 0.14, 500, 1.4, 0.3, 'bandpass', 1500 + i * 150);
-    trumpet(r + 0.1, 0.7, 250);
-    tone(r + 0.62, 0.4, 80, 28, 0.9); rumble(r + 0.62, 0.8, 0.6, 90); noise(r + 0.62, 0.3, 260, 0.8, 0.45, 'lowpass');
+    const r = t + 0.5;                                                         // 定格結束：鼻子拍地（掄和甩在 cue.kingT，捲到人才響）
+    noise(r + 0.03, 0.12, 900, 1, 0.5, 'lowpass'); tone(r + 0.03, 0.22, 140, 45, 0.7); rumble(r + 0.03, 0.4, 0.4, 100);
+  },
+  cue: {
+    // 大掄捲到：呼——呼——再呼呼呼呼越來越快（照 pace：一圈 16 幀、兩圈 16 幀），頂上停住那下號角，踩地甩出去另外響（quake、hit）
+    kingT: { start(t) {
+      for (let i = 0; i < 2; i++) noise(t + i * 0.13, 0.13, 500, 1.4, 0.3, 'bandpass', 1400 + i * 100);
+      for (let i = 0; i < 6; i++) noise(t + 0.27 + i * 0.045, 0.06, 600, 1.4, 0.32, 'bandpass', 1800 + i * 160);
+      trumpet(t + 0.53, 0.5, 300);
+      tone(t + 0.67, 0.45, 75, 26, 0.95); noise(t + 0.67, 0.35, 260, 0.8, 0.5, 'lowpass');
+    } },
   },
   hit(t, big, su) {
     tone(t, 0.28, 130, 40, 0.6); noise(t, 0.16, 500, 0.8, 0.35, 'lowpass');
@@ -746,10 +754,11 @@ const SND = {
   // 念招式名稱。who 這隻上一句還沒念完就不念（一直吐泡泡不會疊成一團）；force 超必殺一定念
   voice({ ch, id, who = ch, force }) {
     const c = CHARS[ch], e = c && [...c.specials, ...c.supers].find((s) => s.id === id);
-    if (!e?.yomi) return;
+    const tai = !JP && e?.tai;
+    if (!tai && !e?.yomi) return;
     const t = ctx.currentTime;
     if (!force && lastVoice[who] > t) return;
-    lastVoice[who] = speak(ctx, dest, noiseBuf, e.yomi, { amp: 0.5, ...c.voice }, t + 0.03);
+    lastVoice[who] = (tai ? speakTai : speak)(ctx, dest, noiseBuf, tai || e.yomi, { amp: 0.5, ...c.voice }, t + 0.03);
   },
 };
 const ECHO = { pillar: 0.4, hit: 0.25, explode: 0.5, erupt: 0.4, wall: 0.2, shatter: 0.5, super: 0.5, ko: 0.9, fight: 0.5, clash: 0.4, win: 0.3, voice: 0.15 };
@@ -829,6 +838,7 @@ export function sfxState(S, panOf = () => 0) {
       else if (f.mv === 'runS') play('slide', { ch: f.ch }, pan);
       else if (m && (m.kind === 'n' || !m.kind)) play('swing', { heavy: (m.hits?.[0]?.dmg || 0) >= 55 }, pan);
     }
+    if (f.act === 'atk' && o.mv !== f.mv && KIT[f.ch]?.cue?.[f.mv]?.start) play('cue', { ch: f.ch, id: f.mv, cue: 'start' }, pan);   // 換成這招就響（大掄捲到）
     // 招式中途：起跳那幀（鑽地飛出來）
     if (f.act === 'atk' && o.act === 'atk' && o.mv === f.mv && KIT[f.ch]?.cue?.[f.mv]) {
       const j = MOVES[f.ch][f.mv]?.jump?.[0];

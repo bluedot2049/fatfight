@@ -755,11 +755,11 @@ function startOnline(c0, c1, carry = null) {
   const oneWay = G.net.rtt / 2 / (1000 / 60);
   const delay = Math.max(1, Math.min(5, Math.ceil(oneWay * 0.6)));
   const quest = G.room.mode === 'quest' ? G.room.stage : null;
-  const m = { t: 'start', ch: [c0, c1], delay, quest, seed: quest ? (Math.random() * 0x7fffffff) | 0 : 0, carry };
+  const m = { t: 'start', ch: [c0, c1], delay, quest, seed: quest ? (Math.random() * 0x7fffffff) | 0 : 0, carry, gid: 1 + ((Math.random() * 0x7ffffffe) | 0) };
   G.net.ctl(m);
   beginOnline(m);
 }
-function beginOnline({ ch, delay, quest, seed, carry }) {
+function beginOnline({ ch, delay, quest, seed, carry, gid }) {
   G.vote = G.otherVote = null;
   menu.hide(); closeOverlay(); cards3d?.stop();
   document.body.classList.remove('at-title');
@@ -767,7 +767,7 @@ function beginOnline({ ch, delay, quest, seed, carry }) {
   if (quest) { G.room.mode = 'quest'; G.room.stage = quest; }
   view.camOffset = 0; view.marks = true;
   const init = quest ? newQuest(ch, quest, { seed, ...(carry || {}) }) : newMatch(ch[0], ch[1]);
-  G.rb = new Rollback({ local: G.side, init, send: (m) => G.net?.fast(m), delay });
+  G.rb = new Rollback({ local: G.side, init, send: (m) => G.net?.fast(m), delay, gid });
   G.S = G.rb.S;
   G.mode = 'fight'; G.paused = false; acc = 0; G.overShown = false;
   hud.show(true); hud.setNames(G.S); hud.setMoves(G.S, G.side); hud.showMoves(movesOn);

@@ -19,7 +19,7 @@ function normals(o) {
   return [
     { id: 'combo', name: '連續技', kind: 'n', d: o.combo, in: [BA, ...W(16), BA, ...W(17), ...H(RIGHT, o.cw || 0), BA], len: 100 },
     { id: 'crouch', name: '蹲攻連段', kind: 'n', d: o.crouch, in: [BS, BS, BS | BA, ...H(BS, 7), BS | BA, ...H(BS, 8), BS | BA, ...H(BS, 20)], len: 80 },
-    { id: 'CD', name: '吹飛', kind: 'n', d: o.cd, in: [BA | BJ], len: 60 },
+    { id: 'CD', name: '撞飛', kind: 'n', d: o.cd, in: [BA | BJ], len: 60 },
     { id: 'runA', name: '衝刺攻擊', kind: 'n', d: o.run, in: [...RUN, ...H(RIGHT, o.runN), BA], len: 70 },
     { id: 'runS', name: '滑行', kind: 'n', d: o.run, in: [...RUN, ...H(RIGHT, o.runN), BS], len: 70 },
     { id: 'jA', name: '跳躍攻擊', kind: 'n', d: o.jump, in: [RIGHT | BJ, ...H(RIGHT, o.jumpN), BA], len: 70 },
@@ -49,7 +49,7 @@ export const DEMOS = {
     { id: 'trunk', name: '鼻子捲', kind: 'sp', d: 1800, in: cmd(RIGHT, BA), foe: 'guard', len: 110 },
     { id: 'rock', name: '拔石頭', kind: 'sp', d: 4000, in: cmd(RIGHT, BJ), len: 100 },
     { id: 'stomp', name: '象腳踏地', kind: 'sp', d: 2600, in: [...cmd(DOWN, BA), ...H(BA, 20)], len: 100 },
-    { id: 'skygrab', name: '鼻子撈天', kind: 'sp', ...antiAir() },
+    { id: 'horn', name: '象鼻號角', kind: 'sp', ...antiAir() },
     { id: 'kingspin', name: '象王大掄', kind: 'su', d: 1700, in: cmd(UP, BJ), foe: 'guard', len: 140 },
   ],
   penguin: [

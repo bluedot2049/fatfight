@@ -22,21 +22,22 @@ const N = {
 };
 
 // 吐火：長嘴往下垂，火是斜斜往前掃地面（框矮，跳得過、蹲著躲不掉）。按住攻一直噴、按上下擺頭；被擋也一下一下鎖住
+// 2026-11-26 很耗魔：起手 120→150、按住每段 30→90（噴滿 510，約半條），打中不回魔（原本按住每段幾乎自己回本）
 const FLAME = [150, 0, 1600, 700];
 const puff = (t) => hit([t, t + 1], FLAME, 'S', { dmg: 20, fall: 0, hs: 16, stop: 2, bdef: 3, dvx: 3, zr: 300, fire: 1 });   // 2026-11-26 每口 16→20、最後一口 30→36（企鵝電腦互打墊底，中距離的主力加一點）
 const SP = [
   { id: 'breath', name: '吐火', yomi: 'fuka', d: 'f', btn: 'A', note: '貼地火焰。長按攻持續，上下調方向',
-    m: mv('breath', '吐火', 36, { kind: 'sp', mp: 120, pose: 'breath', keep: { at: 22, to: 10, n: 4, mp: 30 }, aim: [10, 900],
+    m: mv('breath', '吐火', 36, { kind: 'sp', mp: 150, nogain: 1, pose: 'breath', keep: { at: 22, to: 10, n: 4, mp: 90 }, aim: [10, 900],
       hits: [puff(8), puff(12), puff(16), puff(20),
         hit([25, 27], FLAME, 'S', { dmg: 36, kd: 1, dvx: 24, dvy: 52, stop: 8, bdef: 8, zr: 300, fire: 1 })] }) },
-  // 火球：拋出去，落地（或打到人）變成一片地上的火，燒一下才熄。拋物線越過前面的人
+  // 火球：拋出去，落地（或打到人）變成一片地上的火，燒一下才熄。拋物線越過前面的人（2026-11-26 魔力 130→120，吐火變貴，換火球、火柱多放）
   { id: 'fireball', name: '火球', yomi: 'kakyu-', d: 'f', btn: 'J', note: '拋物線火球，落地留火',
-    m: mv('fireball', '火球', 34, { kind: 'sp', mp: 130, pose: 'toss',
+    m: mv('fireball', '火球', 34, { kind: 'sp', mp: 120, pose: 'toss',
       proj: { at: 12, x: 300, y: 1200, vx: 40, w: 130, h: 130, dmg: 60, fall: 70, life: 90, kd: 1, dvx: 30, dvy: 70, fire: 1,
         lob: { vy: 50, g: 3 }, boom: { w: 420, h: 160, t: 60, dmg: 40, kd: 1, dvx: 14, dvy: 60, fire: 1 } } }) },
-  // 火焰爆擊：翅膀一彈，最近的敵人腳下先亮一圈，半秒後火柱衝上來。看到的人走開就躲掉；彈完企鵝就能動，但亮著的時候企鵝被打到就散掉
+  // 火焰爆擊：翅膀一彈，最近的敵人腳下先亮一圈，半秒後火柱衝上來。看到的人走開就躲掉；彈完企鵝就能動，但亮著的時候企鵝被打到就散掉（2026-11-26 魔力 150→130）
   { id: 'blast', name: '火焰爆擊', yomi: 'kaen bakugeki', d: 'd', btn: 'A', note: '最近敵人腳下延遲火柱',
-    m: mv('blast', '火焰爆擊', 30, { kind: 'sp', mp: 150, pose: 'snap',
+    m: mv('blast', '火焰爆擊', 30, { kind: 'sp', mp: 130, pose: 'snap',
       proj: { at: 10, x: 1500, y: 0, vx: 0, w: 300, h: 300, dmg: 90, fall: 80, life: 2, aim: { r: 6000, wait: 28 },
         boom: { w: 300, h: 1000, t: 12, dmg: 90, kd: 1, dvx: 8, dvy: 110, fire: 1 } } }) },
   // 對空：不跳，用力踩地板，身前的地上噴出火來往上衝

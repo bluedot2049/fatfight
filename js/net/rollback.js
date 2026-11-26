@@ -6,8 +6,9 @@ import { step, clone, hashState } from '../sim/match.js';
 
 export class Rollback {
   // local：我是 P1(0) 還是 P2(1)；delay：自己的按鍵晚幾幀生效（換來少回滾）；maxPred：最多先跑對方幾幀
-  constructor({ local, init, send, delay = 2, maxPred = 8 }) {
-    this.local = local; this.remote = 1 - local;
+  // gid：這一場的編號（房主開場時給）。上一場打完、對方還沒收到開場前，他舊的那場還在送按鍵，編號不同的不收
+  constructor({ local, init, send, delay = 2, maxPred = 8, gid = 0 }) {
+    this.local = local; this.remote = 1 - local; this.gid = gid;
     this.S = init; this.frame = 0;
     this.delay = delay; this.maxPred = maxPred; this.send = send;
     this.inp = [[], []];
@@ -80,11 +81,12 @@ export class Rollback {
     const start = Math.max(this.peerAck + 1, this.localTop - 64, 0);
     const b = [];
     for (let f = start; f <= this.localTop; f++) b.push(this.inp[this.local][f]);
-    this.send({ t: 'i', s: start, b, a: this.remoteTop, f: this.frame, adv: this.frame - this.peerFrame });
+    this.send({ t: 'i', g: this.gid, s: start, b, a: this.remoteTop, f: this.frame, adv: this.frame - this.peerFrame });
   }
 
   // 收到對方的訊息
   receive(m) {
+    if ((m.g ?? 0) !== this.gid) return;
     if (m.t === 'i') {
       for (let i = 0; i < m.b.length; i++) {
         const f = m.s + i;
@@ -93,7 +95,8 @@ export class Rollback {
         this.remoteTop = f;
         if (f < this.frame && this.used[f] !== m.b[i] && (this.pending < 0 || f < this.pending)) this.pending = f;
       }
-      if (m.a > this.peerAck) this.peerAck = m.a;
+      // 對方說收到哪一幀：不能比我送過的還後面（信了就再也不送按鍵，兩邊一起卡住）
+      if (m.a > this.peerAck && m.a <= this.localTop) this.peerAck = m.a;
       this.peerFrame = m.f; this.peerAdv = m.adv;
     } else if (m.t === 'h') {
       const mine = this.myHash.get(m.f);
@@ -109,7 +112,7 @@ export class Rollback {
     const h = hashState(this.snaps.get(F));
     this.myHash.set(F, h);
     if (this.theirHash && this.theirHash[0] === F && this.theirHash[1] !== h && this.desync < 0) this.desync = F;
-    this.send({ t: 'h', f: F, h });
+    this.send({ t: 'h', g: this.gid, f: F, h });
   }
 
   // 兩邊都確定的最新一幀（之後的畫面可能還會因為回滾改掉）

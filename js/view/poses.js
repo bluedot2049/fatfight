@@ -5,6 +5,16 @@
 //       aN aF 兩隻手往前舉、aNz aFz 往外張、lN lF 腿往前踢、tail 尾巴往上、sink 鑽進地底
 
 import { MOVES, CHARS } from '../sim/chars/index.js';
+import { paceLen } from '../sim/moves.js';
+
+// 象王大掄的掄法（sim 的 orbitStep，這裡算到小數讓身體轉得順）
+const swing = (fast) => ({ sq: 0.08 - 0.08 * fast, lean: -0.12 - 0.1 * fast, bend: -0.1, head: -0.45, aN: 2.3, aF: 2.1, aNz: 0.6 + 0.4 * fast, aFz: 0.6 + 0.4 * fast });
+const KING_SLAP = { sq: -0.14, by: -0.03, lean: 0.28, bend: 0.2, head: 0.5, aN: 0.6, aF: 0.5, aNz: 0.9, aFz: 0.9, lN: -0.1 };   // 鼻子拍地
+function paceSteps(G, t) {
+  let n = 0;
+  for (const [d, k] of G.pace) { if (t < d * k) return n + t / d; t -= d * k; n += k; }
+  return n;
+}
 
 const BASE = {
   idle: {},
@@ -150,7 +160,7 @@ Object.assign(ATK, {
     chop: { w: { aN: 2.6, aF: 2.2, lean: -0.2, head: -0.45 }, s: { aN: 0.8, aF: 0.6, lean: 0.4, bend: 0.3, head: 0.35 } },   // 鼻子、手舉高往下鎚
     stomp: { w: { lN: 1.5, lean: -0.25, aN: 0.9, aF: 0.9, aNz: 0.4, aFz: 0.4, head: -0.3, sq: 0.08 }, s: { lN: -0.1, sq: -0.26, by: -0.05, lean: 0.12, aN: 0.4, aF: 0.4, head: 0.15 } },   // 抬腳踩下去
     rock: { w: { lean: 0.38, bend: 0.3, head: 0.5, sq: -0.14, aN: 0.5, aF: 0.4, lN: 0.25 }, s: { lean: -0.22, bend: -0.18, head: -0.55, sq: 0.1, aN: 1.7, aF: 1.4, lF: 0.3 } },   // 低頭把鼻子插進土裡 → 仰頭甩出去
-    skygrab: { w: { sq: -0.22, head: 0.15, lean: 0.05 }, s: { head: -0.6, lean: -0.22, sq: 0.12, aN: 1.9, aF: 1.6, lN: 0.25 } },                                   // 蹲一下、鼻子直直往上撈
+    horn: { w: { sq: -0.2, head: 0.3, lean: 0.12, aN: 0.5, aF: 0.5 }, s: { head: -0.75, lean: -0.26, bend: -0.12, sq: 0.14, by: 0.03, aN: 1.5, aF: 1.5, aNz: 1.1, aFz: 1.1 } },   // 低頭吸一口氣 → 仰頭、鼻子朝天吹號角，兩手往兩邊張開
     trunkT: { w: { lean: 0.25, bend: 0.2, head: 0.3, aN: 1.2, aF: 1.1, sq: -0.1 }, s: { lean: -0.45, bend: -0.3, head: -0.6, aN: 2.7, aF: 2.5, sq: 0.08 } },   // 低頭捲住、往後仰把人甩過頭
     runS: { w: { sq: -0.15, lean: -0.1 }, s: { lean: -0.55, by: -0.28, lN: 1.5, lF: 1.5, aN: 0.9, aF: 0.9, aNz: 0.5, aFz: 0.5, head: -0.35, sq: -0.08 } },   // 滑行：一屁股坐下去、腳往前滑
   },
@@ -383,15 +393,26 @@ function attackPose(f, m, t, clock) {
     if (t <= at) return { spin: -((t + 64 - at) / 2) * (Math.PI / 4), lean: -0.12, sq: -0.06, aN: 1.4, aF: 1.3, aNz: 0.5, aFz: 0.5, head: 0.1, lN: 0.2 * Math.sin(t * 0.8) };
     return mix({ spin: 0, lean: 0.4, bend: 0.3, head: 0.3, aN: 1.8, aF: 1.6 }, BASE.idle, Math.min(1, (t - at) / Math.max(1, m.total - at)));
   }
-  if (id === 'kingspin') {                           // 象王大掄：蹲低、鼻子拉直，整隻轉一圈掃過去（掃到人就換成 kingT 的掄人）→ 揮空的話轉完愣在那裡
-    const a1 = m.hits[0].on[1] + 3, low = { lean: 0.2, bend: 0.15, sq: -0.14, aN: 1.1, aF: 1.0, aNz: 0.5, aFz: 0.5, head: 0.3, lN: 0.3 };
-    if (t <= a1) return { ...low, spin: -(t / a1) * Math.PI * 2 };
-    return mix({ ...low, head: -0.2, sq: 0.05, lean: -0.1 }, BASE.idle, Math.min(1, (t - a1) / Math.max(1, m.total - a1)));
+  if (id === 'kingspin') {                           // 象王大掄：定格時仰頭鼻子朝天（t 停在 0）→ 鼻子往地上一拍（地上一圈往外擴，掃到人換成 kingT）→ 揮空的話趴著愣在那裡
+    const a0 = m.hits[0].on[0], a1 = m.hits[0].on[1] + 3;
+    const call = { sq: 0.12, lean: -0.32, bend: -0.2, head: -0.75, aN: 2.5, aF: 2.3, aNz: 0.5, aFz: 0.5, lN: 0.35 };
+    const slap = KING_SLAP;
+    if (t < a0) return mix(call, slap, t / a0);
+    if (t <= a1) return slap;
+    return mix(over(slap, { head: 0.2, sq: -0.1 }), BASE.idle, ease(Math.min(1, (t - a1) / Math.max(1, m.total - a1))));
   }
-  if (id === 'skyT') {                               // 撈天捲到：仰著頭把人拉下來 → 往前低頭砸地
-    const at = m.grip.at, up = ATK.elephant.skygrab.s, slam = { head: 0.55, lean: 0.42, bend: 0.32, sq: -0.2, by: -0.04, aN: 0.9, aF: 0.8 };
-    if (t < at) return mix(up, slam, ease(t / at));
-    return mix(slam, BASE.idle, Math.min(1, (t - at - 4) / Math.max(1, m.total - at - 4)));
+  if (id === 'kingT') {                              // 大掄捲到：挺直、手和鼻子舉過頭，跟著被掄的人轉（角度照 sim 的 pace）→ 掄完踮腳後仰、舉在頂上停住 → 踩地往四周甩
+    const G = m.grip, end = paceLen(G), at = G.at;
+    if (t < end) {
+      const fast = Math.min(1, Math.max(0, (t - G.pace[0][0] * G.pace[0][1] + 4) / 8));   // 第二段加速時身體壓低一點、往後倒
+      const p = { ...swing(fast), spin: -paceSteps(G, t) * (Math.PI / 4), lN: 0.15 * Math.sin(t * 0.9) };
+      return t < 5 ? over(mix(KING_SLAP, p, ease(t / 5)), { spin: p.spin }) : p;   // 頭幾幀從拍地的低姿勢把人拉起來
+    }
+    const top = { sq: 0.18, by: 0.06, lean: -0.38, bend: -0.25, head: -0.8, aN: 2.8, aF: 2.6, aNz: 0.35, aFz: 0.35, lN: 1.0 };   // 抬一隻腳踮著、整隻拉長
+    const stomp = { sq: -0.16, by: -0.03, lean: 0.16, bend: 0.1, head: 0.3, aN: 1.4, aF: 1.4, aNz: 1.9, aFz: 1.9, lN: -0.1 };   // 踩下去、兩手往兩邊甩開
+    if (t < at) return mix(swing(1), top, ease(Math.min(1, (t - end + 1) / 4)));
+    if (t < at + 2) return mix(top, stomp, (t - at + 1) / 2);
+    return mix(stomp, BASE.idle, ease(Math.max(0, (t - at - 8) / Math.max(1, m.total - at - 8))));
   }
   if (id === 'frenzy') {                             // 衝過去（照 vx 停下那幀）→ 亂打 → 最後一下往上打（照最後一下的幀數；兩版節奏不同也對得上）
     const dash = m.vx[m.vx.length - 1][0], fin = m.hits[m.hits.length - 1].on[0] - 2;

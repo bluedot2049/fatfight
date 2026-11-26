@@ -4,7 +4,7 @@
 
 import { hit, mv, multi, slide } from '../moves.js';
 
-// 普通技：A1 A2 輪流出，對方頭暈時變 A3；蹲攻 crA（踢）打到接 crB（短手）再接 crD（掃）；攻跳同按吹飛 CD；跑、衝跳、空中各一招
+// 普通技：A1 A2 輪流出，對方頭暈時變 A3；蹲攻 crA（踢）打到接 crB（短手）再接 crD（掃）；攻跳同按撞飛 CD；跑、衝跳、空中各一招
 const N = {
   A1: mv('A1', '鰭拍', 16, { pose: 'sA', cancel: 1, hits: [hit([4, 6], [80, 780, 580, 1200], 'L')] }),   // 打得高，胖鼠蹲下會揮空
   A2: mv('A2', '反手拍', 18, { pose: 'sC', cancel: 1, hits: [hit([5, 7], [80, 450, 570, 1100], 'L')] }),   // 反手比正手短一點（2026-11-24 平衡：原本 620，比 A1 還遠）
@@ -26,21 +26,21 @@ const N = {
 // 必殺：防＋方向＋攻／跳。d 'f' 左右（按哪邊往哪邊）、'u' 上、'd' 下
 const SP = [
   // 按住攻集氣吐大泡（集滿一定打倒），吐完再按攻多吐，最多三顆
-  { id: 'bubble', name: '深海泡', yomi: 'shinkai ho-', d: 'f', btn: 'A', note: '飛行道具。長按攻集氣，追加攻連發',
+  { id: 'bubble', name: '深海泡', yomi: 'shinkai ho-', tai: 'tshim1-hai2-phau3', d: 'f', btn: 'A', note: '飛行道具。長按攻集氣，追加攻連發',
     m: mv('bubble', '深海泡', 32, { kind: 'sp', mp: 150, charge: { at: 9, max: 45 }, mash: { at: 24, to: 7, n: 2, mp: 60 },
       proj: { at: 10, x: 420, y: 880, vx: 66, w: 170, h: 170, dmg: 70, fall: 70, life: 120 } }) },   // 魔力 120→150（2026-11-24 平衡）
-  { id: 'wave', name: '翻滾浪', yomi: 'honkon ro-', d: 'f', btn: 'J', note: '突進。上下調方向，追加攻再滾一次',
+  { id: 'wave', name: '翻滾浪', yomi: 'honkon ro-', tai: 'huan1-kun2-long7', d: 'f', btn: 'J', note: '突進。上下調方向，追加攻再滾一次',
     m: mv('wave', '翻滾浪', 46, { kind: 'sp', mp: 150, cancel: 1, hurt: [-300, 0, 300, 900], vx: [[0, 0], [5, 60], [28, 0]], zm: 10, stick: 1,
       mash: { at: 17, to: 7, n: 1, mp: 50 },
       hits: [hit([7, 12], [0, 0, 540, 1000], 'S', { dmg: 40, fall: 20, hs: 22, stop: 7 }), hit([18, 24], [0, 0, 540, 1000], 'S', { dmg: 55, kd: 1, dvx: 30, dvy: 80 })] }) },
   // 往上衝：前兩下把人帶上去，最後一下打飛，到頂點停一下
-  { id: 'tail', name: '尾巴一甩', yomi: 'biha issui', d: 'u', btn: 'A', note: '對空。出招無敵',
+  { id: 'tail', name: '尾巴一甩', yomi: 'biha issui', tai: 'bue2-pa1 it4-sut4', d: 'u', btn: 'A', note: '對空。出招無敵',
     m: mv('tail', '尾巴一甩', 30, { kind: 'sp', mp: 150, inv: [1, 8], jump: [3, 10, 108], land: 4, landW: 11, hang: 6,
       hits: [hit([3, 5], [0, 300, 580, 1650], 'S', { dmg: 30, fall: 0, carry: 1, stop: 5, hs: 24 }),
         hit([7, 9], [0, 300, 580, 1650], 'S', { dmg: 30, fall: 0, carry: 1, stop: 5, hs: 24 }),
         hit([11, 15], [0, 300, 600, 1700], 'S', { dmg: 60, kd: 1, dvx: 18, dvy: 100, stop: 13 })] }) },
   // 身前捲起漩渦把人吸過來轉，最後往上甩出去
-  { id: 'vortex', name: '深海漩渦', yomi: 'shinkai uzu', d: 'd', btn: 'A', note: '吸入後甩出',
+  { id: 'vortex', name: '深海漩渦', yomi: 'shinkai uzu', tai: 'tshim1-hai2 suan5-oo1', d: 'd', btn: 'A', note: '吸入後甩出',
     m: mv('vortex', '深海漩渦', 60, { kind: 'sp', mp: 200, pull: { on: [8, 44], x: 900, r: 2200, v: 16 },
       hits: multi(14, 7, 5, [250, 0, 1550, 1350], 20, 70, { zr: 700, stop: 2 }).map((h, i, a) => (i === a.length - 1 ? { ...h, stop: 12 } : h)) }) },
 ];
@@ -50,7 +50,7 @@ const SP = [
 // 遠處只吃得到後半段，傷害自然少；揮空收招比原本多 14 幀（86→100），遠遠亂放會被衝過來打
 const BEAM = [150, 250, 2900, 1350];
 const SU = [
-  { id: 'surge', name: '深海霸氣', yomi: 'shinkai haki', d: 'u', btn: 'J', note: '前方大範圍，被防仍鎖住。浪頭可跳過，連打攻追加',
+  { id: 'surge', name: '深海霸氣', yomi: 'shinkai haki', tai: 'tshim1-hai2 pa3-khi3', d: 'u', btn: 'J', note: '前方大範圍，被防仍鎖住。浪頭可跳過，連打攻追加',
     m: mv('surge', '深海霸氣', 100, { kind: 'su', mp: 400, flash: 1, inv: [0, 16], mash: { at: 54, to: 39, n: 2, mp: 60 },
       sweep: { on: [16, 48], to: 6500, near: 3000, low: 700 },
       hits: multi(16, 8, 6, BEAM, 31, 75, { zr: 650 }).map((h) => ({ ...h, on: [h.on[0], h.on[0] + 7] })) }) },   // 2026-11-26 壓一點（對戰每場打 850–1040，別隻的大絕一半）：每下 34→31、最後 80→75（試過 28／70，對戰掉到四成四）。前後寬度試過 650→480，闖關清不掉被圍的雜兵，留著
@@ -60,7 +60,7 @@ export default {
   id: 'manatee', name: '灰牛', full: '灰牛', color: '#7fe6ff',
   blurb: '遠處吐泡泡、尾巴對空', stat: [4, 5, 2],
   pal: ['#5cc8e0', '#123a5c'], card: { attr: '水', type: '深海之獸', lv: 5, art: 'sea' },   // 介面：寶石色（亮、暗）；卡片的屬性、種族、等級星、畫框底色     // 選角畫面：一句話、力氣／距離／速度（1–5）
-  voice: { f0: 92, size: 0.9, mora: 0.12 },   // 念招式名稱的聲音（js/ui/voice.js）：音高、體型、一拍幾秒；招式的 yomi 是念法
+  voice: { f0: 92, size: 0.9, mora: 0.12 },   // 念招式名稱的聲音（js/ui/voice.js）：音高、體型、一拍幾秒；招式的 tai 是台語念法（台羅），沒有的念 yomi（日語）
   w: 330, h: 1450, hc: 950,
   walkX: 16, walkZ: 11, run: 44, runZ: 9, jumpV: 150, jumpX: 18, jumpZ: 12, dashV: 102, dashX: 58,
   normals: N, specials: SP, supers: SU,
