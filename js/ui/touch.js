@@ -25,7 +25,19 @@ const STOP = 5;          // 跑步中搖桿放開幾幀就煞車
 const RUN_AGAIN = 14;    // 補過一次連按兩下以後，隔幾幀還在走才再補（等核心的狀態傳回來）
 const JOY_KEY = 'fatfight.joy';
 
-const portrait = () => (screen.orientation?.type ? screen.orientation.type.startsWith('portrait') : innerHeight > innerWidth);
+// 直的還是橫的看實際畫面的寬高：App 裡的瀏覽器（Messenger 那些）的 screen.orientation 跟畫面對不上。打字時鍵盤會把畫面壓扁，不算數
+const portrait = (was) => (document.activeElement?.matches?.('input, textarea') ? was : innerHeight > innerWidth);
+// App 裡的瀏覽器（照煉金畫廊 inapp.js 的判斷）：Messenger、Facebook、Instagram 在 iPhone 上常常鎖成直的，轉手機也沒用，要換到手機的瀏覽器開
+const UA = navigator.userAgent;
+const inApp = /\bLine\/\d/.test(UA) ? 'LINE' : /Instagram/.test(UA) ? 'Instagram' : /Barcelona/.test(UA) ? 'Threads'
+  : /Messenger|FB_IAB\/MESSENGER/i.test(UA) ? 'Messenger' : /FBAN|FBAV|FB_IAB/.test(UA) ? 'Facebook' : null;
+// 叫手機的瀏覽器：LINE 認網址參數；Android 用 intent；iPhone 試 x-safari-（iOS 17 起有，App 擋了就沒反應，旁邊還有複製網址）
+function leaveURL() {
+  const u = new URL(location.href);
+  if (inApp === 'LINE') { u.searchParams.set('openExternalBrowser', '1'); return u.href; }
+  if (/Android/i.test(UA)) return `intent://${u.host}${u.pathname}${u.search}${u.hash}#Intent;scheme=https;end`;
+  return 'x-safari-' + u.href;
+}
 export const canFull = () => !!document.documentElement.requestFullscreen;
 export const isFull = () => !!document.fullscreenElement;
 // 全螢幕，進去以後鎖成橫的（Android 鎖得住；iPhone 的 Safari 沒有全螢幕，靠「請橫拿」那張卡）
@@ -50,7 +62,8 @@ export class Touch {
       <button class="tswap" aria-label="換邊"><svg viewBox="0 0 24 24"><path d="M5 9h13l-3.5-3.5M19 15H6l3.5 3.5"/></svg></button>
     </div>`);
     this.backBtn = add(`<button id="tback" hidden>${button(96, 40, 'sub')}<span>返回</span></button>`);
-    this.turn = add(`<div id="turn"><div><i class="ph"></i><b>請橫拿</b><button ${canFull() ? '' : 'hidden'}>全螢幕</button></div></div>`);
+    this.turn = add(`<div id="turn"><div><i class="ph"></i><b>請橫拿</b><button class="full" ${canFull() && !inApp ? '' : 'hidden'}>全螢幕</button>
+      ${inApp ? `<p>${inApp} 裡轉不過來<br>請用手機的瀏覽器開</p><button class="leave">用瀏覽器開</button><button class="copy">複製網址</button>` : ''}</div></div>`);
     const $ = (s) => this.root.querySelector(s);
     this.stickEl = $('.stick'); this.knob = $('.knob'); this.base = $('.base');
     this.btns = [['D', BD], ['S', BS], ['A', BA], ['J', BJ]].map(([c, bit]) => ({ el: $(`.tb.${c}`), bit }));
@@ -74,7 +87,18 @@ export class Touch {
     $('.tpause').addEventListener('pointerdown', (e) => { e.stopPropagation(); e.preventDefault(); this.cb.pause(); });
     $('.tswap').addEventListener('pointerdown', (e) => { e.stopPropagation(); e.preventDefault(); this.setSide(!this.left); });
     onTap(this.backBtn, () => { this.cb.back(); return true; });
-    this.turn.querySelector('button').addEventListener('click', () => fullscreen(true));
+    this.turn.querySelector('.full').addEventListener('click', () => fullscreen(true));
+    if (inApp) {
+      this.turn.querySelector('.leave').addEventListener('click', () => { location.href = leaveURL(); });
+      const copy = this.turn.querySelector('.copy');
+      copy.addEventListener('click', async () => {
+        const u = new URL(location.href); u.searchParams.delete('openExternalBrowser');
+        let ok = false;
+        try { await navigator.clipboard.writeText(u.href); ok = true; } catch {}
+        if (!ok) { const t = document.createElement('textarea'); t.value = u.href; document.body.appendChild(t); t.select(); try { ok = document.execCommand('copy'); } catch {} t.remove(); }
+        copy.textContent = ok ? '複製好了' : u.href;
+      });
+    }
     // 手指一碰就換成觸控的介面；畫面上沒有手指時落下的第一根表示之前的都放開了（放開有時送不到：系統手勢、切 App），記著的清掉
     addEventListener('pointerdown', (e) => {
       if (e.pointerType !== 'touch') return;
@@ -105,7 +129,7 @@ export class Touch {
     if (!on) this.show(false);
   }
   checkTall() {
-    const tall = portrait();
+    const tall = portrait(this.tall);
     if (tall === this.tall) return;
     this.tall = tall;
     document.body.classList.toggle('tall', tall);
