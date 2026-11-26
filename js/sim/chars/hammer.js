@@ -21,13 +21,13 @@ const N = {
 
 // 必殺（雜兵不放，留著給之後的精英版或可選角色）
 const SP = [
-  { id: 'bite', name: '鯊魚咬', yomi: 'same kami', d: 'f', btn: 'A', note: '撲過去咬一口',
+  { id: 'bite', name: '鯊魚咬', yomi: 'same kami', tai: 'sua1-hi5-ka7', d: 'f', btn: 'A', note: '撲過去咬一口',
     m: mv('bite', '鯊魚咬', 40, { kind: 'sp', mp: 120, pose: 'bite', vx: [[0, 0], [6, 60], [18, 0]],
       hits: [hit([8, 16], [0, 300, 620, 1100], 'S', { dmg: 85, kd: 1, dvx: 22, dvy: 60 })] }) },
-  { id: 'whirl', name: '錘頭旋風', yomi: 'tsuito- senpu-', d: 'f', btn: 'J', note: '原地轉著往前，連打三下，按上下可以偏',
+  { id: 'whirl', name: '錘頭旋風', yomi: 'tsuito- senpu-', tai: 'thui5-thau5 suan5-hong1', d: 'f', btn: 'J', note: '原地轉著往前，連打三下，按上下可以偏',
     m: mv('whirl', '錘頭旋風', 50, { kind: 'sp', mp: 150, vx: [[0, 0], [6, 40], [34, 0]], zm: 10, stick: 1,
       hits: multi(8, 9, 3, [0, 300, 600, 1250], 34, 60) }) },
-  { id: 'fin', name: '鯊鰭衝天', yomi: 'sakki sho-ten', d: 'u', btn: 'A', note: '對空，起手打不到',
+  { id: 'fin', name: '鯊鰭衝天', yomi: 'sakki sho-ten', tai: 'sua1-ki5 tshiong1-thian1', d: 'u', btn: 'A', note: '對空，起手打不到',
     m: mv('fin', '鯊鰭衝天', 30, { kind: 'sp', mp: 150, inv: [1, 8], jump: [4, 10, 110], land: 4, landW: 11,
       hits: [hit([4, 14], [0, 400, 560, 1600], 'S', { dmg: 100, kd: 1, dvx: 16, dvy: 95 })] }) },
 ];

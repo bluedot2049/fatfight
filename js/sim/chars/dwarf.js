@@ -20,18 +20,18 @@ const N = {
 };
 
 const SP = [
-  { id: 'boulder', name: '滾石', yomi: 'konseki', d: 'f', btn: 'A', note: '一鎬敲出一顆石頭貼地滾過去，跳得過',
+  { id: 'boulder', name: '滾石', yomi: 'konseki', tai: 'kun2-tsioh8', d: 'f', btn: 'A', note: '一鎬敲出一顆石頭貼地滾過去，跳得過',
     m: mv('boulder', '滾石', 46, { kind: 'sp', mp: 120, pose: 'chop', proj: { at: 16, x: 500, y: 220, vx: 52, w: 220, h: 200, dmg: 85, fall: 70, life: 120 } }) },
-  { id: 'drill', name: '鑽頭衝', yomi: 'santo- sho-', d: 'f', btn: 'J', note: '鎬子朝前轉著衝過來，按上下可以偏',
+  { id: 'drill', name: '鑽頭衝', yomi: 'santo- sho-', tai: 'tsng3-thau5-tshiong1', d: 'f', btn: 'J', note: '鎬子朝前轉著衝過來，按上下可以偏',
     m: mv('drill', '鑽頭衝', 48, { kind: 'sp', mp: 150, pose: 'CD', hurt: [-300, 0, 300, 800], vx: [[0, 0], [8, 62], [32, 14], [38, 0]], zm: 12,
       hits: [hit([8, 32], [0, 0, 600, 900], 'S', { dmg: 92, kd: 1, dvx: 24, dvy: 75 })] }) },
-  { id: 'uppick', name: '鎬子上挑', yomi: 'ko-shi jo-cho-', d: 'u', btn: 'A', note: '對空，起手打不到',
+  { id: 'uppick', name: '鎬子上挑', yomi: 'ko-shi jo-cho-', tai: 'ko2-tsi2 siong7-thiau1', d: 'u', btn: 'A', note: '對空，起手打不到',
     m: mv('uppick', '鎬子上挑', 30, { kind: 'sp', mp: 150, inv: [1, 8], jump: [4, 10, 110], land: 4, landW: 11,
       hits: [hit([4, 15], [0, 300, 600, 1700], 'S', { dmg: 105, kd: 1, dvx: 14, dvy: 100 })] }) },
 ];
 
 const SU = [
-  { id: 'cavein', name: '礦坑崩塌', yomi: 'ko-ko- ho-kai', d: 'u', btn: 'J', note: '跳起來一鎬劈進地裡，前後都很寬',
+  { id: 'cavein', name: '礦坑崩塌', yomi: 'ko-ko- ho-kai', tai: 'khong3-khenn1 pang1-thap4', d: 'u', btn: 'J', note: '跳起來一鎬劈進地裡，前後都很寬',
     m: mv('cavein', '礦坑崩塌', 62, { kind: 'su', mp: 400, flash: 1, inv: [0, 20], jump: [10, 20, 150], land: 6, landW: 14,
       hits: [hit([40, 54], [-950, -500, 950, 700], 'S', { dmg: 190, kd: 1, dvx: 22, dvy: 100, zr: 750, stop: 10, bdef: 60 })] }) },
 ];

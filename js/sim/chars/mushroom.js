@@ -21,12 +21,12 @@ const N = {
 
 // 必殺（雜兵不放，留著給之後的精英版或可選角色）
 const SP = [
-  { id: 'spore', name: '孢子彈', yomi: 'ho-shi dan', d: 'f', btn: 'A', note: '噴一團孢子飄過去',
+  { id: 'spore', name: '孢子彈', yomi: 'ho-shi dan', tai: 'pau1-tsu2-tan7', d: 'f', btn: 'A', note: '噴一團孢子飄過去',
     m: mv('spore', '孢子彈', 40, { kind: 'sp', mp: 120, pose: 'puff', proj: { at: 14, x: 360, y: 700, vx: 40, w: 180, h: 180, dmg: 65, fall: 70, life: 110 } }) },
-  { id: 'bounce', name: '彈傘衝', yomi: 'dansan sho-', d: 'f', btn: 'J', note: '傘朝前彈過去，按上下可以偏',
+  { id: 'bounce', name: '彈傘衝', yomi: 'dansan sho-', tai: 'tuann7-suann3-tshiong1', d: 'f', btn: 'J', note: '傘朝前彈過去，按上下可以偏',
     m: mv('bounce', '彈傘衝', 46, { kind: 'sp', mp: 150, pose: 'CD', vx: [[0, 0], [6, 56], [28, 0]], zm: 10,
       hits: [hit([6, 28], [0, 0, 560, 1000], 'S', { dmg: 88, kd: 1, dvx: 24, dvy: 70 })] }) },
-  { id: 'capup', name: '傘頂衝天', yomi: 'santei sho-ten', d: 'u', btn: 'A', note: '對空，起手打不到',
+  { id: 'capup', name: '傘頂衝天', yomi: 'santei sho-ten', tai: 'suann3-ting2 tshiong1-thian1', d: 'u', btn: 'A', note: '對空，起手打不到',
     m: mv('capup', '傘頂衝天', 30, { kind: 'sp', mp: 150, inv: [1, 8], jump: [3, 10, 125], land: 4, landW: 11,
       hits: [hit([3, 15], [0, 300, 500, 1550], 'S', { dmg: 100, kd: 1, dvx: 14, dvy: 100 })] }) },
 ];

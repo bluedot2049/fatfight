@@ -21,23 +21,23 @@ const N = {
 
 const SP = [
   // 念力彈：一顆慢慢飄的念力球；tk＝同時把附近地上的一個東西砸過來（場上東西越多越麻煩，先撿走或打破）
-  { id: 'psi', name: '念力彈', yomi: 'nenriki dan', d: 'f', btn: 'A', note: '一顆念力球，附近地上有東西就一起砸過來',
+  { id: 'psi', name: '念力彈', yomi: 'nenriki dan', tai: 'liam7-lik8-tan7', d: 'f', btn: 'A', note: '一顆念力球，附近地上有東西就一起砸過來',
     m: mv('psi', '念力彈', 42, { kind: 'sp', mp: 120, pose: 'push', tk: { at: 14, r: 4500 },
       proj: { at: 14, x: 420, y: 820, vx: 46, w: 170, h: 170, dmg: 66, fall: 70, life: 120 } }) },
   // 瞬移：消失、出現在最近的敵人背後電一下。面向原本那邊擋不住，要轉身或往前後走開
-  { id: 'blink', name: '瞬移', yomi: 'shunkan ido-', d: 'f', btn: 'J', note: '消失再出現在背後電一下；要轉身擋或走開',
+  { id: 'blink', name: '瞬移', yomi: 'shunkan ido-', tai: 'sun3-i5', d: 'f', btn: 'J', note: '消失再出現在背後電一下；要轉身擋或走開',
     m: mv('blink', '瞬移', 46, { kind: 'sp', mp: 150, pose: 'sA', inv: [3, 18], warp: { at: 13, r: 5000, d: 620 },
       hits: [hit([22, 26], [80, 250, 820, 1050], 'S', { dmg: 78, kd: 1, dvx: 22, dvy: 65 })] }) },
-  { id: 'grip', name: '念力吸', yomi: 'nenriki kyu-', d: 'd', btn: 'A', note: '把人吸過去轉，最後甩出去',
+  { id: 'grip', name: '念力吸', yomi: 'nenriki kyu-', tai: 'liam7-lik8-khip4', d: 'd', btn: 'A', note: '把人吸過去轉，最後甩出去',
     m: mv('grip', '念力吸', 58, { kind: 'sp', mp: 200, pose: 'cast', pull: { on: [8, 42], x: 900, r: 2400, v: 16 },
       hits: multi(14, 7, 5, [250, 0, 1500, 1300], 18, 66, { zr: 700, stop: 2, dvy: 60 }).map((h, i, a) => (i === a.length - 1 ? { ...h, stop: 12 } : h)) }) },
-  { id: 'barrier', name: '念力罩', yomi: 'nenriki sho-', d: 'u', btn: 'A', note: '身邊炸一圈，起手打不到',
+  { id: 'barrier', name: '念力罩', yomi: 'nenriki sho-', tai: 'liam7-lik8-tau3', d: 'u', btn: 'A', note: '身邊炸一圈，起手打不到',
     m: mv('barrier', '念力罩', 40, { kind: 'sp', mp: 150, pose: 'nova', inv: [1, 12],
       hits: [hit([8, 14], [-650, 0, 650, 1500], 'S', { dmg: 76, kd: 1, dvx: 26, dvy: 80, zr: 520 })] }) },
 ];
 
 const SU = [
-  { id: 'storm', name: '念力風暴', yomi: 'nenriki arashi', d: 'u', btn: 'J', note: '身前一大片連續震五下，前後也寬',
+  { id: 'storm', name: '念力風暴', yomi: 'nenriki arashi', tai: 'liam7-lik8 hong1-po7', d: 'u', btn: 'J', note: '身前一大片連續震五下，前後也寬',
     m: mv('storm', '念力風暴', 72, { kind: 'su', mp: 400, flash: 1, inv: [0, 18], pose: 'cast',
       hits: multi(20, 6, 5, [150, 0, 2600, 1400], 30, 84, { zr: 700, dvy: 60 }) }) },
 ];

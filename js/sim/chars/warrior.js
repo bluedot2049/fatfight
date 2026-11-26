@@ -20,16 +20,16 @@ const N = {
 };
 
 const SP = [
-  { id: 'bash', name: '舉盾衝', yomi: 'tate totsu', d: 'f', btn: 'A', note: '盾擋在前面衝過來，擋了會破防',
+  { id: 'bash', name: '舉盾衝', yomi: 'tate totsu', tai: 'ki2-tun2-tshiong1', d: 'f', btn: 'A', note: '盾擋在前面衝過來，擋了會破防',
     m: mv('bash', '舉盾衝', 50, { kind: 'sp', mp: 150, pose: 'bash', vx: [[0, 0], [10, 56], [32, 12], [38, 0]],
       hits: [hit([10, 32], [0, 0, 560, 1100], 'S', { dmg: 84, kd: 1, dvx: 26, dvy: 70, bdef: 60 })] }) },
-  { id: 'upaxe', name: '斧頭上撩', yomi: 'ono age', d: 'u', btn: 'A', note: '對空，起手打不到',
+  { id: 'upaxe', name: '斧頭上撩', yomi: 'ono age', tai: 'poo2-thau5 siong7-liau5', d: 'u', btn: 'A', note: '對空，起手打不到',
     m: mv('upaxe', '斧頭上撩', 30, { kind: 'sp', mp: 150, inv: [1, 8], jump: [4, 10, 110], land: 4, landW: 11,
       hits: [hit([4, 15], [0, 300, 600, 1650], 'S', { dmg: 100, kd: 1, dvx: 14, dvy: 100 })] }) },
 ];
 
 const SU = [
-  { id: 'whirl', name: '旋風斧', yomi: 'senpu- ono', d: 'u', btn: 'J', note: '轉著斧頭慢慢逼過來，前後都掃得到',
+  { id: 'whirl', name: '旋風斧', yomi: 'senpu- ono', tai: 'suan5-hong1-poo2', d: 'u', btn: 'J', note: '轉著斧頭慢慢逼過來，前後都掃得到',
     m: mv('whirl', '旋風斧', 70, { kind: 'su', mp: 400, flash: 1, inv: [0, 16], vx: [[0, 0], [16, 16], [46, 0]], zm: 6,
       hits: multi(18, 6, 5, [-760, 0, 760, 1150], 28, 80, { zr: 620, dvy: 60 }) }) },   // 五下、最後一下飛得低（不彈地）：整套加躺著不能超過 3 秒
 ];

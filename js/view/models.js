@@ -32,7 +32,7 @@ export function buildManatee() {
   for (const s of [-1, 1]) h.ball(0.13, PAD, s * 0.088, -0.08, 0.26, { sx: 1.0, sy: 0.85, sz: 0.7 });
   const tongue = h.ball(0.065, TONGUE, 0, -0.2, 0.3, { sx: 1.0, sy: 1.15, sz: 0.5 });
   for (const s of [-1, 1]) {
-    h.ball(0.03, INK, s * 0.13, 0.11, 0.3, { line: false, sz: 0.6 });
+    h.ball(0.018, INK, s * 0.13, 0.11, 0.3, { line: false });   // 豆豆眼，跟黃狗一樣大
     h.ball(0.012, INK, s * 0.035, 0.0, 0.345, { line: false });
     for (let i = 0; i < 3; i++) h.box(0.13, 0.009, 0.009, INK, s * 0.235, -0.04 - i * 0.04, 0.23, { line: false, ry: s * 0.5, rz: s * (0.1 - i * 0.1) });
   }

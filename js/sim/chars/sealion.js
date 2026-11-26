@@ -21,18 +21,18 @@ const N = {
 
 // 必殺：防＋方向＋攻／跳
 const SP = [
-  { id: 'ballshot', name: '頂球砸', yomi: 'cho-kyu- za', d: 'f', btn: 'A', note: '把鼻子上的球頂出去',
+  { id: 'ballshot', name: '頂球砸', yomi: 'cho-kyu- za', tai: 'ting2-kiu5-tsap8', d: 'f', btn: 'A', note: '把鼻子上的球頂出去',
     m: mv('ballshot', '頂球砸', 44, { kind: 'sp', mp: 120, proj: { at: 16, x: 380, y: 1300, vx: 46, w: 200, h: 200, dmg: 85, fall: 70, life: 150 } }) },
-  { id: 'slide', name: '肚皮滑壘', yomi: 'tohi katsurui', d: 'f', btn: 'J', note: '趴下去貼地滑過來，按上下可以偏',
+  { id: 'slide', name: '肚皮滑壘', yomi: 'tohi katsurui', tai: 'too7-phue5 kut8-lui2', d: 'f', btn: 'J', note: '趴下去貼地滑過來，按上下可以偏',
     m: mv('slide', '肚皮滑壘', 50, { kind: 'sp', mp: 150, hurt: [-420, 0, 420, 620], vx: [[0, 0], [8, 64], [34, 12], [40, 0]], zm: 10,
       hits: [hit([8, 34], [0, 0, 620, 600], 'S', { dmg: 95, kd: 1, dvx: 22, dvy: 70 })] }) },
-  { id: 'clap', name: '拍鰭衝天', yomi: 'hakuki sho-ten', d: 'u', btn: 'A', note: '對空，起手打不到',
+  { id: 'clap', name: '拍鰭衝天', yomi: 'hakuki sho-ten', tai: 'phah4-ki5 tshiong1-thian1', d: 'u', btn: 'A', note: '對空，起手打不到',
     m: mv('clap', '拍鰭衝天', 32, { kind: 'sp', mp: 150, inv: [1, 8], jump: [4, 8, 105], land: 5, landW: 12,
       hits: [hit([4, 15], [0, 400, 640, 1800], 'S', { dmg: 105, kd: 1, dvx: 14, dvy: 95 })] }) },
 ];
 
 const SU = [
-  { id: 'press', name: '萬噸壓頂', yomi: 'manton accho-', d: 'u', btn: 'J', note: '整隻跳起來壓下去，前後都很寬',
+  { id: 'press', name: '萬噸壓頂', yomi: 'manton accho-', tai: 'ban7-tun3 ah4-ting2', d: 'u', btn: 'J', note: '整隻跳起來壓下去，前後都很寬',
     m: mv('press', '萬噸壓頂', 60, { kind: 'su', mp: 400, flash: 1, inv: [0, 20], jump: [10, 24, 150], land: 6, landW: 14,
       hits: [hit([40, 54], [-900, -500, 900, 700], 'S', { dmg: 190, kd: 1, dvx: 22, dvy: 100, zr: 750, stop: 10, bdef: 60 })] }) },
 ];

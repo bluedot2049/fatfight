@@ -21,12 +21,12 @@ const N = {
 
 // 必殺（一般的雜兵不放；精英會放，出手前一樣先預告）
 const SP = [
-  { id: 'wrench', name: '丟扳手', yomi: 'supana nage', d: 'f', btn: 'A', note: '從口袋掏一把扳手丟過來',
+  { id: 'wrench', name: '丟扳手', yomi: 'supana nage', tai: 'tan3-pan1-tshiu2', d: 'f', btn: 'A', note: '從口袋掏一把扳手丟過來',
     m: mv('wrench', '丟扳手', 38, { kind: 'sp', mp: 120, pose: 'sC', proj: { at: 13, x: 420, y: 880, vx: 66, w: 150, h: 130, dmg: 58, fall: 60, life: 90 } }) },
-  { id: 'cart', name: '推車衝', yomi: 'daisha totsu', d: 'f', btn: 'J', note: '低著頭一路推過來',
+  { id: 'cart', name: '推車衝', yomi: 'daisha totsu', tai: 'the1-tshia1-tshiong1', d: 'f', btn: 'J', note: '低著頭一路推過來',
     m: mv('cart', '推車衝', 46, { kind: 'sp', mp: 150, pose: 'CD', vx: [[0, 0], [8, 54], [30, 10], [36, 0]],
       hits: [hit([8, 30], [0, 0, 560, 900], 'S', { dmg: 76, kd: 1, dvx: 24, dvy: 65 })] }) },
-  { id: 'helmet', name: '安全帽上頂', yomi: 'herumetto age', d: 'u', btn: 'A', note: '對空，起手打不到',
+  { id: 'helmet', name: '安全帽上頂', yomi: 'herumetto age', tai: 'an1-tsuan5-bo7 siong7-ting2', d: 'u', btn: 'A', note: '對空，起手打不到',
     m: mv('helmet', '安全帽上頂', 30, { kind: 'sp', mp: 150, inv: [1, 8], jump: [3, 8, 128], land: 4, landW: 11,
       hits: [hit([3, 15], [0, 250, 500, 1500], 'S', { dmg: 84, kd: 1, dvx: 14, dvy: 100 })] }) },
 ];

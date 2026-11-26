@@ -21,10 +21,10 @@ const N = {
 
 // 必殺（一般的雜兵不放；精英會放，出手前一樣先預告）
 const SP = [
-  { id: 'pounce', name: '撲過頭', yomi: 'tobi koe', d: 'f', btn: 'J', note: '跳過頭頂，落下來咬',
+  { id: 'pounce', name: '撲過頭', yomi: 'tobi koe', tai: 'phok4-kue3-thau5', d: 'f', btn: 'J', note: '跳過頭頂，落下來咬',
     m: mv('pounce', '撲過頭', 46, { kind: 'sp', mp: 150, pose: 'jD', jump: [6, 42, 118], land: 4, landW: 13,
       hits: [hit([16, 34], [-100, -150, 560, 480], 'S', { dmg: 78, kd: 1, dvx: 20, dvy: 62 })] }) },
-  { id: 'tailup', name: '尾巴上撩', yomi: 'o age', d: 'u', btn: 'A', note: '對空，起手打不到',
+  { id: 'tailup', name: '尾巴上撩', yomi: 'o age', tai: 'bue2-pa1 siong7-liau5', d: 'u', btn: 'A', note: '對空，起手打不到',
     m: mv('tailup', '尾巴上撩', 30, { kind: 'sp', mp: 150, inv: [1, 8], jump: [3, 8, 130], land: 4, landW: 11,
       hits: [hit([3, 15], [0, 250, 500, 1450], 'S', { dmg: 85, kd: 1, dvx: 14, dvy: 100 })] }) },
 ];

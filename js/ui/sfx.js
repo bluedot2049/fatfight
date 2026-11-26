@@ -5,8 +5,9 @@
 
 import { ITEMS } from '../sim/items.js';
 import { MOVES, CHARS } from '../sim/chars/index.js';
-import { speak, speakTai } from './voice.js';
+import { speak, speakTai, grunt } from './voice.js';
 const JP = typeof location !== 'undefined' && new URLSearchParams(location.search).has('jp');   // ?jp 念回日語，對照用
+const TAI_SP = 0.8;   // 台語念必殺比超必殺快兩成（一拍的秒數乘這個）
 
 let ctx = null, master = null, sfxBus = null, musicBus = null, echoIn = null, verbIn = null, hallIn = null, noiseBuf = null;
 const HALL = { gap: 0.3, fb: 0.5 };   // 大招回音：每一聲隔幾秒、每彈一次剩多少
@@ -624,6 +625,28 @@ function roar(t, dur, p = 1) {
   noise(t, dur * 0.8, 900, 0.6, 0.18 * p, 'bandpass', 500, dur * 0.3);
 }
 const lastVoice = {};
+// 喊聲要不要喊：照幀號＋誰＋哪種算一個雜湊（同一下回滾重送也是同一個結果，不用 Math.random）
+function roll(f, who, salt) {
+  let x = Math.imul(f | 0, 0x9e3779b1) ^ Math.imul((who | 0) + 1, 0x85ebca6b) ^ Math.imul(salt + 1, 0xc2b2ae35);
+  x = Math.imul(x ^ (x >>> 16), 0x45d9f3b); x = Math.imul(x ^ (x >>> 16), 0x45d9f3b);
+  return ((x ^ (x >>> 16)) >>> 0) / 4294967296;
+}
+// 喊的機率（不是每下都喊）、喊完隔多久才能再喊（秒）
+const GRUNT = { eff: 0.3, effBig: 0.55, hurt: 0.35, hurtBig: 0.8, gap: 0.5 };
+const lastGrunt = {};
+// 選角卡上的角色才喊（闖關的雜兵、頭目不喊）；正在念招式名稱、剛喊過的不喊
+function tryGrunt(S, who, kind, big, pan) {
+  const f = S?.p[who], c = f && CHARS[f.ch];
+  if (!c || c.npc || !ctx || ctx.state !== 'running') return;
+  const salt = kind === 'eff' ? 1 : 2;
+  if (roll(S.f, who, salt) >= GRUNT[kind + (big ? 'Big' : '')]) return;
+  const t = ctx.currentTime;
+  if (lastGrunt[who] > t || lastVoice[who] > t) return;
+  let n = 0; const r = (m) => roll(S.f + 977 * ++n, who, salt + 4) * m;   // 喊哪個音、高低長短也照雜湊
+  route(pan, 0, 0.08, 0);
+  const end = grunt(ctx, dest, noiseBuf, kind, big, { amp: 0.5, ...c.voice }, r, t + 0.01);
+  lastGrunt[who] = end + GRUNT.gap;
+}
 
 const SND = {
   // 打中。big 重的；combo 第幾下（越後面音越高）；kind 'su' 超必殺多一層金屬聲
@@ -751,6 +774,8 @@ const SND = {
   beep({ hi }) { const t = ctx.currentTime; tone(t, 0.12, hi ? 1320 : 880, hi ? 1320 : 880, 0.25, 'triangle'); },
   // 招式中途的聲音（鑽地飛出來那一下）
   cue({ ch, id, cue }) { KIT[ch]?.cue?.[id]?.[cue]?.(ctx.currentTime); },
+  // 喊聲（試聽用：play('grunt', { ch: 'manatee', hurt: 1, big: 1 })）；對戰裡走 tryGrunt
+  grunt({ ch = 'manatee', hurt, big }) { grunt(ctx, dest, noiseBuf, hurt ? 'hurt' : 'eff', big, { amp: 0.5, ...CHARS[ch]?.voice }); },
   // 念招式名稱。who 這隻上一句還沒念完就不念（一直吐泡泡不會疊成一團）；force 超必殺一定念
   voice({ ch, id, who = ch, force }) {
     const c = CHARS[ch], e = c && [...c.specials, ...c.supers].find((s) => s.id === id);
@@ -758,7 +783,9 @@ const SND = {
     if (!tai && !e?.yomi) return;
     const t = ctx.currentTime;
     if (!force && lastVoice[who] > t) return;
-    lastVoice[who] = (tai ? speakTai : speak)(ctx, dest, noiseBuf, tai || e.yomi, { amp: 0.5, ...c.voice }, t + 0.03);
+    const o = { amp: 0.5, ...c.voice };
+    if (tai && !c.supers.includes(e)) o.mora = (o.mora || 0.11) * TAI_SP;
+    lastVoice[who] = (tai ? speakTai : speak)(ctx, dest, noiseBuf, tai || e.yomi, o, t + 0.03);
   },
 };
 const ECHO = { pillar: 0.4, hit: 0.25, explode: 0.5, erupt: 0.4, wall: 0.2, shatter: 0.5, super: 0.5, ko: 0.9, fight: 0.5, clash: 0.4, win: 0.3, voice: 0.15 };
@@ -780,7 +807,7 @@ export function play(name, arg = {}, pan = 0) {
 export function sfxEvent(e, pan = 0, S = null) {
   const ch = S?.p[e.s]?.ch;
   switch (e.k) {
-    case 'hit': play('hit', { ...e, ch }, pan); break;
+    case 'hit': play('hit', { ...e, ch }, pan); if (e.d !== undefined && !e.armor) tryGrunt(S, e.d, 'hurt', e.big, pan); break;
     case 'block': play('block', e, pan); break;
     case 'break': play('shatter', e, pan); break;
     case 'dizzy': play('dizzy', e, pan); break;
@@ -836,7 +863,10 @@ export function sfxState(S, panOf = () => 0) {
       const m = MOVES[f.ch][f.mv];
       if (f.mv === 'roll') play('roll', {}, pan);
       else if (f.mv === 'runS') play('slide', { ch: f.ch }, pan);
-      else if (m && (m.kind === 'n' || !m.kind)) play('swing', { heavy: (m.hits?.[0]?.dmg || 0) >= 55 }, pan);
+      else if (m && (m.kind === 'n' || !m.kind)) {
+        const heavy = (m.hits?.[0]?.dmg || 0) >= 55;
+        play('swing', { heavy }, pan); tryGrunt(S, i, 'eff', heavy, pan);
+      }
     }
     if (f.act === 'atk' && o.mv !== f.mv && KIT[f.ch]?.cue?.[f.mv]?.start) play('cue', { ch: f.ch, id: f.mv, cue: 'start' }, pan);   // 換成這招就響（大掄捲到）
     // 招式中途：起跳那幀（鑽地飛出來）

@@ -21,12 +21,12 @@ const N = {
 
 // 必殺（一般的雜兵不放；精英會放，出手前一樣先預告）
 const SP = [
-  { id: 'rocket', name: '飛拳', yomi: 'tobi ken', d: 'f', btn: 'A', note: '拳頭射出去，飛得直',
+  { id: 'rocket', name: '飛拳', yomi: 'tobi ken', tai: 'pue1-kun5', d: 'f', btn: 'A', note: '拳頭射出去，飛得直',
     m: mv('rocket', '飛拳', 44, { kind: 'sp', mp: 120, pose: 'sA', proj: { at: 16, x: 500, y: 900, vx: 58, w: 180, h: 150, dmg: 72, fall: 70, life: 90 } }) },
-  { id: 'spin', name: '迴旋臂', yomi: 'kaiten wan', d: 'f', btn: 'J', note: '兩隻手臂轉著衝過來',
+  { id: 'spin', name: '迴旋臂', yomi: 'kaiten wan', tai: 'hue5-suan5-pi3', d: 'f', btn: 'J', note: '兩隻手臂轉著衝過來',
     m: mv('spin', '迴旋臂', 50, { kind: 'sp', mp: 150, pose: 'spinarm', vx: [[0, 0], [10, 44], [32, 10], [38, 0]],
       hits: [hit([10, 32], [-500, 200, 560, 1100], 'S', { dmg: 86, kd: 1, dvx: 24, dvy: 70 })] }) },
-  { id: 'upjet', name: '噴射上勾', yomi: 'funsha kagi', d: 'u', btn: 'A', note: '對空，起手打不到',
+  { id: 'upjet', name: '噴射上勾', yomi: 'funsha kagi', tai: 'phun3-sia7 siong7-kau1', d: 'u', btn: 'A', note: '對空，起手打不到',
     m: mv('upjet', '噴射上勾', 32, { kind: 'sp', mp: 150, inv: [1, 8], jump: [4, 8, 112], land: 5, landW: 12,
       hits: [hit([4, 16], [0, 300, 600, 1750], 'S', { dmg: 98, kd: 1, dvx: 14, dvy: 100 })] }) },
 ];

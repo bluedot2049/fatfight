@@ -29,19 +29,19 @@ const SUSA = [-30000, 0, 30000, 520];
 const flame = (t, o) => hit([t, t + 2], SUSA, 'S', { dmg: 45, fall: 0, hs: 22, stop: 3, bdef: 12, zr: 6000, ub: 1, ...o });
 
 const SP = [
-  { id: 'kunai', name: '苦無發射', yomi: 'kunai hassha', d: 'f', btn: 'A', note: '周圍一圈射出苦無，軌跡不規則。收招慢',
+  { id: 'kunai', name: '苦無發射', yomi: 'kunai hassha', tai: 'khoo2-bu5 huat4-sia7', d: 'f', btn: 'A', note: '周圍一圈射出苦無，軌跡不規則。收招慢',
     m: mv('kunai', '苦無發射', 40, { kind: 'sp', mp: 150, pose: 'kunai',
       proj: { at: 9, x: 150, y: 760, vx: 52, w: 70, h: 40, dmg: 28, fall: 22, life: 36, fan: FAN, curl: 1, look: 'kunai' } }) },
   // 幻術：前面一整排的人腳下發動，從背後打（擋不住）、打中就頭暈；打在腳邊，跳起來的打不到
-  { id: 'genjutsu', name: '幻術', yomi: 'genjutsu', d: 'f', btn: 'J', note: '前方一排腳下發動。背後攻擊，打中頭暈。可跳過',
+  { id: 'genjutsu', name: '幻術', yomi: 'genjutsu', tai: 'huan7-sut8', d: 'f', btn: 'J', note: '前方一排腳下發動。背後攻擊，打中頭暈。可跳過',
     m: mv('genjutsu', '幻術', 46, { kind: 'sp', mp: 150, pose: 'genjutsu',
       hits: [hit([13, 16], [350, 0, 4700, 350], 'S', { dmg: 40, fall: 0, rear: 1, daze: 1, zr: 220, hs: 30, stop: 8, bdef: 0 })] }) },
   // 踹：起手慢，踹到的人飛超遠（飛出去撞到人一起倒、撞牆彈回來）
-  { id: 'kick', name: '踹', yomi: 'keri', d: 'd', btn: 'A', note: '起手慢。踹飛超遠，飛出去會撞倒人',
+  { id: 'kick', name: '踹', yomi: 'keri', tai: 'tshuai3', d: 'd', btn: 'A', note: '起手慢。踹飛超遠，飛出去會撞倒人',
     m: mv('kick', '踹', 44, { kind: 'sp', mp: 150, pose: 'kick', vx: [[0, 0], [16, 22], [25, 0]],
       hits: [hit([23, 26], [100, 150, 1150, 900], 'S', { dmg: 200, kd: 1, dvx: 100, dvy: 95, bdef: 50, stop: 14, hs: 26 })] }) },
   // 豪火球之術：對空。起手打不到，噴出一顆越滾越大的火球（穿過人、每人燒一次、打倒著火）
-  { id: 'fireball', name: '豪火球之術', yomi: 'go-kakyu- no jutsu', d: 'u', btn: 'A', note: '對空。出招無敵，超大火球。收招慢',
+  { id: 'fireball', name: '豪火球之術', yomi: 'go-kakyu- no jutsu', tai: 'ho5-hue2-kiu5 tsi1-sut8', d: 'u', btn: 'A', note: '對空。出招無敵，超大火球。收招慢',
     m: mv('fireball', '豪火球之術', 56, { kind: 'sp', mp: 150, pose: 'fireball', inv: [1, 23],
       proj: { at: 24, x: 450, y: 900, vx: 22, w: 420, h: 420, dmg: 90, fall: 80, kd: 1, dvx: 22, dvy: 80, life: 50, pierce: 1, fire: 1, grow: 8, look: 'fire' } }) },
 ];
@@ -50,7 +50,7 @@ const SP = [
 // 起手沒有無敵，看到了跳起來就躲得掉。使用者 2026-11-26 嫌太強：第一下從 24 延到 38、五下擠在 38～43（原本 24～37），
 // 一次跳就蓋得住。實測定格結束後第 11～27 幀起跳躲得掉（小象、臘腸狗跳得低，14～26）；太早跳會先落地被燒到，畫面上腳下的圈縮到底那下跳
 const SU = [
-  { id: 'susanoo', name: '須左能乎', yomi: 'susano-o', d: 'u', btn: 'J', note: '全場、不能防禦，打中頭暈。可跳過',
+  { id: 'susanoo', name: '須左能乎', yomi: 'susano-o', tai: 'su1-tso2 ling5-hoo5', d: 'u', btn: 'J', note: '全場、不能防禦，打中頭暈。可跳過',
     m: mv('susanoo', '須左能乎', 46, { kind: 'su', mp: 400, flash: 1, pose: 'susanoo',
       hits: [flame(38), flame(39), flame(40), flame(41), flame(43, { dmg: 110, daze: 1, hs: 30, stop: 14 })] }) },
 ];

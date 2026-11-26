@@ -21,11 +21,11 @@ const N = {
 
 // 必殺（雜兵不放，留著給之後的精英版或可選角色）
 const SP = [
-  { id: 'ink', name: '墨汁彈', yomi: 'bokuju- dan', d: 'f', btn: 'A', note: '吐一團墨',
+  { id: 'ink', name: '墨汁彈', yomi: 'bokuju- dan', tai: 'bak8-tsiap4-tan7', d: 'f', btn: 'A', note: '吐一團墨',
     m: mv('ink', '墨汁彈', 42, { kind: 'sp', mp: 120, pose: 'ink', proj: { at: 15, x: 380, y: 900, vx: 50, w: 150, h: 150, dmg: 70, fall: 70, life: 120 } }) },
-  { id: 'whip', name: '觸鬚大鞭', yomi: 'shokushu taiben', d: 'f', btn: 'J', note: '觸鬚甩很遠',
+  { id: 'whip', name: '觸鬚大鞭', yomi: 'shokushu taiben', tai: 'tshiok4-tshiu1 tua7-pinn1', d: 'f', btn: 'J', note: '觸鬚甩很遠',
     m: mv('whip', '觸鬚大鞭', 44, { kind: 'sp', mp: 150, pose: 'lash', hits: [hit([10, 16], [100, 200, 1500, 1000], 'S', { dmg: 90, kd: 1, dvx: 22, dvy: 60 })] }) },
-  { id: 'rise', name: '墨霧上竄', yomi: 'bokumu jo-zan', d: 'u', btn: 'A', note: '對空，起手打不到',
+  { id: 'rise', name: '墨霧上竄', yomi: 'bokumu jo-zan', tai: 'bak8-bu7 siong7-tshuan3', d: 'u', btn: 'A', note: '對空，起手打不到',
     m: mv('rise', '墨霧上竄', 30, { kind: 'sp', mp: 150, inv: [1, 8], jump: [4, 6, 115], land: 4, landW: 11,
       hits: [hit([4, 14], [0, 350, 540, 1600], 'S', { dmg: 95, kd: 1, dvx: 14, dvy: 95 })] }) },
 ];

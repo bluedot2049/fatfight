@@ -24,9 +24,9 @@ const N = {
 };
 
 const SP = [
-  { id: 'feather', name: '羽毛鏢', yomi: 'hane tobashi', d: 'f', btn: 'A', note: '從空中往前射一根羽毛',
+  { id: 'feather', name: '羽毛鏢', yomi: 'hane tobashi', tai: 'u2-moo5-pio1', d: 'f', btn: 'A', note: '從空中往前射一根羽毛',
     m: mv('feather', '羽毛鏢', 40, { kind: 'sp', mp: 120, pose: 'gust', proj: { at: 14, x: 360, y: 760, vx: 52, w: 130, h: 110, dmg: 56, fall: 50, life: 70 } }) },
-  { id: 'divebomb', name: '急降', yomi: 'kyu-ko-ka', d: 'f', btn: 'J', note: '從空中斜斜撞下來',
+  { id: 'divebomb', name: '急降', yomi: 'kyu-ko-ka', tai: 'kip4-kang3', d: 'f', btn: 'J', note: '從空中斜斜撞下來',
     m: mv('divebomb', '急降', 50, { kind: 'sp', mp: 150, pose: 'swoop', vx: [[0, 0], [10, 52], [22, 8], [32, 0]], fy: [[0, 0], [10, -100], [22, 0], [34, 60]],
       hits: [hit([15, 24], [0, -150, 620, 520], 'S', { dmg: 84, kd: 1, dvx: 24, dvy: 70 })] }) },
 ];

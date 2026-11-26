@@ -260,3 +260,40 @@ export function speakTai(ctx, out, noiseBuf, text, o = {}, t0 = ctx.currentTime)
   });
   return R.done(t);
 }
+
+// ── 喊聲（不念字）──────────────────────────────
+// 出拳用力「喝！」、被打「唔」「啊——」。kind：'eff' 用力、'hurt' 被打；big 重的（重拳、被打飛）。
+// r(n) 回傳 0～n 的亂數（呼叫的人給，同一下會得到同一聲）。回傳喊完的時間
+export function grunt(ctx, out, noiseBuf, kind, big, o = {}, r = (n) => Math.random() * n, t0 = ctx.currentTime) {
+  const f0 = (o.f0 || 110) * (0.94 + r(0.12)), k = (o.size || 1) * (0.97 + r(0.06));
+  const R = rig(ctx, out, noiseBuf, { ...o, size: k, amp: (o.amp || 0.5) * (big ? 0.95 : 0.75) }, t0);
+  const { src, ag, lg, fs, F, setF, voice, pulse } = R;
+  const pick = (a) => a[Math.min(a.length - 1, r(a.length) | 0)];
+  let t = t0 + 0.01;
+  if (kind === 'eff') {
+    // 用力：先一口氣（h），母音一下衝上去、喉嚨一刀收住；重的低一點、長一點、帶沙
+    const v = pick(big ? ['a', 'O', 'a'] : ['a', 'e', 'O', 'u']), len = (big ? 0.16 : 0.085) + r(0.04);
+    F(v).forEach((f, j) => fs[j].frequency.setValueAtTime(f, t0));
+    src.frequency.setValueAtTime(f0 * (big ? 1.05 : 1.2), t0);
+    if (r(1) < 0.7) { pulse(ag.gain, 0.45, t, 0.025 + r(0.02)); t += 0.03; }
+    voice(1, t, 0.006);
+    src.frequency.setTargetAtTime(f0 * (big ? 1.25 : 1.45), t, 0.02);
+    lg.gain.setTargetAtTime(big ? 0.35 : 0.12, t, 0.02);
+    if (big) { setF(v === 'O' ? 'O' : 'a', t + len * 0.4, 0.03); src.frequency.setTargetAtTime(f0 * 1.1, t + len * 0.5, 0.04); }
+    t += len;
+    voice(0, t, 0.005); lg.gain.setTargetAtTime(0, t, 0.004);
+  } else {
+    // 被打：一下被擠出聲音、音高往上衝再垮下來；輕的「唔」短，重的「啊——」拖長、尾巴帶沙
+    const v = pick(big ? ['a', 'a', 'O', 'e'] : ['u', 'N', 'O', 'a']), len = (big ? 0.26 : 0.1) + r(big ? 0.12 : 0.05);
+    F(v === 'N' ? 'N' : big ? 'u' : v).forEach((f, j) => fs[j].frequency.setValueAtTime(f, t0));
+    src.frequency.setValueAtTime(f0 * (big ? 1.7 : 1.45), t0);
+    voice(big ? 1 : 0.8, t, 0.004);
+    if (big) setF(v, t + 0.03, 0.02);                      // 「嗚啊」：先縮一下再張開
+    src.frequency.setTargetAtTime(f0 * (big ? 1.95 : 1.6), t, 0.015);
+    src.frequency.setTargetAtTime(f0 * (big ? 0.85 : 1.05), t + len * 0.35, len * 0.3);
+    lg.gain.setTargetAtTime(big ? 0.5 : 0.2, t + len * 0.4, 0.03);
+    t += len;
+    voice(0, t, big ? 0.03 : 0.012);
+  }
+  return R.done(t);
+}

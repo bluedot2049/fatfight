@@ -21,17 +21,17 @@ const N = {
 
 const SP = [
   // 箭：快、直、射在胸口的高度，蹲下躲得掉（矮的角色蹲著從底下過）；再按攻多射
-  { id: 'arrow', name: '連珠箭', yomi: 'renju sen', d: 'f', btn: 'A', note: '又快又直的箭，射得高、蹲下躲得掉；再按攻多射',
+  { id: 'arrow', name: '連珠箭', yomi: 'renju sen', tai: 'lian5-tsu1-tsinn3', d: 'f', btn: 'A', note: '又快又直的箭，射得高、蹲下躲得掉；再按攻多射',
     m: mv('arrow', '連珠箭', 34, { kind: 'sp', mp: 120, pose: 'shoot', mash: { at: 24, to: 10, n: 2, mp: 50 },
       proj: { at: 14, x: 520, y: 1020, vx: 104, w: 170, h: 50, dmg: 52, fall: 40, life: 44 } }) },
-  { id: 'flip', name: '後翻踢', yomi: 'ko-ten geri', d: 'u', btn: 'A', note: '對空，起手打不到',
+  { id: 'flip', name: '後翻踢', yomi: 'ko-ten geri', tai: 'au7-huan1-that4', d: 'u', btn: 'A', note: '對空，起手打不到',
     m: mv('flip', '後翻踢', 30, { kind: 'sp', mp: 150, inv: [1, 8], jump: [3, 6, 128], land: 4, landW: 11,
       hits: [hit([3, 15], [0, 250, 540, 1600], 'S', { dmg: 88, kd: 1, dvx: 16, dvy: 100 })] }) },
 ];
 
 const SU = [
   // 穿雲箭：拉滿了射一支穿過一整排人的大箭（每個人打一次），跳得過
-  { id: 'piercer', name: '穿雲箭', yomi: 'un o ugatsu', d: 'u', btn: 'J', note: '拉滿弓射一支穿過所有人的大箭，跳得過',
+  { id: 'piercer', name: '穿雲箭', yomi: 'un o ugatsu', tai: 'tshuan1-hun5-tsinn3', d: 'u', btn: 'J', note: '拉滿弓射一支穿過所有人的大箭，跳得過',
     m: mv('piercer', '穿雲箭', 66, { kind: 'su', mp: 400, flash: 1, inv: [0, 14], pose: 'shoot',
       proj: { at: 26, x: 520, y: 700, vx: 96, w: 260, h: 240, dmg: 170, fall: 80, life: 70, kd: 1, dvx: 30, dvy: 80, pierce: 1 } }) },
 ];

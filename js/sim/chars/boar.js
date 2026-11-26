@@ -23,10 +23,10 @@ const N = {
 };
 
 const SP = [
-  { id: 'rampage', name: '蠻衝', yomi: 'ban totsu', d: 'f', btn: 'J', note: '衝得更遠更快，擋了會破防',
+  { id: 'rampage', name: '蠻衝', yomi: 'ban totsu', tai: 'ban5-tshiong1', d: 'f', btn: 'J', note: '衝得更遠更快，擋了會破防',
     m: mv('rampage', '蠻衝', 92, { kind: 'sp', mp: 150, pose: 'charge', vx: [[0, 0], [22, 70], [60, 12], [66, 0]], crash: [22, 60],
       hits: [hit([22, 60], [100, 0, 600, 950], 'S', { dmg: 92, kd: 1, dvx: 34, dvy: 70, bdef: 60, zr: 280 })] }) },
-  { id: 'trample', name: '踏地', yomi: 'jidanda', d: 'd', btn: 'A', note: '前腳踏地震一圈，跳得過',
+  { id: 'trample', name: '踏地', yomi: 'jidanda', tai: 'tah8-te7', d: 'd', btn: 'A', note: '前腳踏地震一圈，跳得過',
     m: mv('trample', '踏地', 48, { kind: 'sp', mp: 150, pose: 'stomp', quake: [16],
       hits: [hit([16, 20], [-850, 0, 850, 320], 'S', { dmg: 70, kd: 1, dvx: 16, dvy: 80, zr: 700 })] }) },
 ];

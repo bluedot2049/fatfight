@@ -25,20 +25,20 @@ const N = {
 
 const SP = [
   // 往上衝：前兩下把人帶上去，最後一下打飛，到頂點停一下
-  { id: 'tooth', name: '門牙衝天', yomi: 'monga sho-ten', d: 'u', btn: 'A', note: '對空。出招無敵',
+  { id: 'tooth', name: '門牙衝天', yomi: 'monga sho-ten', tai: 'mng5-ge5 tshiong1-thian1', d: 'u', btn: 'A', note: '對空。出招無敵',
     m: mv('tooth', '門牙衝天', 30, { kind: 'sp', mp: 150, inv: [1, 8], jump: [2, 16, 136], land: 4, landW: 11, hang: 6,
       hits: [hit([2, 4], [0, 250, 500, 1600], 'S', { dmg: 32, fall: 0, carry: 1, stop: 5, hs: 24 }),
         hit([6, 8], [0, 250, 500, 1600], 'S', { dmg: 32, fall: 0, carry: 1, stop: 5, hs: 24 }),
         hit([10, 15], [0, 250, 520, 1700], 'S', { dmg: 62, kd: 1, dvx: 14, dvy: 110, stop: 13 })] }) },
-  { id: 'burrow', name: '鑽地三圈', yomi: 'sanchi sanken', d: 'd', btn: 'A', note: '潛地前進後竄出。上下轉向，潛地中無敵',
+  { id: 'burrow', name: '鑽地三圈', yomi: 'sanchi sanken', tai: 'tsng3-te7 sann1-khian1', d: 'd', btn: 'A', note: '潛地前進後竄出。上下轉向，潛地中無敵',
     m: mv('burrow', '鑽地三圈', 44, { kind: 'sp', mp: 180, under: [6, 40], vx: [[0, 0], [8, 36], [40, 0]], zm: 22,
       jump: [40, 14, 120], land: 4, landW: 11, hits: [hit([40, 52], [-80, 0, 480, 1350], 'S', { dmg: 120, kd: 1, dvx: 14, dvy: 100 })] }) },
-  { id: 'ball', name: '胖鼠翻滾', yomi: 'hanso honkon', d: 'f', btn: 'J', note: '突進。上下調方向',
+  { id: 'ball', name: '胖鼠翻滾', yomi: 'hanso honkon', tai: 'phong3-tshi2 huan1-kun2', d: 'f', btn: 'J', note: '突進。上下調方向',
     m: mv('ball', '胖鼠翻滾', 48, { kind: 'sp', mp: 150, cancel: 1, hurt: [-280, 0, 280, 720], vx: [[0, 0], [6, 76], [32, 18], [38, 0]], zm: 12,
       hits: [hit([6, 32], [0, 0, 540, 720], 'S', { dmg: 90, kd: 1, dvx: 30, dvy: 80 })] }) },
   // 地裂雷（2026-11-24 取代門牙連啃）：拍地，一道裂縫貼著地板竄過去，碰到人或竄到底就從地底炸上來把人往上彈。
   // 手按著地控制：按上下轉彎、再按攻當場炸；出招被打斷裂縫就沒了。貼地走，蹲下躲不掉、要跳過；中距離（約 5 公尺）
-  { id: 'crack', name: '地裂雷', yomi: 'chiretsu rai', d: 'f', btn: 'A', note: '貼地飛行道具。上下轉向，追加攻引爆',
+  { id: 'crack', name: '地裂雷', yomi: 'chiretsu rai', tai: 'te7-lih8-lui5', d: 'f', btn: 'A', note: '貼地飛行道具。上下轉向，追加攻引爆',
     m: mv('crack', '地裂雷', 60, { kind: 'sp', mp: 150, pose: 'crack',
       proj: { at: 12, x: 380, y: 140, vx: 90, w: 160, h: 140, dmg: 85, fall: 80, life: 34, gr: 1, zm: 14, kd: 1, dvx: 8, dvy: 110,
         boom: { w: 280, h: 750, t: 6, rec: 12 } } }) },
@@ -46,7 +46,7 @@ const SP = [
 
 const RUSH = [0, 0, 620, 1200];
 const SU = [
-  { id: 'frenzy', name: '狂妄連擊', yomi: 'kyo-bo- rengeki', d: 'u', btn: 'J', note: '突進亂打。連打攻追加',
+  { id: 'frenzy', name: '狂妄連擊', yomi: 'kyo-bo- rengeki', tai: 'kong5-bong7 lian5-kik4', d: 'u', btn: 'J', note: '突進亂打。連打攻追加',
     m: mv('frenzy', '狂妄連擊', 90, { kind: 'su', mp: 400, flash: 1, inv: [0, 16], stick: 1, vx: [[0, 0], [6, 92], [26, 0]], mash: { at: 62, to: 47, n: 2, mp: 60 },
       hits: [hit([6, 26], [0, 0, 600, 1100], 'S', { dmg: 60, fall: 0, hs: 30, stop: 4, dvx: 2 }), ...multi(32, 8, 5, RUSH, 40, 90)] }) },
 ];

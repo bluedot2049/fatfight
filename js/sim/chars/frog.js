@@ -21,12 +21,12 @@ const N = {
 
 // 必殺（雜兵不放，留著給之後的精英版或可選角色）
 const SP = [
-  { id: 'tongue', name: '長舌捲', yomi: 'cho-zetsu ken', d: 'f', btn: 'A', note: '舌頭彈很遠',
+  { id: 'tongue', name: '長舌捲', yomi: 'cho-zetsu ken', tai: 'tng5-tsih8-kng2', d: 'f', btn: 'A', note: '舌頭彈很遠',
     m: mv('tongue', '長舌捲', 40, { kind: 'sp', mp: 120, pose: 'lash', hits: [hit([8, 14], [100, 350, 1600, 800], 'S', { dmg: 80, kd: 1, dvx: 20, dvy: 60 })] }) },
-  { id: 'leap', name: '蛙跳踹', yomi: 'achou sen', d: 'f', btn: 'J', note: '跳很遠踹下去',
+  { id: 'leap', name: '蛙跳踹', yomi: 'achou sen', tai: 'ua1-thiau3-tshuai3', d: 'f', btn: 'J', note: '跳很遠踹下去',
     m: mv('leap', '蛙跳踹', 44, { kind: 'sp', mp: 150, pose: 'jD', jump: [6, 40, 120], land: 4, landW: 12,
       hits: [hit([12, 30], [60, -100, 620, 500], 'S', { dmg: 90, kd: 1, dvx: 22, dvy: 65 })] }) },
-  { id: 'hop', name: '蛙躍衝天', yomi: 'aeyaku sho-ten', d: 'u', btn: 'A', note: '對空，起手打不到',
+  { id: 'hop', name: '蛙躍衝天', yomi: 'aeyaku sho-ten', tai: 'ua1-iok8 tshiong1-thian1', d: 'u', btn: 'A', note: '對空，起手打不到',
     m: mv('hop', '蛙躍衝天', 30, { kind: 'sp', mp: 150, inv: [1, 8], jump: [3, 8, 140], land: 4, landW: 11,
       hits: [hit([3, 15], [0, 250, 500, 1500], 'S', { dmg: 95, kd: 1, dvx: 14, dvy: 100 })] }) },
 ];

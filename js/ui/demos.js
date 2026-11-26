@@ -33,7 +33,7 @@ export const DEMOS = {
     { id: 'bubble', name: '深海泡', kind: 'sp', d: 3600, in: cmd(RIGHT, BA), len: 90 },
     { id: 'wave', name: '翻滾浪', kind: 'sp', d: 1800, in: cmd(RIGHT, BJ), len: 90 },
     { id: 'vortex', name: '深海漩渦', kind: 'sp', d: 2200, in: cmd(DOWN, BA), len: 110 },
-    { id: 'tail', name: '尾巴一甩', kind: 'sp', ...antiAir() },
+    { id: 'tail', name: '肥尾抽臉', kind: 'sp', ...antiAir() },
     { id: 'surge', name: '深海霸氣', kind: 'su', d: 3000, in: cmd(UP, BJ), foe: 'guard', len: 150 },
   ],
   marmot: [

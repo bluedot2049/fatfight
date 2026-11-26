@@ -20,21 +20,21 @@ const N = {
 };
 
 const SP = [
-  { id: 'orb', name: '魔彈', yomi: 'madan', d: 'f', btn: 'A', note: '慢慢飄過來的一大顆，擋得住、打得掉',
+  { id: 'orb', name: '魔彈', yomi: 'madan', tai: 'moo5-tan7', d: 'f', btn: 'A', note: '慢慢飄過來的一大顆，擋得住、打得掉',
     m: mv('orb', '魔彈', 44, { kind: 'sp', mp: 120, pose: 'cast', proj: { at: 16, x: 480, y: 850, vx: 34, w: 220, h: 220, dmg: 76, fall: 70, life: 150 } }) },
   // 火柱：最近的敵人腳下亮一圈，半秒後往上噴；看到亮就走開。亮著的時候法師被打到就散掉（跟企鵝的火焰爆擊同一套）
-  { id: 'pillar', name: '火柱', yomi: 'hibashira', d: 'd', btn: 'A', note: '對方腳下亮一圈再噴火，看到就走開；法師被打到就散掉',
+  { id: 'pillar', name: '火柱', yomi: 'hibashira', tai: 'hue2-thiau7', d: 'd', btn: 'A', note: '對方腳下亮一圈再噴火，看到就走開；法師被打到就散掉',
     m: mv('pillar', '火柱', 38, { kind: 'sp', mp: 150, pose: 'cast',
       proj: { at: 12, x: 1500, y: 0, vx: 0, w: 300, h: 300, dmg: 84, fall: 80, life: 2, aim: { r: 5600, wait: 30 },
         boom: { w: 300, h: 1050, t: 12, dmg: 84, kd: 1, dvx: 8, dvy: 105, fire: 1 } } }) },
-  { id: 'nova', name: '護身爆', yomi: 'goshin baku', d: 'u', btn: 'A', note: '身邊炸一圈，起手打不到',
+  { id: 'nova', name: '護身爆', yomi: 'goshin baku', tai: 'hoo7-sin1-pok8', d: 'u', btn: 'A', note: '身邊炸一圈，起手打不到',
     m: mv('nova', '護身爆', 40, { kind: 'sp', mp: 150, pose: 'nova', inv: [1, 12],
       hits: [hit([8, 14], [-650, 0, 650, 1500], 'S', { dmg: 78, kd: 1, dvx: 26, dvy: 80, zr: 520 })] }) },
 ];
 
 const SU = [
   // 隕石：身前一大片，前後也寬；起手很久，看到定格就往後退或貼上去打斷不了（起手打不到）就繞到背後
-  { id: 'meteor', name: '隕石', yomi: 'inseki', d: 'u', btn: 'J', note: '身前砸下一大片，起手很久',
+  { id: 'meteor', name: '隕石', yomi: 'inseki', tai: 'un2-tsioh8', d: 'u', btn: 'J', note: '身前砸下一大片，起手很久',
     m: mv('meteor', '隕石', 74, { kind: 'su', mp: 400, flash: 1, inv: [0, 22], pose: 'meteor', quake: [38],
       hits: [hit([38, 46], [250, 0, 2700, 1500], 'S', { dmg: 185, kd: 1, dvx: 22, dvy: 100, zr: 700, stop: 12, bdef: 60, fire: 1 })] }) },
 ];

@@ -21,11 +21,11 @@ const N = {
 
 // 必殺（雜兵不放，留著給之後的精英版或可選角色）
 const SP = [
-  { id: 'hurl', name: '丟石頭', yomi: 'to-seki', d: 'f', btn: 'A', note: '從背上抓一塊石頭丟過去',
+  { id: 'hurl', name: '丟石頭', yomi: 'to-seki', tai: 'tan3-tsioh8-thau5', d: 'f', btn: 'A', note: '從背上抓一塊石頭丟過去',
     m: mv('hurl', '丟石頭', 46, { kind: 'sp', mp: 120, pose: 'hurl', proj: { at: 18, x: 400, y: 1200, vx: 44, w: 200, h: 200, dmg: 85, fall: 70, life: 140 } }) },
-  { id: 'roots', name: '苔根纏', yomi: 'taikon ten', d: 'f', btn: 'J', note: '手插進地裡，前面冒出樹根',
+  { id: 'roots', name: '苔根纏', yomi: 'taikon ten', tai: 'thi5-kin1-tinn5', d: 'f', btn: 'J', note: '手插進地裡，前面冒出樹根',
     m: mv('roots', '苔根纏', 48, { kind: 'sp', mp: 150, pose: 'smash', hits: [hit([14, 22], [200, 0, 1700, 500], 'S', { dmg: 90, kd: 1, dvx: 14, dvy: 80 })] }) },
-  { id: 'heave', name: '苔拳衝天', yomi: 'taiken sho-ten', d: 'u', btn: 'A', note: '對空，起手打不到',
+  { id: 'heave', name: '苔拳衝天', yomi: 'taiken sho-ten', tai: 'thi5-kun5 tshiong1-thian1', d: 'u', btn: 'A', note: '對空，起手打不到',
     m: mv('heave', '苔拳衝天', 32, { kind: 'sp', mp: 150, inv: [1, 8], jump: [4, 8, 100], land: 5, landW: 12,
       hits: [hit([4, 15], [0, 400, 620, 1750], 'S', { dmg: 100, kd: 1, dvx: 14, dvy: 95 })] }) },
 ];
