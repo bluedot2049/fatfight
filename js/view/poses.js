@@ -80,6 +80,10 @@ const ATK = {
     jD: { w: {}, s: { sq: -0.22, lean: 0.25, lN: -0.4, lF: -0.4 } },
     CD: { w: { lean: -0.3 }, s: { lean: 0.5, bend: 0.4, bz: 0.2 } },
     tooth: { w: { sq: -0.25 }, s: { aN: 2.8, aF: 2.5, head: -0.35, sq: 0.15 } },
+    // 牙衝頂點的收尾：往上再頂一爪、橫掃（近手從後面甩到前面）、雙手舉過頭往斜下劈
+    toothU: { w: { sq: -0.2, aN: 1.2, aF: 1.0 }, s: { aN: 3.0, aF: 2.8, head: -0.45, sq: 0.2, lean: -0.15 } },
+    toothF: { w: { aN: -0.7, aF: 0.4, spin: -0.55, lean: -0.15, sq: -0.1 }, s: { aN: 1.7, aNz: -0.25, aF: -0.3, spin: 0.5, lean: 0.35, bend: 0.15 } },
+    toothD: { w: { aN: 3.0, aF: 2.8, lean: -0.3, bend: -0.2, head: -0.3, sq: 0.12 }, s: { aN: 0.6, aF: 0.5, lean: 0.6, bend: 0.4, head: 0.35, sq: -0.15 } },
     runS: { w: { sq: -0.2, lean: 0.2 }, s: { sq: -0.34, by: 0.1, lean: 0.62, bend: 0.2, aN: 1.6, aF: 1.6, head: -0.3, lN: -0.5, lF: -0.5 } },   // 滑行：壓低撲進土裡、兩手往前扒（土是 view 揚的）
   },
   sealion: {
@@ -417,6 +421,14 @@ function attackPose(f, m, t, clock) {
     if (t < at + 2) return mix(top, stomp, (t - at + 1) / 2);
     return mix(stomp, BASE.idle, ease(Math.max(0, (t - at - 8) / Math.max(1, m.total - at - 8))));
   }
+  if (id === 'tail' && f.ch === 'manatee') {         // 肥尾抽半月掃：轉身讓尾巴朝前 → 往後翻半圈（尾巴從身前低處經過頭頂掃到背後）→ 空中扭回正面
+    const a0 = m.hits[0].on[0], a1 = m.hits[m.hits.length - 1].on[1] + 1;
+    const turn = { spin: Math.PI, sq: -0.22, tail: 0.3, lean: 0.1 };
+    if (t < a0) return mix(BASE.idle, turn, ease(t / Math.max(1, a0)));
+    const flip = (k) => ({ spin: Math.PI, tumble: Math.PI * k, tail: 0.9, sq: 0.1, aN: 0.7, aF: 0.6, head: -0.3 });
+    if (t <= a1) { const k = (t - a0) / Math.max(1, a1 - a0); return flip(k * k * (3 - 2 * k)); }
+    return mix(flip(1), BASE.idle, ease(Math.min(1, (t - a1) / 8)));
+  }
   if (id === 'frenzy') {                             // 衝過去（照 vx 停下那幀）→ 亂打 → 最後一下往上打（照最後一下的幀數；兩版節奏不同也對得上）
     const dash = m.vx[m.vx.length - 1][0], fin = m.hits[m.hits.length - 1].on[0] - 2;
     if (t < dash) return BASE.run;
@@ -439,7 +451,7 @@ function attackPose(f, m, t, clock) {
     if (m.kind === 'su' || m.pull) return over(Sx, { aN: (Sx.aN || 0) + 0.25 * Math.sin(clock * 40), aF: (Sx.aF || 0) - 0.25 * Math.sin(clock * 40) });
     return Sx;
   }
-  if (m.air) return Sx;
+  if (m.air || (m.fork && f.air)) return Sx;          // 牙衝：停在頂點等收尾的時候爪子一直舉著
   return mix(Sx, base, ease(Math.min(1, (t - a1 - 2) / Math.max(1, m.total - a1 - 2))));
 }
 

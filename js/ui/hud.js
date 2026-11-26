@@ -10,6 +10,7 @@ import { entryAt, entryLen } from '../sim/match.js';
 import { QUESTS } from '../sim/quests/index.js';
 import { btnName, keyName, KEYMAP, device } from './keys.js';
 import { pickKind } from '../sim/item.js';
+import { pasMeter } from '../sim/fighter.js';
 import { CHARS, MOVES } from '../sim/chars/index.js';
 import { cmdHtml, withKeys } from './menu.js';
 import { gt, gtSet } from './gt.js';
@@ -34,6 +35,7 @@ export class Hud {
         <div class="mp">${'<i></i>'.repeat(10)}</div>
         <div class="sp">${seal('超')}</div>
         <div class="wins"><b></b><b></b></div>
+        <div class="pas"><b></b><em></em></div>
         <div class="qi"><span class="lives"></span><b class="score">0</b></div>
       </div>`;
     root.innerHTML = `
@@ -63,7 +65,7 @@ export class Hud {
       const pp = $(`.pp.p${i}`, root);
       return { pp, img: $('.medal .img', pp), tag: $('.tag', pp), nm: $('.nm b', pp), fill: $('.hp .fill', pp), trail: $('.hp .trail', pp),
         mp: [...pp.querySelectorAll('.mp i')], sp: $('.sp', pp), wins: [...pp.querySelectorAll('.wins b')], combo: $(`.combo.p${i}`, root), sup: $(`.super.p${i}`, root),
-        lives: $('.lives', pp), score: $('.score', pp) };
+        lives: $('.lives', pp), score: $('.score', pp), pas: $('.pas', pp), pasB: $('.pas b', pp), pasV: $('.pas em', pp) };
     });
     this.trail = [HP, HP];
     this.last = [{}, {}];          // 上一次畫的值，沒變就不碰 DOM
@@ -143,6 +145,7 @@ export class Hud {
       e.tag.classList.toggle('pc', !!mk?.label);
       e.tag.style.setProperty('--pc', mk?.label ? mk.c : '');
       e.need = C.supers[0]?.m.mp || 400;
+      e.pas.hidden = !C.pas; e.pasB.textContent = C.pas?.ico || ''; e.pasV.textContent = '';
       e.combo.classList.remove('on'); e.sup.classList.remove('on');
     });
     this.trail = [HP, HP]; this.last = [{}, {}]; this.cdmg = [0, 0]; this.comboT = [0, 0]; this.rd = null;
@@ -182,6 +185,15 @@ export class Hud {
         });
         const ready = p.mp >= e.need;
         if (ready !== L.ready) { L.ready = ready; e.sp.classList.toggle('on', ready); }
+      }
+      // 被動：一顆小章，外圈照冷卻轉一圈，好了就亮（臘腸狗、企鵝旁邊寫數字）
+      const pm = pasMeter(p);
+      if (pm) {
+        const k = Math.round(Math.max(0, Math.min(1, pm.k)) * 40);
+        if (k !== L.pk) { L.pk = k; e.pas.style.setProperty('--k', k / 40); }
+        if (pm.on !== L.pon) { L.pon = pm.on; e.pas.classList.toggle('on', !!pm.on); }
+        const v = pm.v === undefined || !pm.on ? '' : CHARS[p.ch].pas.k === 'ember' ? `×${(pm.v / 10).toFixed(1)}` : `+${pm.v}%`;
+        if (v !== L.pv) { L.pv = v; e.pasV.textContent = v; }
       }
       const w = S.wins[p.team];
       if (w !== L.w) { L.w = w; e.wins.forEach((b, k) => b.classList.toggle('on', w > k)); }

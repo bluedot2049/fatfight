@@ -276,7 +276,7 @@ function startFight(c0, c1) {
   G.chars = [c0, c1];
   G.S = newMatch(c0, c1, { train: G.kind === 'train', cpu: G.kind === 'cpu' ? G.cpuLv : undefined, items: itemsOn });
   if (G.kind === 'train' && G.dummy === 5) setCpu(G.S, 1, TRAIN_CPU);
-  G.mode = 'fight'; G.paused = false; acc = 0; G.overShown = false;
+  G.mode = 'fight'; G.paused = false; acc = 0; G.overShown = false; view.fresh();
   hud.show(true); hud.setNames(G.S); hud.setMoves(G.S, 0); hud.showMoves(movesOn);
   hud.net(G.wait ? (G.wait.quick ? '找對手中' : `房間開著等人・${G.wait.code}`) : '');
   document.body.classList.remove('at-title');
@@ -289,7 +289,7 @@ function startQuest(c0, id = ORDER[0], carry = null) {
   view.camOffset = 0; view.marks = true;
   G.kind = 'quest'; G.chars = [c0]; G.quest = id; G.side = 0;
   G.S = newQuest([c0], id, { seed: (Math.random() * 0x7fffffff) | 0, ...(carry || {}) });
-  G.mode = 'fight'; G.paused = false; acc = 0; G.overShown = false;
+  G.mode = 'fight'; G.paused = false; acc = 0; G.overShown = false; view.fresh();
   hud.show(true); hud.setNames(G.S); hud.setMoves(G.S, 0); hud.showMoves(movesOn);
   document.body.classList.remove('at-title');
   music.muffle(false); music.level(1); music.battle();
@@ -783,7 +783,7 @@ function beginOnline({ ch, delay, quest, seed, carry, gid }) {
   const init = quest ? newQuest(ch, quest, { seed, ...(carry || {}) }) : newMatch(ch[0], ch[1]);
   G.rb = new Rollback({ local: G.side, init, send: (m) => G.net?.fast(m), delay, gid });
   G.S = G.rb.S;
-  G.mode = 'fight'; G.paused = false; acc = 0; G.overShown = false;
+  G.mode = 'fight'; G.paused = false; acc = 0; G.overShown = false; view.fresh();
   hud.show(true); hud.setNames(G.S); hud.setMoves(G.S, G.side); hud.showMoves(movesOn);
   music.muffle(false); music.level(1); music.battle();
 }

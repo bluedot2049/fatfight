@@ -137,6 +137,20 @@ function applyHit(S, a, d, h, kind, fromX, isProj, m = null) {
     return;
   }
   a.mp = Math.min(MP, a.mp + own);
+  // 被動（角色表 pas，打中才算，被擋、被格檔不算）
+  const PA = a !== d && CHARS[a.ch].pas, PD = CHARS[d.ch].pas;
+  if (PA && PA.k === 'zoom') a.pv = Math.min(PA.max, a.pv + PA.per);     // 興奮搖尾（臘腸狗）：每打中一下跑速多一點
+  if (PA && PA.k === 'zap' && !a.pv && !isProj && m && CHARS[a.ch].normals[m.id] === m) {   // 狂雷附體（胖鼠）：普通技打中多一道閃電，進冷卻
+    h = { ...h, dmg: h.dmg + PA.dmg, hs: (h.hs || 0) + PA.hs };
+    a.pv = PA.cd;
+    S.ev.push({ k: 'zap', s: a.i, d: d.i, x: ex, y: ey, z: ez });
+  }
+  if (PD && (PD.k === 'hide' || PD.k === 'fat') && d.pv > 0) d.pv = PD.cd;   // 象皮、肥肉冷卻中又挨打：重算（要 cd 幀沒挨打才長回來，使用者 2026-11-27）
+  if (PD && PD.k === 'hide' && !d.pv && h.dmg > 0) {                     // 象皮（鼻象）：這一下的傷害整下吃掉，硬直、倒值照算；抓投不走這裡（吃不掉）
+    h = { ...h, dmg: 0 };
+    d.pv = PD.cd;
+    S.ev.push({ k: 'hide', s: d.i, x: ex, y: ey, z: ez });
+  }
   if (d.hold >= 0) release(S, d);
   // 打不動（機器人，角色表 armor）：站得好好的時候，輕的普通拳只扣血、不硬直、不累積倒值。重的、必殺、丟過來的東西照樣打得動
   if (CHARS[d.ch].armor && kind === 'n' && !isProj && !h.kd && h.fall < ARMOR_FALL && !d.air && d.act !== 'hit' && d.act !== 'dizzy' && d.act !== 'fall' && d.hp > h.dmg) {
@@ -151,6 +165,15 @@ function applyHit(S, a, d, h, kind, fromX, isProj, m = null) {
     d.hp -= h.dmg; d.lh = a.i; d.lhT = S.f; d.lhN = d.H.n;
     a.stop = h.stop; a.con = 1; d.stop = 2;
     S.ev.push({ k: 'hit', s: a.i, d: d.i, x: ex, y: ey, z: ez, big: 0, dmg: h.dmg, combo: 1, kind, stop: h.stop, armor: 1 });
+    return;
+  }
+  // 肥肉緩衝（海牛，被動 fat）：出招中被打不停招、血照扣（打死的那下照常），進冷卻
+  if (PD && PD.k === 'fat' && !d.pv && d.act === 'atk' && d.hp > h.dmg) {
+    d.hp -= h.dmg; d.lh = a.i; d.lhT = S.f; d.lhN = d.H.n;
+    d.pv = PD.cd; d.stop = 2;
+    if (!isProj) { a.stop = h.stop; a.con = 1; }
+    S.ev.push({ k: 'hit', s: a.i, d: d.i, x: ex, y: ey, z: ez, big: 0, dmg: h.dmg, combo: 1, kind, stop: h.stop, armor: 1 });
+    S.ev.push({ k: 'fat', s: d.i, x: ex, y: ey, z: ez });
     return;
   }
   // 被圍：不同的人接著打你，倒值只會讓你倒地、不會頭暈
@@ -170,6 +193,7 @@ function applyHit(S, a, d, h, kind, fromX, isProj, m = null) {
     launch(d, dir, h.dvx, h.dvy, a);
     d.jug++;
     if (h.fire) d.burn = 1;
+    if (h.slam) d.slm = 1;
   } else if ((h.daze || d.fallv >= DIZZY) && !gang && !d.dz) {      // daze：幻術、修羅護法身直接打暈
     setAct(d, 'dizzy'); d.dz = 1;
     d.slide = 120; d.sdir = dir;
@@ -181,7 +205,7 @@ function applyHit(S, a, d, h, kind, fromX, isProj, m = null) {
   d.stop = h.stop;
   if (!isProj) { a.stop = h.stop; a.con = 1; }
   if (d.item >= 0 && (d.ik !== 1 || d.act === 'fall' || h.fall >= WPN_KNOCK || kind === 'sp' || kind === 'su')) dropItem(S, d, dir);   // 被打：重物、吃的一定掉，武器被重擊、必殺、打飛才掉
-  S.ev.push({ k: 'hit', s: a.i, d: d.i, x: ex, y: ey, z: ez, big: h.fall >= KNOCK || kind === 'su' || h.kd ? 1 : 0, dmg: h.dmg, combo: d.combo, kind, stop: h.stop, src: h.src });   // src：丟的東西 item、炸的 boom、撞的 body、甲板炮 shot（闖關的打法分看）
+  S.ev.push({ k: 'hit', s: a.i, d: d.i, x: ex, y: ey, z: ez, big: h.fall >= KNOCK || kind === 'su' || h.kd ? 1 : 0, dmg: h.dmg, combo: d.combo, kind, stop: h.stop, src: h.src, fx: h.fx });   // src：丟的東西 item、炸的 boom、撞的 body、甲板炮 shot（闖關的打法分看）
 }
 
 // 打飛：a 是打的人（飛出去撞到別人算他的）
@@ -189,7 +213,7 @@ function launch(d, dir, vx, vy, a) {
   d.act = 'fall'; d.t = -1; d.air = 1; d.y = Math.max(d.y, 1);
   d.vx = dir * vx; d.vy = vy; d.vz = 0; d.fallv = 0;
   d.slide = 0; d.mv = '';
-  d.by = a ? a.i : -1; d.bh = 0; d.bnc = 0;
+  d.by = a ? a.i : -1; d.bh = 0; d.bnc = 0; d.slm = 0;
 }
 
 // 被打飛的人撞到別人：照打的人那隊算，撞到的一起倒（撞完自己慢下來）

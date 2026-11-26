@@ -288,6 +288,11 @@ function decide(S, f, A) {
     }
     // 會連按加段的招：快到的時候按攻（會接拳的難度才會）
     if (m.mash && f.ext < m.mash.n && f.mp >= m.mash.mp && L.combo >= 2 && f.t >= m.mash.at - 8 && f.t < m.mash.at && !(A.last & BA)) return BA;
+    // 牙衝停在頂點：會接拳的難度按攻收尾。旁邊還有別的敵人就平打（打飛去撞人），不然一半砸地
+    if (m.fork && f.hang > 0 && f.con === 1 && L.combo >= 1 && !(A.last & BA)) {
+      const crowd = S.p.some((e) => e.team !== f.team && e.i !== o.i && e.hp > 0 && !e.gone && Math.abs(e.x - f.x) < 3000 && Math.abs(e.z - f.z) < 800);
+      return BA | (!crowd && rnd(A) < 0.5 ? DOWN : 0);
+    }
     // 必殺打中、最後一下打完：照難度再接一招必殺
     if (m.kind === 'sp' && m.cancel && f.con === 1 && !f.air && L.combo >= 3 && f.t === m.hits[m.hits.length - 1].on[1] + 1) {
       const s = pickRush(S, f, A, L, K, R, rx, adz, true);
@@ -446,11 +451,14 @@ function attack(S, f, A, L, K, R, rx, adz, tw) {
   return BA | tw;
 }
 const inR2 = (r, rx, adz) => r && rx <= r.far - 40 && adz <= r.zr - 60;
+// 對方身上有擋一下的被動還沒用掉（鼻象象皮、海牛肥肉緩衝）
+const shell = (o) => { const P = o && CHARS[o.ch].pas; return !!(P && (P.k === 'hide' || P.k === 'fat') && !o.pv); };
 
 // 挑一招必殺：combo＝打到人後接的（只挑衝過去的和超必殺）；不然看距離挑
 function pickRush(S, f, A, L, K, R, rx, adz, combo) {
   if (!L.sp || rnd(A) >= L.sp + (combo ? 40 : 0)) return null;
   const o = S.p[A.tgt];
+  if (!combo && A.lv >= 2 && shell(o)) return null;        // 對方的象皮、肥肉還在：先用拳敲掉，不拿必殺去撞
   const ok = (s) => f.mp >= s.m.mp && inR2(R[s.m.id], rx, adz) && !(o && grabMiss(s, o));
   if (A.lv >= 2) for (const s of K.su) if (ok(s) && rnd(A) < 110) return s;
   for (const s of K.rush) if (ok(s)) return s;
@@ -660,10 +668,11 @@ function plan(S, f, A, L, K, R, o, rx, adz) {
       : adz < (P.gr ? 700 : 200) && rx > 1200 && (!P.gr || rx < r.far - 300);
     if (ok) add(sc(L.sp >> 1, W.far), s);
   }
-  for (const s of K.su) if (f.mp >= s.m.mp && inR2(R[s.m.id], rx, adz) && !grabMiss(s, o)) add(L.sp >> 2, s);
+  const sh = A.lv >= 2 && shell(o) ? 2 : 0;                // 對方的象皮、肥肉還在：必殺少出（先戳掉）
+  for (const s of K.su) if (f.mp >= s.m.mp && inR2(R[s.m.id], rx, adz) && !grabMiss(s, o)) add(L.sp >> (2 + sh), s);
   for (const s of K.hurl) if (f.mp >= s.m.mp && adz < 300 && rx > 1000 && rx < 3200) add(L.sp >> 1, s);
   for (const s of K.heal) if (f.mp >= s.m.mp + 100 && f.hp < (f.mhp * 3) / 5 && rx > 2400 && !S.it.some((q) => q.own === f.i)) add(L.sp >> 2, s);
-  for (const s of K.rush) if (f.mp >= s.m.mp + (W.rush > 16 ? 50 : 200) && inR2(R[s.m.id], rx, adz) && !grabMiss(s, o)) add(sc(L.sp >> 3, W.rush), s);
+  for (const s of K.rush) if (f.mp >= s.m.mp + (W.rush > 16 ? 50 : 200) && inR2(R[s.m.id], rx, adz) && !grabMiss(s, o)) add(sc(L.sp >> (3 + sh), W.rush), s);
   let tot = 0;
   for (const [w] of opts) tot += w;
   let v = (rnd(A) * 256 + rnd(A)) % tot;

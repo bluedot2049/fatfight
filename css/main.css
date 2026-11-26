@@ -110,7 +110,16 @@ li[data-orn], .mbtn { position: relative; isolation: isolate; }
 #hud .pp .wins { position: absolute; left: 462px; top: 84px; display: flex; gap: 8px; }
 #hud .pp .wins b { width: 18px; height: 18px; border-radius: 50%; background: #120c0c; border: 1px solid #7d6538; box-shadow: 0 0 0 1px #0a0604; }
 #hud .pp .wins b.on { background: var(--grainm), radial-gradient(circle at 35% 30%, #fffaf0 0 10%, #dcc28a 28%, #8e6f38 70%, #3b2a12); border-color: #e6d3a0; animation: stamp .35s; }
-#hud .pp.p1 .nm, #hud .pp.p1 .tag, #hud .pp.p1 .sp, #hud .pp.p1 .mvb { transform: scaleX(-1); }
+/* 被動：勝場旁邊一顆小章，外圈照冷卻轉一圈（--k 0–1），好了就亮、亮的時候寫數字的寫在右邊 */
+#hud .pp .pas { position: absolute; left: 526px; top: 77px; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center;
+  background: conic-gradient(var(--gem) calc(var(--k, 0) * 1turn), #2a1e18 0); box-shadow: 0 0 0 1px #0a0604, inset 0 0 0 1px #7d6538; }
+#hud .pp .pas::before { content: ''; position: absolute; inset: 4px; border-radius: 50%; background: radial-gradient(circle at 50% 35%, #2a1e1a, #0d0a0c 80%); box-shadow: inset 0 0 0 1px #000; }
+#hud .pp .pas b { position: relative; font-size: 16px; font-weight: 700; line-height: 1; color: #6e5a40; }
+#hud .pp .pas em { position: absolute; left: 40px; top: 7px; font: 700 16px/1 var(--cinzel); font-style: normal; color: var(--ivoryc); text-shadow: 0 2px 0 #000; white-space: nowrap; }
+#hud .pp .pas.on { background: radial-gradient(circle, color-mix(in srgb, var(--gem) 65%, #fff), var(--gem) 60%, var(--deep)); box-shadow: 0 0 0 1px #0a0604, inset 0 0 0 1px #e2cf9e, 0 0 12px var(--gem); animation: stamp .3s; }
+#hud .pp .pas.on b { color: #fff6e2; text-shadow: 0 0 6px var(--gem), 0 1px 0 #000; }
+#hud.quest .pp .pas { left: 640px; }
+#hud .pp.p1 .nm, #hud .pp.p1 .tag, #hud .pp.p1 .sp, #hud .pp.p1 .mvb, #hud .pp.p1 .pas b, #hud .pp.p1 .pas em { transform: scaleX(-1); }
 #hud .pp .mvb { display: none; }
 
 /* 邊角的細節靠形狀、不靠花紋：牌子外側兩個角跟按鈕一樣往內凹（框是 ornate.js 畫的），血條尾端收一個小尖 */

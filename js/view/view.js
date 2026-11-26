@@ -25,6 +25,17 @@ import { ITEMS } from '../sim/items.js';
 import { InkLines } from './inkline.js';
 
 const ROCK = '#8a5a2e';   // 地裂噴出來的碎石
+const CLAW = new THREE.Vector3(), TIP = new THREE.Vector3();
+// 朝前那隻手（離鏡頭遠的 aF，模型斜站時在身體前側）的爪尖在哪（照這幀的姿勢；胖鼠的月牙刀光、冒電從這裡出來）。
+// 前後固定在角色站的那條線（手往鏡頭伸的話畫面上會往下掉，看起來像在腳邊）。reach：沿著手臂再往外多遠（刀光的弧才夠大）
+function clawAt(v, p, reach = 0, out = CLAW) {
+  v.model.root.updateMatrixWorld(true);
+  v.model.J.aF.localToWorld(out.set(0.03, -0.31 - reach, 0.06));
+  out.z = p.z * U;
+  return out;
+}
+// 牙衝收尾的衝擊波往哪飛（往前 1、往上 1）：尾巴拖回反方向
+const TEAR_DIR = { flat: [1, 0], down: [0.7, -0.7], up: [0.15, 1] };
 const U = 1 / 1000;
 const SCENES = { sea: SeaStage, tunnel: TunnelStage, forest: ForestStage, moon: MoonStage };   // 闖關的場景：關卡表的 scene → 哪個類別
 
@@ -190,6 +201,9 @@ export class View {
     this.sceneName = name;
   }
 
+  // 換一場比賽：幀號從頭算，上一場記住的事件要清掉（不然開場同一幀的出場、回合會被當成放過了）
+  fresh() { this.seen.clear(); }
+
   // events：這次跑過的幀的事件，每個帶 f（第幾幀）。同一幀同一件事只放一次特效（回滾重算會再送一次）
   render(S, events, dt) {
     this.clock += dt;
@@ -252,6 +266,26 @@ export class View {
           this.fx.motes(x, y, c, su ? 10 : 5, z);
           this.punch = Math.max(this.punch, su ? 0.9 : 0.55);
         } else if ((e.combo || 0) >= 3) { this.fx.bolts(x, y, c, 2, 0.8, z); this.fx.motes(x, y, c, 2, z); }
+        const zc = CHARS[S.p[e.s]?.ch]?.zap;
+        if (zc) {                                        // 閃電拳手（胖鼠）：每一拳都帶電，必殺重擊從頭上劈一道雷
+          const power = e.kind === 'sp' || e.kind === 'su';
+          this.fx.bolts(x, y, zc, e.big ? 5 : 2, e.big ? 1.5 : 0.6, z, e.big ? 0.22 : 0.12);
+          if (e.big && power) this.fx.strike(x, y, z, zc, su ? 4.2 : 3.2);
+        }
+        if (e.fx && TEAR_DIR[e.fx]) {                    // 牙衝收尾：水滴形的衝擊波，飛出去的人身後也拖一道
+          const Ad = S.p[e.s], Dv = S.p[e.d], dir = Math.sign((Dv?.x ?? 0) - (Ad?.x ?? 0)) || Ad?.face || 1, [tx, ty] = TEAR_DIR[e.fx], tc = zc || c;
+          this.fx.tear(x, y, z, Math.atan2(-ty, -tx * dir), 3.0, tc, 0.34, 0.75);
+          this.fx.shock(x, y, HOT, 1.6, z, 0.2);
+          const vt = this.fighters[e.d];
+          if (vt) { vt.tearT = 0.6; vt.tearC = tc; vt.tearBig = 1; }   // 頓格完飛出去那一刻再爆一個大的，接著一路拖光
+          this.shake = Math.max(this.shake, 0.07);
+        }
+        if (e.fx === 'splash') {                         // 海牛肥尾抽掃中：水花炸開、一圈水環、水珠往下掉
+          const wc = CHARS[S.p[e.s]?.ch]?.pal?.[0] || c;
+          this.fx.pop(x, y, wc, z); this.fx.shock(x, y, '#d8f6ff', 2.4, z, 0.3); this.fx.shock(x, y, wc, 1.6, z, 0.22);
+          for (let i = 0; i < 18; i++) this.fx.speck(x, y, i % 3 ? wc : '#ffffff', 4.5, z, 9, 1.8);
+          this.fx.motes(x, y, '#d8f6ff', 6, z, 0.8);
+        }
         // 鏡頭往打的方向頂一下再彈回來（亂抖只留一點點給重擊）；被打的那隻壓扁，頓格中停著，頓完彈回來
         const A = S.p[e.s], Dd = S.p[e.d], dir = Math.sign((Dd?.x ?? 0) - (A?.x ?? 0)) || A?.face || 1;
         this.kick.v -= dir * (e.big ? (su ? 4.4 : 3.2) : 1.2);
@@ -274,6 +308,27 @@ export class View {
         const p = S.p[e.s], c = col(e.s), cy = CHARS[p.ch].h * U * 0.55;
         this.fx.shock(p.x * U, cy, c, 1.4, p.z * U, 0.2); this.fx.motes(p.x * U, cy, c, 4, p.z * U);
         this.fighters[e.s].flash = Math.max(this.fighters[e.s].flash, 0.4);
+        break;
+      }
+      // 牙衝停在頂點換招：爪上一團電炸開（沒按的往上那下小一點）
+      case 'fork': {
+        const v = this.fighters[e.s], p = S.p[e.s], zc = CHARS[p?.ch]?.zap || col(e.s);
+        if (!v || !p) break;
+        const w = clawAt(v, p), up = e.id === 'toothU';
+        this.fx.glow(w.x, w.y, zc, up ? 1.0 : 1.6, w.z, 0.18); this.fx.glow(w.x, w.y, HOT, up ? 0.5 : 0.8, w.z, 0.12);
+        this.fx.bolts(w.x, w.y, zc, up ? 3 : 6, up ? 0.8 : 1.2, w.z, 0.2);
+        if (!up) this.fx.shock(w.x, w.y, zc, 1.3, w.z, 0.18);
+        v.flash = Math.max(v.flash, up ? 0.3 : 0.6);
+        break;
+      }
+      // 往下砸的人撞到地：地上炸一圈、裂成叉、雷從天上劈到落點
+      case 'slam': {
+        const x = e.x * U, zc = CHARS[S.p[e.s]?.ch]?.zap || col(e.s);
+        this.fx.wave(x, z, zc, 3.4, 0.5); this.fx.groundRing(x, z, HOT, 2.4, 0.35); this.fx.groundRing(x, z, zc, 3.2, 0.45);
+        this.fx.crack(x - 0.7, z - 0.32, x + 0.7, z + 0.32, zc, 1.4); this.fx.crack(x - 0.6, z + 0.38, x + 0.6, z - 0.38, zc, 1.4);
+        this.fx.strike(x, 0.2, z, zc, 3.6, 0.24); this.fx.bolts(x, 0.3, zc, 5, 1.4, z, 0.22);
+        this.fx.shards(x, 0.2, ROCK, 14, 5, z); this.fx.dust(x, 0, 12, '#3a2a1a', z);
+        this.shake = Math.max(this.shake, 0.12); this.punch = Math.max(this.punch, 0.5);
         break;
       }
       case 'chgmax': {
@@ -424,6 +479,7 @@ export class View {
         this.fx.shock(x, 0.7, HOT, 1.5, z, 0.22); this.fx.bolts(x, 0.9, '#ffe58a', 4, 1.5, z); this.fx.bolts(x, 0.3, c, 3, 1.0, z);
         this.fx.shards(x, 0.3, ROCK, 14, 6, z); this.fx.shards(x, 0.5, c, 8, 5, z); this.fx.dust(x, 0, 12, '#3a2a1a', z);
         this.fx.crack(x - 0.6, z - 0.3, x + 0.6, z + 0.3, c, 1.3); this.fx.crack(x - 0.55, z + 0.35, x + 0.55, z - 0.35, c, 1.3);   // 炸開的地方裂成一個叉
+        { const zc = CHARS[S.p[e.s]?.ch]?.zap; if (zc) this.fx.strike(x, 0.1, z, zc, 3.4, 0.22); }   // 地裂雷：炸開那下天上也劈一道
         this.shake = Math.max(this.shake, 0.08); this.punch = Math.max(this.punch, 0.35);
         break;
       }
@@ -456,6 +512,32 @@ export class View {
         break;
       }
       case 'fizzle': if (e.fire) { this.fx.smoke(e.x * U, 0.1, z, 5); break; } else { const x = e.x * U; this.fx.dust(x, 0, 5, null, z); this.fx.shards(x, 0.1, ROCK, 4, 2, z); this.fx.bolts(x, 0.15, col(e.s), 1, 0.5, z); break; }
+      // 被動（角色表 pas）：胖鼠追加的雷、鼻象象皮破掉、海牛肥肉頂住一下、冷卻好了
+      case 'zap': {
+        const x = e.x * U, y = e.y * U, zc = CHARS[S.p[e.s]?.ch]?.zap || col(e.s);
+        this.fx.strike(x, y, z, zc, 3.6, 0.24); this.fx.bolts(x, y, zc, 6, 1.4, z, 0.2); this.fx.glow(x, y, HOT, 1.4, z, 0.14);
+        this.shake = Math.max(this.shake, 0.06);
+        break;
+      }
+      case 'hide': {
+        const x = e.x * U, y = e.y * U, c = col(e.s);
+        this.fx.shards(x, y, c, 12, 4, z); this.fx.shards(x, y, ROCK, 8, 3.5, z); this.fx.shock(x, y, c, 1.8, z, 0.26); this.fx.glow(x, y, HOT, 1.0, z, 0.12);
+        break;
+      }
+      case 'fat': {
+        const x = e.x * U, y = e.y * U, c = col(e.s);
+        this.fx.shock(x, y, c, 1.6, z, 0.24); this.fx.shock(x, y, HOT, 0.9, z, 0.16);
+        if (this.fighters[e.s]) this.fighters[e.s].flash = Math.max(this.fighters[e.s].flash, 0.35);
+        break;
+      }
+      case 'pas': {
+        const p = S.p[e.s], v = this.fighters[e.s];
+        if (!p || !v) break;
+        const y = CHARS[p.ch].h * U * 0.55;
+        this.fx.glow(p.x * U, y, col(e.s), 1.3, p.z * U, 0.2); this.fx.motes(p.x * U, y, col(e.s), 5, p.z * U);
+        v.flash = Math.max(v.flash, 0.25);
+        break;
+      }
       case 'crow': this.fx.shards(e.x * U, 1.0, '#2a2430', 8, 2.5, z); this.fx.glow(e.x * U, 1.0, '#9b6cff', 0.8, z, 0.2); break;   // 烏鴉從對手背後飛來（出發的地方掉幾根羽毛）
       case 'grab': { const p = S.p[e.s]; this.fx.spark((p.x + p.face * 300) * U, CHARS[p.ch].h * U * 0.6, 0, '#ffffff', p.z * U); break; }
       case 'dizzy': { const p = S.p[e.s]; this.fx.shards(p.x * U, CHARS[p.ch].h * U, '#ffe98a', 8, 2.5, p.z * U); break; }
@@ -578,6 +660,9 @@ export class View {
     this.fireFx(S, p, v, m, C);
     this.dogFx(S, p, v, m);
     this.bearFx(S, p, v, m);
+    this.zapFx(S, p, v, m, C);
+    this.seaFx(S, p, v, m, C);
+    this.pasFx(S, p, v, C);
     // 海牛吐舌頭：出必殺技時伸長一點
     if (v.model.tongue) v.model.tongue.scale.y = m && m.kind !== 'n' ? 1.5 : 1;
     // 舌頭、觸鬚（青蛙、鬚臉）：姿勢是 lash 的招，出手前 3 幀彈出去、打完 5 幀收回來；長度照打擊框最遠那格
@@ -842,6 +927,77 @@ export class View {
       if (q.t % 3 === 0) this.fx.embers(x, y, z, 2, q.w * U);
     }
   }
+  // 海牛肥尾抽：尾巴尖掃過的路拉成一道水的半月（外圈寶石青、白芯），弧邊甩出水珠往下掉，起掃的地方冒泡泡
+  seaFx(S, p, v, m, C) {
+    if (!(m && m.id === 'tail' && p.ch === 'manatee')) { v.tip = null; return; }
+    const a0 = m.hits[0].on[0] - 1, a1 = m.hits[m.hits.length - 1].on[1] + 1;
+    if (p.t < a0 || p.t > a1) { v.tip = null; return; }
+    v.model.root.updateMatrixWorld(true);
+    const w = v.model.J.tail.localToWorld(TIP.set(0, -0.12, -0.95));   // 畫在尾巴尖外面一點：半月才夠大，跟放大的判定對得上
+    w.z = p.z * U;                                     // 前後固定在角色那條線（尾巴往鏡頭甩的話畫面上會往下掉）
+    const c = C.pal?.[0] || C.color;
+    if (v.tip && v.tip.distanceTo(w) > 0.01) {
+      this.fx.swipe(v.tip.x, v.tip.y, v.tip.z, w.x, w.y, w.z, c, 0.62, 0.34);
+      if (v.fxT % 2 === 0) this.fx.speck(w.x, w.y, Math.random() < 0.4 ? '#ffffff' : '#bfefff', 1.6, w.z + 0.4, 7, 1.3);   // 甩出去的水珠
+    } else if (!v.tip) this.fx.motes(w.x, w.y, '#d8f6ff', 4, w.z, 0.5);   // 起掃：冒幾顆泡泡
+    (v.tip || (v.tip = new THREE.Vector3())).copy(w);
+  }
+  // 閃電拳手（角色表寫 zap 的，胖鼠）：出拳的有效幀爪上劈啪、必殺身上冒電；牙衝爪子劃一道月牙上去、頂點爪上電一直閃；
+  // 收尾的揮擊也留一道刀光；鑽地在土裡竄電、竄出來劈一道雷。被牙衝收尾打飛的人（任何角色）身後拖水滴形的光
+  zapFx(S, p, v, m, C) {
+    if (v.tearT > 0 && !(p.stop > 0)) {               // 頓格中先停著，飛出去才開始算
+      v.tearT -= this.dt;
+      const sp = Math.hypot(p.vx, p.vy), x = p.x * U, y = (p.y + CHARS[p.ch].h * 0.4) * U, a = Math.atan2(-p.vy, -p.vx);
+      if (v.tearBig && sp > 8) { v.tearBig = 0; this.fx.tear(x, y, p.z * U, a, 3.4, v.tearC, 0.4, 0.95); this.fx.bolts(x, y, v.tearC, 3, 1.0, p.z * U, 0.16); }
+      if (sp > 8) this.fx.tear(x, y, p.z * U, a, 1.0 + Math.min(1.6, sp * U * 14), v.tearC, 0.12, 0.55);
+    }
+    const zc = C.zap;
+    if (!zc) return;
+    const id = m && m.id, x = p.x * U, z = p.z * U;
+    if (m && m.hits.length) {
+      const a0 = m.hits[0].on[0], a1 = m.hits[m.hits.length - 1].on[1], n = m.kind === 'n';
+      if (p.t >= a0 - 1 && p.t <= a1 && v.fxT % (n ? 3 : 2) === 0) { const w = clawAt(v, p); this.fx.bolts(w.x, w.y, zc, n ? 1 : 2, n ? 0.4 : 0.7, w.z, 0.1); }
+    }
+    if (m && m.kind !== 'n' && m.kind !== 'sys' && v.fxT % 4 === 0) this.fx.bolts(x, (p.y + C.h * (0.3 + Math.random() * 0.5)) * U, zc, 1, 0.6, z, 0.1);   // 出必殺的時候身上冒電
+    // 月牙刀光：往上衝那段、頂點三種收尾揮下去那幾幀，爪子走過的路一段段接起來
+    const fin = id === 'toothU' || id === 'toothF' || id === 'toothD';
+    const arc = (id === 'tooth' && p.t >= 1 && !p.hang) || (fin && p.t >= m.hits[0].on[0] - 2 && p.t <= m.hits[0].on[1] + 1);
+    if (arc) {
+      const w = clawAt(v, p, 0.22);
+      if (v.claw && v.claw.distanceTo(w) > 0.01) this.fx.swipe(v.claw.x, v.claw.y, v.claw.z, w.x, w.y, w.z, zc, fin ? 0.6 : 0.5, fin ? 0.22 : 0.32);
+      (v.claw || (v.claw = new THREE.Vector3())).copy(w);
+    } else if (v.claw) v.claw = null;
+    if (id === 'tooth' && p.hang > 0 && v.fxT % 2 === 0) {   // 停在頂點等收尾：爪上的電一直劈
+      const w = clawAt(v, p);
+      this.fx.bolts(w.x, w.y, zc, 2, 0.8, w.z, 0.12); this.fx.glow(w.x, w.y, zc, 0.7, w.z, 0.1);
+    }
+    if (id === 'ball' && p.t >= m.hits[0].on[0] && p.t <= m.hits[0].on[1]) {   // 雷閃：整團電滾過去
+      const cy = (p.y + C.h * 0.45) * U;
+      this.fx.bolts(x, cy, zc, 2, 0.9, z, 0.1);
+      if (v.fxT % 3 === 0) this.fx.glow(x, cy, zc, 1.4, z, 0.12);
+    }
+    if (id === 'burrow') {
+      if (m.under && p.t >= m.under[0] && p.t <= m.under[1] && v.fxT % 3 === 0) this.fx.bolts(x, 0.08, zc, 1, 0.6, z, 0.12);   // 土裡竄電
+      if (p.t >= m.jump[0] && !v.bUp) {                  // 竄出來：一道雷劈在出土的地方
+        v.bUp = 1;
+        this.fx.strike(x, 0.1, z, zc, 3.2, 0.22); this.fx.groundRing(x, z, zc, 2.2, 0.35); this.fx.bolts(x, 0.4, zc, 4, 1.2, z, 0.2);
+      }
+    } else v.bUp = 0;
+  }
+  // 被動好了的樣子（角色表 pas，只看狀態）：胖鼠爪上劈啪、鼻象身上閃粉色岩光、海牛身上冒青色氣、
+  // 臘腸狗跑步揚塵拖光（越快越多）、企鵝血越少身上飄越多火星
+  pasFx(S, p, v, C) {
+    const P = C.pas;
+    if (!P || p.hp <= 0 || p.act === 'down' || p.act === 'ko') return;
+    const x = p.x * U, z = p.z * U, c = C.pal?.[0] || C.color, by = () => (p.y + C.h * (0.25 + Math.random() * 0.5)) * U;
+    if (P.k === 'zap' && !p.pv && v.fxT % 7 === 0) { const w = clawAt(v, p); this.fx.bolts(w.x, w.y, C.zap || c, 1, 0.45, w.z, 0.1); }
+    else if (P.k === 'hide' && !p.pv && v.fxT % 14 === 0) this.fx.motes(x + (Math.random() - 0.5) * C.w * U * 2, by(), c, 1, z, 0.3);
+    else if (P.k === 'fat' && !p.pv && v.fxT % 12 === 0) this.fx.motes(x + (Math.random() - 0.5) * C.w * U * 2, by(), c, 1, z, 0.3);
+    else if (P.k === 'zoom' && p.pv > 0 && p.act === 'run' && v.fxT % Math.max(2, 8 - (p.pv / 50 | 0)) === 0) {
+      this.fx.dust(x - p.face * C.w * U, 0, 1, null, z);
+      this.fx.trail(x - p.face * C.w * U * 1.4, (p.y + C.h * 0.4) * U, c, 0.4 + p.pv / P.max, z, 0.08);
+    } else if (P.k === 'ember' && p.hp < p.mhp && v.fxT % Math.max(3, 22 - ((p.mhp - p.hp) * 20 / p.mhp | 0)) === 0) this.fx.embers(x, by(), z, 1, C.w * U * 2);
+  }
   // 臘腸狗：長長臘腸（前半身往前推、中間拉長；拉的時候轉成正側面，不然會往鏡頭伸）、耳旋風耳朵往外甩、鑽褲襠揚土、埋骨頭扒土
   dogFx(S, p, v, m) {
     const M = v.model, id = m && (m.pose || m.id);
@@ -986,11 +1142,14 @@ export class View {
     const sx = (Math.random() - 0.5) * this.shake + this.kick.x, sy = (Math.random() - 0.5) * this.shake + this.kickY.x;
     this.off = (this.off || 0) + (this.camOffset - (this.off || 0)) * k;
     const ox = this.cam.x - this.off;
+    // 有人飛很高（胖鼠牙衝的頂點）：鏡頭跟著往上抬一點，頭頂才不會被血條擋住；一般跳只抬一點點
+    const air = Math.max(0, ...live.map((p) => p.y * U));
+    this.camY = (this.camY || 0) + (Math.max(0, air - 0.8) * 0.7 - (this.camY || 0)) * (1 - Math.pow(0.01, dt));
     // 俯角約 26 度：高度和距離照比例一起拉
     const D = this.cam.d - this.punch;
-    const lo2 = this.low || 0;
-    this.camera.position.set(ox + sx, 0.55 + D * (0.5 - 0.3 * lo2) + sy, this.cam.z + 0.3 + D);
-    this.camera.lookAt(ox + sx, 0.55 + 0.12 * lo2 + sy, this.cam.z - 0.15);
+    const lo2 = this.low || 0, cy = this.camY;
+    this.camera.position.set(ox + sx, 0.55 + D * (0.5 - 0.3 * lo2) + sy + cy, this.cam.z + 0.3 + D);
+    this.camera.lookAt(ox + sx, 0.55 + 0.12 * lo2 + sy + cy, this.cam.z - 0.15);
   }
 
   // 開場先把每種特效、泡泡、浪、星星都畫一次到一張小圖上：著色器和貼圖先準備好，第一次出招才不會頓一下

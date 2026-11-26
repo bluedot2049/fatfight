@@ -17,6 +17,7 @@ export const GUARD_MIN = 4;     // 按一下防至少擋幾幀才放得開
 const CHAIN_BUF = 10;           // 打到人之後接下一拳：這麼久以前按的攻也算（含頓格，連打才不會掉拳）
 const HOVER = new Set(['stand', 'walk', 'run', 'brake', 'guard', 'crouch']), FLY_UP = 28;   // 會飛的：哪些狀態會浮回去、每幀升多少
 const MASH_DIZZY = 4, MASH_GRAB = 7;   // 頭暈、被抓的時候每按一下（任何鍵，剛按下的才算）早幾幀掙脫
+const FORK_BUF = 32;            // 頂點追加：停住前多久按的攻也算（整段往上衝的時間都算，提早按就好）
 
 export function newFighter(ch, i, team, x, face) {
   return {
@@ -34,6 +35,7 @@ export function newFighter(ch, i, team, x, face) {
     hold: -1, grabT: 0,           // 抓著誰（或被誰抓著）、還能抓多久
     ext: 0, chg: 0, hang: 0,      // 這招連按加了幾段、集氣幾幀、頂點還停幾幀（-1 停過了）
     by: -1, bh: 0, bnc: 0,        // 被打飛：誰打的（撞到人算他的）、撞過誰（位元）、彈過地了沒
+    slm: 0,                       // 被往下砸（hits 的 slam），落地那一下送 slam 事件
     burn: 0, az: 0, sf: 0,        // 著火（被火打倒飛出去那段，落地就熄）；出招往前後擺的偏移（企鵝吐火）；拉長的招咬到人時前緣停在哪（臘腸狗）
     item: -1, ik: 0,              // 手上拿的東西（S.it 的 id）、哪一類（1 輕武器 2 重物 3 吃的）
     lh: -1, lhT: -9999, lhN: 0,   // 最後打到我的是誰、在第幾幀（被圍不頭暈）、那時候我的按鍵紀錄到第幾格（爆氣要在這之後按）
@@ -42,7 +44,7 @@ export function newFighter(ch, i, team, x, face) {
     dz: 0,                        // 這套連打裡暈過了（回到能動之前不再暈，打到倒值滿就倒地）
     packI: -1, packF: -9999,      // 闖關：一起上的頭目（營火三冒險者）現在誰帶頭打我、從第幾幀起（ai.js packTok）
     tokF: -9999,                  // 闖關：敵人上一次拿到打我的攻擊權是第幾幀（ai.js 輪流上）
-    pv: 0,                        // 被動的計時（爛熊的烏鴉，角色表 crow）
+    pv: 0,                        // 被動的計時（角色表 pas，每一種怎麼數寫在 pasStep）
     mgz: 0, mgx: 0,               // 出招吸附還要往前後、往前拉多少（startMove 定，打到之前拉完）
     H: newHistory(),
   };
@@ -72,7 +74,7 @@ export function startMove(S, f, m) {
   f.mgz = f.mgx = 0;
   if (m.mag && !f.air) magnet(S, f, m);
   if (m.flash) { S.freeze = 30; S.fwho = f.i; S.ev.push({ k: 'super', s: f.i, id: m.id }); }
-  else if (m.kind === 'sp') S.ev.push({ k: 'sp', s: f.i, id: m.id });
+  else if (m.kind === 'sp' && !m.sub) S.ev.push({ k: 'sp', s: f.i, id: m.id });
 }
 
 // 必殺指令：防＋方向＋攻／跳，魔力不夠就不出（按下去的攻、跳照一般的算）
@@ -353,27 +355,53 @@ export function think(S, f, noInput) {
   if (want === 'walk') grabTry(S, f);
 }
 
-// 被動（角色表 crow，爛熊）：每 every 幀從最近的敵人背後飛來一群烏鴉，穿過去、每人打一次（從背後來，擋不住；不痛，打斷人）。
-// 倒地、出局的時候不算；KO 之後不飛
-export function crowStep(S, ko) {
+// 被動（角色表 pas，每隻一個；k 是哪一種，數字都在角色表）。f.pv 是被動的計時，每回合、復活歸零（newFighter）：
+//   zap 狂雷附體（胖鼠）、hide 象皮（鼻象）、fat 肥肉緩衝（海牛）：冷卻還剩幾幀，0＝好了；用掉的那下在 combat.js applyHit 設回 cd。
+//       zap 寫 under 的話鑽地中冷卻跑 under 倍。好了那幀送 pas 事件
+//   zoom 興奮搖尾（臘腸狗）：跑速多了幾‰（打中加 per、最多 max，每 drop 幀掉 1；被打不清空）
+//   ember 越燒越旺（企鵝）：不用計時，回魔在 advance 照血算
+//   crow 烏鴉（爛熊）：每 every 幀從最近的敵人背後飛來一群烏鴉，穿過去、每人打一次（從背後來，擋不住；不痛，打斷人）
+// 倒地、出局的時候不算；KO 之後停住
+export function pasStep(S, ko) {
   if (ko) return;
   for (const f of S.p) {
-    const K = CHARS[f.ch].crow;
-    if (!K || f.hp <= 0 || f.gone || f.act === 'ko') continue;
-    if (f.pv < K.every) { f.pv++; continue; }
-    let o = null, bd = 1e9;
-    for (const e of S.p) {
-      if (e.team === f.team || e.hp <= 0 || e.gone || e.act === 'down' || e.act === 'ko') continue;
-      const d = Math.abs(e.x - f.x) + Math.abs(e.z - f.z);
-      if (d < bd) { bd = d; o = e; }
+    const P = CHARS[f.ch].pas;
+    if (!P || f.hp <= 0 || f.gone || f.act === 'ko') continue;
+    if (P.k === 'crow') crow(S, f, P);
+    else if (P.k === 'zoom') { if (f.pv > 0 && S.f % P.drop === 0) f.pv--; }
+    else if (P.cd && f.pv > 0) {
+      f.pv = Math.max(0, f.pv - (P.under && isUnder(f) ? P.under : 1));
+      if (!f.pv) S.ev.push({ k: 'pas', s: f.i });
     }
-    if (!o) continue;                                   // 沒有站著的敵人：等到有再飛
-    f.pv = 0;
-    const dir = o.face, x = Math.max(S.lo - 500, Math.min(S.hi + 500, o.x - dir * K.far));
-    S.pr.push({ o: f.i, team: f.team, x, y: K.y, z: o.z, vx: dir * K.v, w: K.w, h: K.h, dmg: K.dmg, fall: K.fall, big: 0, life: K.life, t: 0, id: S.pid++, mv: 'crow', pierce: 1, hl: [], look: 'crow' });
-    S.ev.push({ k: 'crow', s: f.i, x, z: o.z });
   }
 }
+function crow(S, f, K) {
+  if (f.pv < K.every) { f.pv++; return; }
+  let o = null, bd = 1e9;
+  for (const e of S.p) {
+    if (e.team === f.team || e.hp <= 0 || e.gone || e.act === 'down' || e.act === 'ko') continue;
+    const d = Math.abs(e.x - f.x) + Math.abs(e.z - f.z);
+    if (d < bd) { bd = d; o = e; }
+  }
+  if (!o) return;                                       // 沒有站著的敵人：等到有再飛
+  f.pv = 0;
+  const dir = o.face, x = Math.max(S.lo - 500, Math.min(S.hi + 500, o.x - dir * K.far));
+  S.pr.push({ o: f.i, team: f.team, x, y: K.y, z: o.z, vx: dir * K.v, w: K.w, h: K.h, dmg: K.dmg, fall: K.fall, big: 0, life: K.life, t: 0, id: S.pid++, mv: 'crow', pierce: 1, hl: [], look: 'crow' });
+  S.ev.push({ k: 'crow', s: f.i, x, z: o.z });
+}
+// 被動現在怎樣（HUD 畫圖示用，不改狀態）：k 0–1 滿了多少、on 1＝好了（亮著）、v 數字（臘腸狗加了幾 %、企鵝回魔幾倍×10）
+export function pasMeter(f) {
+  const P = CHARS[f.ch].pas;
+  if (!P) return null;
+  if (P.k === 'crow') return { k: f.pv / P.every, on: 0 };
+  if (P.k === 'zoom') return { k: f.pv / P.max, on: f.pv > 0 ? 1 : 0, v: (f.pv / 10) | 0 };
+  if (P.k === 'ember') { const r = emberRate(f, P); return { k: (r - 100) / (P.max - 100), on: r > 100 ? 1 : 0, v: (r / 10) | 0 }; }
+  return { k: 1 - f.pv / P.cd, on: f.pv ? 0 : 1 };
+}
+// 企鵝回魔的倍率（百分比）：滿血 100，扣越多越快，沒血時 max
+const emberRate = (f, P) => 100 + ((((P.max - 100) * Math.max(0, f.mhp - f.hp)) / f.mhp) | 0);
+// 臘腸狗跑步的速度（加 f.pv ‰）
+const runV = (f, C, v) => (C.pas && C.pas.k === 'zoom' && f.pv ? ((v * (1000 + f.pv)) / 1000) | 0 : v);
 
 // 走（或跑）進頭暈的人就抓住
 function grabTry(S, f) {
@@ -424,8 +452,10 @@ export function advance(S, f) {
   const C = CHARS[f.ch];
   const H = f.H;
 
-  // 魔力慢慢回，血少回得快
-  if (f.mp < MP && f.hp > 0 && ++f.mpT >= (f.hp < f.mhp / 3 ? 1 : MP_REGEN)) { f.mp++; f.mpT = 0; }
+  // 魔力慢慢回，血少回得快。企鵝（被動 ember）換成照扣掉的血一路加快：mpT 改算百分之一幀
+  if (C.pas && C.pas.k === 'ember') {
+    if (f.mp < MP && f.hp > 0) { f.mpT += emberRate(f, C.pas); while (f.mpT >= MP_REGEN * 100 && f.mp < MP) { f.mp++; f.mpT -= MP_REGEN * 100; } }
+  } else if (f.mp < MP && f.hp > 0 && ++f.mpT >= (f.hp < f.mhp / 3 ? 1 : MP_REGEN)) { f.mp++; f.mpT = 0; }
   if (f.iv > 0) f.iv--;
   // 倒值、防禦累積在能動的時候慢慢消
   if (f.act !== 'hit' && f.act !== 'dizzy' && f.act !== 'fall' && f.act !== 'grabbed') {
@@ -443,7 +473,7 @@ export function advance(S, f) {
     case 'walk': f.vx = WALK(C.walkX) * dirX(H); f.vz = WALK_Z(C.walkZ) * dirZ(H); if (f.ik === 2) { f.vx >>= 1; f.vz >>= 1; } break;   // 舉著重物走一半
     case 'crouch': f.vx = (WALK(C.walkX) * dirX(H)) >> 1; f.vz = (WALK_Z(C.walkZ) * dirZ(H)) >> 1; break;   // 蹲走：走路的一半
     case 'air': airSteer(f, C); break;
-    case 'run': f.vx = RUN(C.run) * f.face; f.vz = RUN(C.runZ) * dirZ(H); break;
+    case 'run': f.vx = runV(f, C, RUN(C.run)) * f.face; f.vz = runV(f, C, RUN(C.runZ)) * dirZ(H); break;   // 臘腸狗打中人越跑越快（被動 zoom）
     case 'brake': f.vx = (f.vx * 3) >> 2; f.vz = 0; if (f.t >= 6) toFree(f); break;
     case 'block': f.vx = 0; f.vz = 0; if (f.t >= f.stun) { setAct(f, holding(H, BD) ? 'guard' : 'stand'); if (f.act === 'guard') f.t = GUARD_MIN; } break;
     case 'pre':
@@ -558,6 +588,17 @@ function atkStep(S, f, C) {
   }
   if (m.pick && f.t >= m.pick[0] && f.t <= m.pick[1]) slidePick(S, f);   // 滑過地上的東西順手撿
   if (m.hang && f.air && f.hang === 0 && f.vy <= 0) f.hang = m.hang;
+  // 頂點追加（胖鼠牙衝）：停住的時候按過攻就照方向換招，停完沒按換 def。起跳前那下攻拿去出招了（已用掉），不算
+  if (m.fork && f.air && f.hang) {
+    const F = m.fork, k2 = f.hang > 0 ? pressed(H, BA, FORK_BUF) : -1;
+    if (k2 >= 0 || (f.hang < 0 && F.def)) {
+      if (k2 >= 0) consume(H, k2);
+      const id = k2 < 0 ? F.def : dirZ(H) > 0 || holding(H, BS) ? F.d : F.f;
+      startMove(S, f, MOVES[f.ch][id]);
+      S.ev.push({ k: 'fork', s: f.i, id, x: f.x, y: f.y, z: f.z });
+      return;
+    }
+  }
   if (m.it && f.t === m.it.at) itemAct(S, f, m);
   if (m.flip === f.t) f.face = -f.face;              // 鑽過去之後回頭
   // 長長臘腸咬到人：頭跟著咬到的那個（被咬退一點也咬得到下一口）
@@ -760,7 +801,7 @@ function atkStep(S, f, C) {
 function throwOut(S, f, o, vx, vy) {
   f.hold = -1; o.hold = -1;
   o.act = 'fall'; o.t = 0; o.air = 1; o.y = 10; o.vx = f.face * vx; o.vy = vy; o.vz = 0; o.fallv = 0;
-  o.mv = ''; o.by = f.i; o.bh = 0; o.bnc = 0;
+  o.mv = ''; o.by = f.i; o.bh = 0; o.bnc = 0; o.slm = 0;
 }
 
 function land(S, f) {
@@ -768,6 +809,7 @@ function land(S, f) {
   f.y = 0; f.vy = 0; f.air = 0;
   S.ev.push({ k: 'land', s: f.i, x: f.x, z: f.z, hard: f.act === 'fall' ? 1 : 0 });
   if (f.act === 'fall') {
+    if (f.slm) { f.slm = 0; S.ev.push({ k: 'slam', s: f.by, d: f.i, x: f.x, z: f.z }); }   // 被往下砸的撞到地：地上炸一圈（畫面、聲音）
     // 摔得重的彈一次再躺
     if (!f.bnc && vy <= -BOUNCE_V) {
       f.bnc = 1; f.air = 1; f.y = 1; f.vy = ((-vy * 5) >> 3); f.vx = (f.vx / 2) | 0;

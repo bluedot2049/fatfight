@@ -67,6 +67,8 @@ export default {
   w: 400, h: 1450, hc: 980,
   walkX: 14, walkZ: 10, run: 40, runZ: 8, jumpV: 140, jumpX: 16, jumpZ: 11, dashV: 96, dashX: 52,
   ai: { style: 'grab', zone: { r: 1700, mp: 400 } },   // 有象王風車的魔力時，敵方電腦不走進身體邊緣 1.7 公尺內（鼻象收招、倒著的時候照樣衝進來）
+  // 被動（使用者 2026-11-27）：挨的下一下不扣血，硬直照吃；破了之後 8 秒沒挨打才長回來。抓投吃不掉。對手先用輕拳敲掉再接連段
+  pas: { k: 'hide', name: '象皮', ico: '皮', note: '擋掉一下傷害（硬直照吃），8 秒沒挨打長回來', cd: 480 },
   pickR: 520,                    // 用鼻子撿：離身體邊緣 0.5 公尺內的東西撿得到（別人 0.14）
   normals: N, specials: SP, supers: SU,
   extra: {

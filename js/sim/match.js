@@ -5,7 +5,7 @@
 import { HP, MP, WIN_ROUNDS, ENTRY_IN, ENTRY, BA, START_X, MAX_SEP, STAGE_HALF, PUSH_Z, PUSH_IN } from './const.js';
 import { CHARS } from './chars/index.js';
 import { pressed } from './input.js';
-import { newFighter, think, advance, record, toFree, FREE, isUnder, moveOf, crowStep } from './fighter.js';
+import { newFighter, think, advance, record, toFree, FREE, isUnder, moveOf, pasStep } from './fighter.js';
 import { resolveHits, moveProjectiles, pullStep } from './combat.js';
 import { newAI, aiBits } from './ai.js';
 import { questStep } from './quest.js';
@@ -98,7 +98,7 @@ export function world(S, ko) {
   for (const f of S.p) think(S, f, ko || f.hp <= 0);
   for (const f of S.p) advance(S, f);
   if (S.tr) trapsStep(S);                 // 闖關的場地機關（洋流推人、甲板炮轟出炮彈）
-  crowStep(S, ko);                        // 被動（爛熊的烏鴉）
+  pasStep(S, ko);                         // 被動（角色表 pas：冷卻、烏鴉、臘腸狗跑速慢慢掉）
   pullStep(S);
   pushApart(S);
   keepTogether(S);

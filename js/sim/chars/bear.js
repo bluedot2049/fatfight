@@ -37,9 +37,10 @@ const SP = [
     m: mv('genjutsu', '幻術', 46, { kind: 'sp', mp: 150, pose: 'genjutsu',
       hits: [hit([13, 16], [350, 0, 4700, 350], 'S', { dmg: 40, fall: 0, rear: 1, daze: 1, zr: 220, hs: 30, stop: 8, bdef: 0 })] }) },
   // 踹：起手慢，踹到的人飛超遠（飛出去撞到人一起倒、撞牆彈回來）
-  { id: 'kick', name: '天罰蹴', yomi: 'keri', tai: 'Thinn-hua̍t-tshiok', d: 'd', btn: 'A', note: '起手慢。踹飛超遠，飛出去會撞倒人',
-    m: mv('kick', '天罰蹴', 44, { kind: 'sp', mp: 150, pose: 'kick', vx: [[0, 0], [16, 22], [25, 0]],
-      hits: [hit([23, 26], [100, 150, 1150, 900], 'S', { dmg: 200, kd: 1, dvx: 100, dvy: 95, bdef: 50, stop: 14, hs: 26 })] }) },
+  // 使用者 2026-11-27 嫌難中：起手照舊慢，但起手霸體（輕拳打不斷）、出腳往對手那條線拉（mag，往前靠 vx 自己衝）、判定 4→8 幀、前後 500→650
+  { id: 'kick', name: '天罰蹴', yomi: 'keri', tai: 'Thinn-hua̍t-tshiok', d: 'd', btn: 'A', note: '起手慢、輕拳打不斷。踹飛超遠，飛出去會撞倒人',
+    m: mv('kick', '天罰蹴', 44, { kind: 'sp', mp: 150, pose: 'kick', vx: [[0, 0], [16, 22], [25, 0]], armor: [0, 22], mag: [500, 600],
+      hits: [hit([23, 30], [100, 150, 1150, 900], 'S', { dmg: 200, kd: 1, dvx: 100, dvy: 95, bdef: 50, stop: 14, hs: 26, zr: 530 })] }) },
   // 豪火之術：對空。起手打不到，噴出一顆越滾越大的火球（穿過人、每人燒一次、打倒著火）
   { id: 'fireball', name: '豪火之術', yomi: 'go-kakyu- no jutsu', tai: 'ho5-hue2 tsi1-sut8', d: 'u', btn: 'A', note: '對空。出招無敵，超大火球。收招慢',
     m: mv('fireball', '豪火之術', 56, { kind: 'sp', mp: 150, pose: 'fireball', inv: [1, 23],
@@ -65,7 +66,7 @@ export default {
   walkX: 18, walkZ: 12, run: 48, runZ: 10, jumpV: 150, jumpX: 19, jumpZ: 12, dashV: 102, dashX: 60,
   frail: 110,                 // 弱點：挨打多扣一成（投稿表「得癌症，防禦力很弱」）
   // 被動：每 10 秒從最近的敵人背後飛來一群烏鴉，穿過去（不痛，打斷人）
-  crow: { every: 600, far: 2400, v: 64, y: 1000, w: 260, h: 220, dmg: 12, fall: 20, life: 80 },
+  pas: { k: 'crow', name: '烏鴉', ico: '鴉', note: '每 10 秒烏鴉從對手背後飛來亂', every: 600, far: 2400, v: 64, y: 1000, w: 260, h: 220, dmg: 12, fall: 20, life: 80 },
   ai: { style: 'zone', esc: 'fireball' },   // 電腦的打法：遠攻（ai.js STYLE）；被貼上用 fireball 頂開
   normals: N, specials: SP, supers: SU,
 };

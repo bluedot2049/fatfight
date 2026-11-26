@@ -62,5 +62,7 @@ export default {
   w: 330, h: 1050, hc: 680,        // 身體看起來長，受擊框照一般寬（太寬的話隔很遠就被打到）
   walkX: 19, walkZ: 12, run: 52, runZ: 10, jumpV: 140, jumpX: 20, jumpZ: 13, dashV: 98, dashX: 62,
   ai: { style: 'rush' },          // 電腦的打法：突進（ai.js STYLE）
+  // 被動（使用者 2026-11-27）：打中一下跑速 +3%，連段疊加、被擋不算，最多 +30%；每秒掉 3%（被打不清空）
+  pas: { k: 'zoom', name: '興奮搖尾', ico: '尾', note: '打中一下跑速 +3%，最多 +30%，每秒掉 3%', per: 30, max: 300, drop: 2 },
   normals: N, specials: SP, supers: SU,
 };

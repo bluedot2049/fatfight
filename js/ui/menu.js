@@ -286,7 +286,8 @@ export function moveListHtml(cur) {
   return `<div class="movelist"><nav class="mtabs">${tabs}${device.touch ? '' : `<small class="hint">${kbd(k0('left'), k0('right'))} 換</small>`}</nav>${ROSTER.map((c) => page(c.id, `
       <h3><i class="gem"></i>${c.full}</h3>
       <table><tr><th colspan="3">必殺技（→＝左右皆可）</th></tr>${c.specials.map(row).join('')}
-      <tr><th colspan="3">超必殺技</th></tr>${c.supers.map(row).join('')}</table>`, palStyle(c.id))).join('')}
+      <tr><th colspan="3">超必殺技</th></tr>${c.supers.map(row).join('')}
+      ${c.pas ? `<tr><th colspan="3">被動</th></tr><tr><td>${c.pas.name}</td><td></td><td class="note">${c.pas.note}</td></tr>` : ''}</table>`, palStyle(c.id))).join('')}
     ${page('sys', `<h3><i class="gem"></i>共通</h3><div class="sysgrid">${sysList().map(([t, rows]) => `<section><h4>${t}</h4>${rows.map(([c, n]) => `<div><span class="cmd"><b>${withKeys(c)}</b></span><span>${n}</span></div>`).join('')}</section>`).join('')}</div>
     <p class="foot">${device.touch ? '必殺：推方向，依序按防、攻或跳（可從防滑過去）。◆＝兩鍵同按。' : '指令依序輸入，不需同按。'}魔力自動回復，體力低時較快。</p>`)}
   </div>`;

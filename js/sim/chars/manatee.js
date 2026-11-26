@@ -33,12 +33,12 @@ const SP = [
     m: mv('wave', '翻滾浪', 46, { kind: 'sp', mp: 150, cancel: 1, hurt: [-300, 0, 300, 900], vx: [[0, 0], [5, 60], [28, 0]], zm: 10, stick: 1,
       mash: { at: 17, to: 7, n: 1, mp: 50 },
       hits: [hit([7, 12], [0, 0, 540, 1000], 'S', { dmg: 40, fall: 20, hs: 22, stop: 7 }), hit([18, 24], [0, 0, 540, 1000], 'S', { dmg: 55, kd: 1, dvx: 30, dvy: 80 })] }) },
-  // 往上衝：前兩下把人帶上去，最後一下打飛，到頂點停一下
-  { id: 'tail', name: '肥尾抽', yomi: 'hibi chu-ren', tai: 'pui5-bue2-thiu1', d: 'u', btn: 'A', note: '對空。出招無敵',
-    m: mv('tail', '肥尾抽', 30, { kind: 'sp', mp: 150, inv: [1, 8], jump: [3, 10, 108], land: 4, landW: 11, hang: 6,
-      hits: [hit([3, 5], [0, 300, 580, 1650], 'S', { dmg: 30, fall: 0, carry: 1, stop: 5, hs: 24 }),
-        hit([7, 9], [0, 300, 580, 1650], 'S', { dmg: 30, fall: 0, carry: 1, stop: 5, hs: 24 }),
-        hit([11, 15], [0, 300, 600, 1700], 'S', { dmg: 60, kd: 1, dvx: 18, dvy: 100, stop: 13 })] }) },
+  // 半月掃（使用者 2026-11-27，取代三下往上衝）：轉身讓尾巴朝前、小跳往後翻半圈，尾巴從身前低處經過頭頂掃到背後。
+  // 第一下掃前上方把人帶著，第二下掃過頭頂打飛（背後一點也打得到，越過頭頂的人也吃得到）。跟胖鼠的牙衝分開：跳得低、範圍寬、不追加
+  { id: 'tail', name: '肥尾抽', yomi: 'hibi chu-ren', tai: 'pui5-bue2-thiu1', d: 'u', btn: 'A', note: '對空。半月掃到頭頂和背後，出招無敵',
+    m: mv('tail', '肥尾抽', 30, { kind: 'sp', mp: 150, inv: [1, 8], jump: [3, 8, 100], land: 4, landW: 11, hang: 5,
+      hits: [hit([3, 6], [-100, 200, 700, 1600], 'S', { dmg: 45, fall: 0, carry: 1, stop: 6, hs: 24 }),
+        hit([8, 13], [-400, 400, 760, 2000], 'S', { dmg: 75, kd: 1, dvx: 18, dvy: 100, stop: 13, fx: 'splash' })] }) },
   // 身前捲起漩渦把人吸過來轉，最後往上甩出去
   { id: 'vortex', name: '深海渦', yomi: 'shinkai uzu', tai: 'tshim1-hai2-oo1', d: 'd', btn: 'A', note: '吸入後甩出',
     m: mv('vortex', '深海渦', 60, { kind: 'sp', mp: 200, pull: { on: [8, 44], x: 900, r: 2200, v: 16 },
@@ -62,6 +62,8 @@ export default {
   pal: ['#5cc8e0', '#123a5c'], card: { attr: '水', type: '深海之獸', lv: 5, art: 'sea' },   // 介面：寶石色（亮、暗）；卡片的屬性、種族、等級星、畫框底色     // 選角畫面：一句話、力氣／距離／速度（1–5）
   voice: { f0: 92, size: 0.9, mora: 0.12 },   // 念招式名稱的聲音（js/ui/voice.js）：音高、體型、一拍幾秒；招式的 tai 是台語念法（台羅），沒有的念 yomi（日語）
   say: { in: ['深淵無底我為王', 'tshim1-ian1-bu5-ti2 ngoo2-ui5-ong5'], win: ['深海的重量，汝擔袂起', 'tshim1-hai2-e5-tang7-liong7 li2-tann1-be7-khi2'], lose: ['海……猶未平靜……', 'hai2 iau2-bue7-ping5-tsing7'], laugh: 'ha1 ha1-ha1-ha1-ha1' },   // 戲台上說的話（js/ui/sfx.js 念、hud.js 寫）：in 第一回合出場的詩號、win 勝、lose 敗，[字, 台羅]；laugh 勝了之後的笑（空的不笑）
+  // 被動（使用者 2026-11-27）：出招中被打不停招、血照扣；之後 8 秒沒挨打才好。對手先戳一下騙掉
+  pas: { k: 'fat', name: '肥肉緩衝', ico: '肥', note: '出招中被打一下不會停，8 秒沒挨打再生效', cd: 480 },
   w: 330, h: 1450, hc: 950,
   walkX: 16, walkZ: 11, run: 44, runZ: 9, jumpV: 150, jumpX: 18, jumpZ: 12, dashV: 102, dashX: 58,
   normals: N, specials: SP, supers: SU,
