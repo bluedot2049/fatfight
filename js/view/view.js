@@ -18,6 +18,7 @@ import { hitBoxes, paceLen } from '../sim/moves.js';
 import { STAGE_HALF, Z_NEAR, Z_REACH } from '../sim/const.js';
 import { QUESTS } from '../sim/quests/index.js';
 import { hurtBoxes } from '../sim/combat.js';
+import { entryAt } from '../sim/match.js';
 import { ItemView, handAnchor } from './items.js';
 import { TrapView } from './traps.js';
 import { ITEMS } from '../sim/items.js';
@@ -494,7 +495,8 @@ export class View {
 
   updateFighter(S, p, v) {
     const C = CHARS[p.ch];
-    const target = poseOf(p, this.clock);
+    const en = entryAt(S);
+    const target = poseOf(en && en.i === p.i ? { ...p, act: 'entry', t: en.k } : p, this.clock);
     // 出招和被打要乾脆，直接套；其他狀態稍微緩一下，換狀態不會一跳
     const snap = p.act === 'atk' || p.act === 'hit' || p.act === 'block';
     for (const k in target) v.pose[k] = snap ? target[k] : v.pose[k] + (target[k] - v.pose[k]) * 0.45;
@@ -526,7 +528,7 @@ export class View {
     const sh = Math.max(0.3, 1 - p.y * U * 0.4) * (m && m.under && p.t >= 8 && p.t <= m.under[1] ? 0.4 : 1);
     v.shadow.position.set(p.x * U, 0.005, p.z * U);
     v.shadow.scale.set(C.w * U * 1.35 * sh, C.w * U * 0.75 * sh, 1);
-    if (v.mark) placeMark(v.mark, p.x * U, p.z * U, p.face, this.marks && p.gone !== 2, this.dt);   // 跳起來、鑽地都留在地上，看得出人在哪一條線
+    if (v.mark) placeMark(v.mark, p.x * U, p.z * U, p.face, this.marks && p.gone !== 2 && !entryAt(S), this.dt);   // 跳起來、鑽地都留在地上，看得出人在哪一條線
     placeLane(v.lane, p.x * U, p.z * U, this.laneOf(S, p), this.dt);
     v.flash *= 0.94;
     // 必殺、超必殺衝出去的時候往後拉殘影；跑步腳下揚土
@@ -966,6 +968,14 @@ export class View {
       const p = S.p[S.fwho];
       cx = cx * 0.4 + p.x * U * 0.6; cz = p.z * U; d -= 1.6;
     }
+    // 第一回合出場：鏡頭切到輪到的那隻面前、慢慢推近、壓低一點往上看；人站一邊，另一邊留給字
+    const en = entryAt(S);
+    if (en) {
+      const p = S.p[en.i], u = Math.min(1, en.k / en.n);
+      cx = p.x * U + p.face * 1.1; cz = p.z * U; d = 4.7 - 0.6 * u;
+      if (en.k === 0 || this.enCut !== en.i) { this.enCut = en.i; this.cam.x = cx; this.cam.z = cz; this.cam.d = d + 0.5; }   // 換人直接切過去
+    } else this.enCut = -1;
+    this.low = (this.low || 0) + ((en ? 1 : 0) - (this.low || 0)) * (1 - Math.pow(0.002, dt));
     const half = d * Math.tan(this.camera.fov * Math.PI / 360) * this.camera.aspect;
     const lo = (S.lo ?? -STAGE_HALF) * U + half - 0.6, hi = (S.hi ?? STAGE_HALF) * U - half + 0.6;
     cx = lo > hi ? (lo + hi) / 2 : Math.max(lo, Math.min(hi, cx));
@@ -978,8 +988,9 @@ export class View {
     const ox = this.cam.x - this.off;
     // 俯角約 26 度：高度和距離照比例一起拉
     const D = this.cam.d - this.punch;
-    this.camera.position.set(ox + sx, 0.55 + D * 0.5 + sy, this.cam.z + 0.3 + D);
-    this.camera.lookAt(ox + sx, 0.55 + sy, this.cam.z - 0.15);
+    const lo2 = this.low || 0;
+    this.camera.position.set(ox + sx, 0.55 + D * (0.5 - 0.3 * lo2) + sy, this.cam.z + 0.3 + D);
+    this.camera.lookAt(ox + sx, 0.55 + 0.12 * lo2 + sy, this.cam.z - 0.15);
   }
 
   // 開場先把每種特效、泡泡、浪、星星都畫一次到一張小圖上：著色器和貼圖先準備好，第一次出招才不會頓一下

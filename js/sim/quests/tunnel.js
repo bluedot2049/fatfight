@@ -7,7 +7,7 @@
 const m = (ch, lv, hp, side = 'R') => ({ ch, lv, hp, side, mini: 1, pow: 115 });   // 打人 115%（2026-11-26 視野放寬之後變簡單，100→115；2026-11-24 從 75 到 90；2026-11-25 到 100：這關比上一關難的部分放在路上，不放在頭目）
 
 export default {
-  id: 'tunnel', no: 2, name: '土撥鼠的地道', scene: 'tunnel', bossSay: '誰准你走我的礦道',
+  id: 'tunnel', no: 2, name: '土撥鼠的地道', scene: 'tunnel', bossSay: '誰准你走我的礦道', bossTai: 'siang2 tsun2-li2 kiann5 gua2-e5-khong3-to7',
   // 地上的東西（items.js）：每段 items [種類, 離這段左邊多遠, 前後]，走到這段才擺出來；food 是雜兵掉的吃的
   food: ['mushroom', 'crystal'],   // 雜兵每倒四隻掉一個（照順序輪）
   span: [-10000, 52000],

@@ -96,6 +96,7 @@ function setMovesOn(on) {
   try { localStorage.setItem(MOVES_KEY, on ? '1' : '0'); } catch {}
 }
 const DUMMY = ['站著', '蹲著', '防禦', '一直跳', '由 P2 操作', '電腦'];
+const OVER_SHOW = 270;     // 打完幾幀才出結果選單（勝利台詞、笑念得完）
 const TRAIN_CPU = 3;        // 練習的電腦對手用幾級
 const MATE_LV = LV_MAX;     // 線上闖關朋友斷線，電腦接手用幾級
 // 聲音偏左偏右：場上的 x（公釐）離鏡頭中心多遠
@@ -104,17 +105,30 @@ view.onEvent = (e, S) => {
   if (G.mode !== 'fight') return;
   hud.event(e, S, view);
   sfxEvent(e, e.x === undefined ? (e.s === undefined ? 0 : panOf(S.p[e.s]?.x)) : panOf(e.x), S);
-  // 音樂跟著比賽：KO 壓低、下一回合拉回來、打完留一點點
-  if (e.k === 'ko') music.level(0.3, 0.2); else if (e.k === 'round') music.level(1, 0.6); else if (e.k === 'over') music.level(0.25, 0.5);
-  // 闖關的事件先借現有的音效
-  if (e.k === 'stage') play('round');
+  // 音樂跟著比賽：出場壓低（聽得到詩號）、KO 停掉留一拍空、下一回合拉回來、勝負段落時停掉
+  if (e.k === 'entry' && e.s === 0) music.level(0.3, 0.4);
+  else if (e.k === 'ko') music.level(0, 0.06);
+  else if (e.k === 'round') music.level(1, 0.6);
+  else if (e.k === 'over' || e.k === 'clear') music.level(0, 0.15);
+  if (e.k === 'over' && !S.quest) overSound(e, S);
+  // 闖關的段落
+  if (e.k === 'stage') play('stage', e);
   else if (e.k === 'hit' && e.armor) play('clank', {}, panOf(e.x));
-  else if (e.k === 'kill') { if (e.boss) { play('ko'); music.level(0.3, 0.2); } else play('shatter', {}, panOf(e.x)); }
+  else if (e.k === 'kill') { if (e.boss) { play('ko'); music.level(0, 0.06); } else play('shatter', {}, panOf(e.x)); }
   else if (e.k === 'die') play('ko');
-  else if (e.k === 'clear') play('win');
-  else if (e.k === 'boss' || e.k === 'respawn' || e.k === 'cont') play('fight');
+  else if (e.k === 'clear') play('win', { ch: mine()?.ch });
+  else if (e.k === 'over' && S.quest && e.w !== 0) play('lose', { ch: mine()?.ch });
+  else if (e.k === 'boss') { if (e.say !== undefined) play('boss', { ch: S.p[e.s]?.ch, tai: QUESTS[S.quest]?.bossTai }); else play('rage'); }
+  else if (e.k === 'respawn' || e.k === 'cont') play('gong');
   else if (e.k === 'contask') music.level(0.4, 0.4);
 };
+// 對戰打完：有「自己」的（打電腦、線上）照自己的角度響勝或敗；本機兩個人打就是勝的那邊念
+function overSound(e, S) {
+  if (e.w < 0) { play('draw'); return; }
+  const me = G.kind === 'online' ? G.side : G.kind === 'cpu' ? 0 : -1;
+  if (me >= 0 && e.w !== me) play('lose', { ch: S.p[me].ch });
+  else play('win', { ch: S.p.find((f) => f.team === e.w)?.ch });
+}
 const soundItem = () => ({ label: '聲音', value: () => SOUND_NAMES[soundMode()], on: () => setSoundMode(soundMode() + 1), cycle: (d) => setSoundMode(soundMode() + d) });
 for (const k of ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown']) addEventListener(k, unlockAudio, { capture: true, passive: true });
 
@@ -163,7 +177,7 @@ function tick() {
     step(G.S, b0, b1);
     for (const e of G.S.ev) G.events.push({ ...e, f: G.S.f });
   }
-  if (G.S.ph === 'over' && G.S.pt >= 150 && !G.overShown) { G.overShown = true; showResult(); }
+  if (G.S.ph === 'over' && G.S.pt >= OVER_SHOW && !G.overShown) { G.overShown = true; showResult(); music.level(0.3, 1.5); }
 }
 
 // 練習對手的按鍵（只在本機用，可以看狀態）：防禦時先轉向 P1 再按住防

@@ -58,6 +58,7 @@ export default {
   blurb: '三道聲波、鑽褲襠、叼骨頭補血', stat: [3, 3, 5],
   pal: ['#ffe066', '#4a3a08'], card: { attr: '風', type: '長身之犬', lv: 4, art: 'sky' },
   voice: { f0: 150, size: 1.05, mora: 0.1 },
+  say: { in: ['身長三丈吠九天', 'sin1-tiong5-sam1-tiong7 pui7-kiu2-thian1'], win: ['吾之長，汝看無盡頭', 'ngoo5-tsi1-tng5 li2-khuann3-bo5-tsin7-thau5'], lose: ['尾溜……縮起來矣……', 'bue2-liu1 kiu1-khi2-lai5-ah4'], laugh: 'ong1 ong1-ong1' },
   w: 330, h: 1050, hc: 680,        // 身體看起來長，受擊框照一般寬（太寬的話隔很遠就被打到）
   walkX: 19, walkZ: 12, run: 52, runZ: 10, jumpV: 140, jumpX: 20, jumpZ: 13, dashV: 98, dashX: 62,
   ai: { style: 'rush' },          // 電腦的打法：突進（ai.js STYLE）

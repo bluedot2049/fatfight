@@ -60,6 +60,7 @@ export default {
   blurb: '苦無、幻術、烏鴉來亂', stat: [3, 3, 4],
   pal: ['#9b6cff', '#2a1846'], card: { attr: '幻', type: '爛熊之王', lv: 5, art: 'crow' },
   voice: { f0: 104, size: 0.88, mora: 0.12 },
+  say: { in: ['烏鴉落處皆幻影', 'oo1-a1-lok8-tshu3 kai1-huan7-ing2'], win: ['汝所看著的，攏是幻術', 'li2-soo2-khuann3-tioh8-e5 long2-si7-huan7-sut8'], lose: ['這嘛是……幻術……', 'tse1-ma7-si7 huan7-sut8'], laugh: 'hennh4 hah4-hah4-hah4' },
   w: 320, h: 1350, hc: 900,
   walkX: 18, walkZ: 12, run: 48, runZ: 10, jumpV: 150, jumpX: 19, jumpZ: 12, dashV: 102, dashX: 60,
   frail: 110,                 // 弱點：挨打多扣一成（投稿表「得癌症，防禦力很弱」）

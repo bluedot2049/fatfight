@@ -17,6 +17,8 @@ export const HP = 1000;
 export const MP = 1000;             // 魔力上限
 export const MP_REGEN = 3;          // 每幾幀回 1 點魔力（血少回得快，見 fighter.js）
 export const WIN_ROUNDS = 2;        // 三戰兩勝
+export const ENTRY_IN = 24;         // 第一回合出場：先拉黑邊幾幀
+export const ENTRY = 150;           // 出場：每隻幾幀（鏡頭推近、擺姿勢、念詩號）；有人按攻就跳過
 export const LIVES = 3;             // 闖關：一開始幾條命（含現在這條），接關也補回這麼多
 export const CONT_TIME = 600;       // 闖關：全倒之後接關倒數幾幀（10 秒）
 // 走、跑、跳的左右前後速度一律過這個（使用者 2026-11-24：先 4 倍，同一天又說整體慢 20%＝3.2 倍）。招式自己的位移（衝撞、翻滾）在 moves.js 的 tune 另算

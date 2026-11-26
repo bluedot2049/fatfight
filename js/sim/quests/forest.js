@@ -11,7 +11,7 @@ const el = (ch, hp, side = 'R') => ({ ch, lv: 3, hp, side, mini: 1, elite: 1, po
 const boss = (ch, hp, side = 'R') => ({ ch, lv: 3, hp, pow: 125, side, boss: 1, pack: 1 });
 
 export default {
-  id: 'forest', no: 3, name: '黑森林', scene: 'forest', bossName: '營火三冒險者', bossSay: '第四個人終於來了。不是？',
+  id: 'forest', no: 3, name: '黑森林', scene: 'forest', bossName: '營火三冒險者', bossSay: '第四個人終於來了。不是？', bossTai: 'te7-si3-e5-lang5 tsiong1-i5-lai5-ah4 m7-si7',
   food: ['mushroom', 'redpot'],   // 雜兵每倒四隻掉一個（照順序輪）
   span: [-10000, 52000],
   secs: [

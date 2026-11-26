@@ -10,7 +10,7 @@ const m = (ch, lv, hp, side = 'R', carry = '') => ({ ch, lv, hp, side, mini: 1, 
 const el = (ch, hp, side = 'R') => ({ ch, lv: 3, hp, side, mini: 1, elite: 1, pow: 104 });   // 雜兵打人 92→104%（2026-11-26 視野放寬之後變簡單）
 
 export default {
-  id: 'moon', no: 4, name: '月球工廠', scene: 'moon', rageName: '小灰人生氣了', bossSay: '參觀動線不在這邊',
+  id: 'moon', no: 4, name: '月球工廠', scene: 'moon', rageName: '小灰人生氣了', bossSay: '參觀動線不在這邊', bossTai: 'tsham1-kuan1-tong7-suann3 bo5-ti7-tsia1',
   food: ['redpot', 'bluepot'],   // 雜兵每倒四隻掉一個（照順序輪）
   span: [-10000, 52000],
   secs: [

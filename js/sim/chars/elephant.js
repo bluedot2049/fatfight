@@ -63,6 +63,7 @@ export default {
   blurb: '捲人掄人、踏地震、身邊全捲', stat: [5, 3, 2],
   pal: ['#e88aa8', '#4a1430'], card: { attr: '岩', type: '長鼻之力', lv: 5, art: 'rose' },
   voice: { f0: 120, size: 0.95, mora: 0.11 },
+  say: { in: ['長鼻一捲天地翻', 'tiong5-pi7-it4-kng2 thian1-te7-huan1'], win: ['象王面前，眾生皆輕', 'tshiunn7-ong5-bin7-tsing5 tsiong3-sing1-kai1-khin1'], lose: ['象……袂倒……', 'tshiunn7 be7-to2'], laugh: 'ho1 ho1-ho1-ho1' },
   w: 400, h: 1450, hc: 980,
   walkX: 14, walkZ: 10, run: 40, runZ: 8, jumpV: 140, jumpX: 16, jumpZ: 11, dashV: 96, dashX: 52,
   ai: { style: 'grab', zone: { r: 1700, mp: 400 } },   // 有象王風車的魔力時，敵方電腦不走進身體邊緣 1.7 公尺內（鼻象收招、倒著的時候照樣衝進來）

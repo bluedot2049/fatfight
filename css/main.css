@@ -149,6 +149,35 @@ li[data-orn], .mbtn { position: relative; isolation: isolate; }
 #hud .super.on { animation: unfurl 1.5s ease-out both; }
 @keyframes unfurl { 0% { opacity: 1; scale: 0 1; transform-origin: var(--o); } 16% { scale: 1 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
 
+/* 第一回合出場：上下黑邊（--lb 0–1）、玩家牌收起來、名字和直書的詩號 */
+#hud .lbox i { position: absolute; left: 0; right: 0; height: 11vh; background: #050304; transform: translateY(calc((1 - var(--lb, 0)) * -100%)); }
+#hud .lbox i + i { top: auto; bottom: 0; transform: translateY(calc((1 - var(--lb, 0)) * 100%)); }
+#hud .lbox i:first-child { top: 0; }
+#hud .pp, #hud .round { transition: opacity .35s; }
+#hud.entry .pp, #hud.entry .round { opacity: 0; }
+#hud .ecard { position: absolute; top: 16%; height: 68%; width: 640px; opacity: 0; display: flex; align-items: center; gap: 40px; }
+#hud .ecard.s0 { right: 6%; flex-direction: row; }
+#hud .ecard.s1 { left: 6%; flex-direction: row-reverse; }
+#hud .ecard.on { opacity: 1; animation: ecIn .35s ease-out both; }
+#hud .ecard .streak { position: absolute; left: -12%; right: -12%; top: 34%; height: 30%; rotate: -8deg;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--gem, #c49a55) 55%, transparent) 18%, color-mix(in srgb, var(--deep, #3b2a12) 80%, transparent) 60%, transparent);
+  mix-blend-mode: screen; opacity: .55; filter: blur(2px); transform-origin: 0 50%; }
+#hud .ecard.s1 .streak { rotate: 8deg; transform-origin: 100% 50%; }
+#hud .ecard.on .streak { animation: streak .4s .12s ease-out both; }
+#hud .ecard .who { position: relative; display: flex; flex-direction: column; align-items: center; gap: 10px; flex: 1; }
+#hud .ecard .who em { font: 900 26px/1 var(--cinzel); font-style: normal; color: var(--goldc); letter-spacing: .3em; text-shadow: 0 2px 0 #000; }
+#hud .ecard .who b { font-size: 132px; line-height: 1; letter-spacing: .08em; white-space: nowrap; }
+#hud .ecard .who small { font: 700 24px/1 var(--serif); color: var(--parch); letter-spacing: .4em; text-shadow: 0 2px 0 #000, 0 0 12px #000; }
+#hud .ecard.on .who { animation: whoIn .4s .2s cubic-bezier(.2, 1.6, .4, 1) both; }
+#hud .ecard .poem { position: relative; margin: 0; writing-mode: vertical-rl; font: 900 58px/1.1 var(--serif); letter-spacing: .12em; color: #f6ecd4;
+  text-shadow: 0 0 2px #000, 0 3px 0 #000, 0 0 18px color-mix(in srgb, var(--gem, #c49a55) 70%, transparent); }
+#hud .ecard .poem span { display: inline-block; opacity: 0; }
+#hud .ecard.on .poem span { animation: inkIn .32s var(--d) ease-out both; }
+@keyframes ecIn { from { opacity: 0; } }
+@keyframes streak { from { scale: 0 1; opacity: 0; } }
+@keyframes whoIn { from { opacity: 0; scale: 1.6; filter: blur(6px); } }
+@keyframes inkIn { from { opacity: 0; scale: 1.5; filter: blur(5px); } 60% { opacity: 1; } to { opacity: 1; scale: 1; filter: none; } }
+
 /* 字卡 */
 #hud .announce { position: absolute; left: 0; right: 0; top: 45%; height: 0; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity .3s; }
 #hud .announce.on { opacity: 1; transition: none; }

@@ -61,6 +61,7 @@ export default {
   blurb: '遠處吐泡泡、尾巴對空', stat: [4, 5, 2],
   pal: ['#5cc8e0', '#123a5c'], card: { attr: '水', type: '深海之獸', lv: 5, art: 'sea' },   // 介面：寶石色（亮、暗）；卡片的屬性、種族、等級星、畫框底色     // 選角畫面：一句話、力氣／距離／速度（1–5）
   voice: { f0: 92, size: 0.9, mora: 0.12 },   // 念招式名稱的聲音（js/ui/voice.js）：音高、體型、一拍幾秒；招式的 tai 是台語念法（台羅），沒有的念 yomi（日語）
+  say: { in: ['深淵無底我為王', 'tshim1-ian1-bu5-ti2 ngoo2-ui5-ong5'], win: ['深海的重量，汝擔袂起', 'tshim1-hai2-e5-tang7-liong7 li2-tann1-be7-khi2'], lose: ['海……猶未平靜……', 'hai2 iau2-bue7-ping5-tsing7'], laugh: 'ha1 ha1-ha1-ha1-ha1' },   // 戲台上說的話（js/ui/sfx.js 念、hud.js 寫）：in 第一回合出場的詩號、win 勝、lose 敗，[字, 台羅]；laugh 勝了之後的笑（空的不笑）
   w: 330, h: 1450, hc: 950,
   walkX: 16, walkZ: 11, run: 44, runZ: 9, jumpV: 150, jumpX: 18, jumpZ: 12, dashV: 102, dashX: 58,
   normals: N, specials: SP, supers: SU,

@@ -32,7 +32,8 @@ const BASE = {
   lie: { tumble: -1.45, by: 0.05 },
   throw: { aN: 1.5, aF: 1.4, lean: 0.35, bend: 0.2 },
   thrown: { lean: -0.6, by: 0.35, aN: 2.2, aF: 2.0 },
-  win: { aN: 0.2, aF: 0.2, aNz: 2.3, aFz: 2.3, sq: 0.08, head: -0.15 },   // 兩手往兩側高舉，不擋臉
+  win: { aN: 0.2, aF: 0.2, aNz: 2.3, aFz: 2.3, sq: 0.08, head: -0.15 },
+  hero: { aN: 2.1, aNz: 0.45, aF: -0.55, aFz: 0.35, lN: 0.4, lF: -0.35, lean: -0.1, bend: -0.08, head: -0.2, sq: -0.06, spin: 0.4 },   // 出場的帥姿勢：前手往前上指、後手往後、腳張開、身體轉向鏡頭   // 兩手往兩側高舉，不擋臉
   backstep: { lean: -0.35, aN: 0.5, aF: 0.5 },
   brake: { lean: -0.4, sq: -0.12, aN: 0.8, aF: 0.6, lN: 0.6 },
   dizzy: { lean: -0.15, aN: 0.3, aF: 0.2, aNz: 0.6, aFz: 0.6, head: 0.2 },
@@ -293,6 +294,8 @@ export function poseOf(f, clock) {
     case 'getup': p = mix(BASE.lie, BASE.crouch, Math.min(1, t / 18)); break;
     case 'throw': p = mix(BASE.throw, over(BASE.throw, { spin: 0.8, lean: -0.2 }), Math.min(1, t / 20)); break;
     case 'thrown': p = over(BASE.thrown, { spin: -t * 0.08 }); break;
+    // 第一回合出場（畫面借用，sim 裡沒有這個狀態）：先蹲下蓄一下，再一口氣站成帥的姿勢，之後跟著呼吸
+    case 'entry': p = t < 10 ? mix(BASE.idle, BASE.pre, t / 10) : mix(BASE.pre, over(BASE.hero, { by: 0.012 * cyc(0.9), sq: -0.06 + 0.015 * cyc(0.9), spin: 0.4 * f.face }), ease(Math.min(1, (t - 10) / 6))); break;
     case 'win': { const k = Math.min(1, t / 12); p = mix(BASE.idle, over(BASE.win, { by: 0.08 * Math.abs(cyc(1.6)) }), k); break; }
     case 'atk': p = attackPose(f, m, t, clock); break;
     default: p = {};

@@ -12,7 +12,7 @@
 const m = (ch, lv, hp, side = 'R') => ({ ch, lv, hp, side, mini: 1, pow: 115 });   // 打人 115%（2026-11-26 視野放寬、加了甲板炮之後變簡單，90→115；2026-11-24 從 70 到 85：雜兵改成輪流上、出手前有預告，被打到的那下就要痛；2026-11-25 到 90：難度從頭目段移到路上）
 
 export default {
-  id: 'sea', no: 1, name: '海底沉船', scene: 'sea', bossSay: '這艘船是我先看到的',
+  id: 'sea', no: 1, name: '海底沉船', scene: 'sea', bossSay: '這艘船是我先看到的', bossTai: 'tsit4-tsiah4-tsun5 si7-gua2 sing1-khuann3-tioh8-e5',
   food: ['seaweed', 'jelly'],   // 雜兵每倒四隻掉一個（照順序輪）
   span: [-10000, 52000],              // 場景要畫多長（畫面用）
   secs: [

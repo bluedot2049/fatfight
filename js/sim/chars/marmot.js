@@ -56,6 +56,7 @@ export default {
   blurb: '近身亂鑽、翻滾衝撞', stat: [3, 2, 5],
   pal: ['#f2a93b', '#5a2a0c'], card: { attr: '地', type: '狂妄之鼠', lv: 4, art: 'earth' },  // 介面：寶石色（亮、暗）；卡片的屬性、種族、等級星、畫框底色       // 選角畫面：一句話、力氣／距離／速度（1–5）
   voice: { f0: 175, size: 1.12, mora: 0.095 },   // 念招式名稱的聲音：比海牛高、快
+  say: { in: ['地裂雷鳴我最狂', 'te7-liat8-lui5-bing5 ngoo2-tsue3-kong5'], win: ['狂，是我的天性', 'kong5 si7-gua2-e5-thian1-sing3'], lose: ['我……會閣鑽出來……', 'gua2 e7-koh4-tsng3-tshut4-lai5'], laugh: 'hah4 ha1-ha1-ha1-ha1-ha1' },
   w: 300, h: 1150, hc: 760,
   walkX: 20, walkZ: 13, run: 54, runZ: 11, jumpV: 156, jumpX: 22, jumpZ: 14, dashV: 105, dashX: 68,
   ai: { style: 'rush' },          // 電腦的打法：突進（ai.js STYLE）

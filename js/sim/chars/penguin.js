@@ -61,6 +61,7 @@ export default {
   blurb: '吐火、火球封路、火柱打在腳下', stat: [3, 5, 2],
   pal: ['#ff6a2a', '#5a1608'], card: { attr: '火', type: '冷面法師', lv: 5, art: 'fire' },
   voice: { f0: 100, size: 1.0, mora: 0.13 },
+  say: { in: ['冰面之下是烈火', 'ping1-bin7-tsi1-ha7 si7-liat8-hue2'], win: ['燒了。下一個。', 'sio1-liau2 e7-tsit8-e5'], lose: ['火……熄矣……', 'hue2 sit4-ah4'], laugh: '' },
   w: 320, h: 1550, hc: 980,
   walkX: 16, walkZ: 11, run: 44, runZ: 9,   // 2026-11-26 14→16、40→44（原本跟鼻象一樣全場最慢，遠攻的要能換位置）
   jumpV: 146, jumpX: 17, jumpZ: 11, dashV: 98, dashX: 54,
