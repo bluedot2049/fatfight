@@ -23,6 +23,7 @@ import { ItemView, handAnchor } from './items.js';
 import { TrapView } from './traps.js';
 import { ITEMS } from '../sim/items.js';
 import { InkLines } from './inkline.js';
+import { SuperShow } from './super.js';
 
 const ROCK = '#8a5a2e';   // 地裂噴出來的碎石
 const CLAW = new THREE.Vector3(), TIP = new THREE.Vector3();
@@ -101,6 +102,7 @@ export class View {
     this.ink = /[?&]noink/.test(location.search) ? null : new InkLines(this.renderer);   // 手疊在身上的內線（?noink 關掉對照）
     this.inkKeep = new Set();
     this.inkSize = new THREE.Vector2();
+    this.show = new SuperShow(this);   // 超必殺的演出：全場暗下去、追光、切入特寫、剪影、超必殺 KO
     this.resize();
     addEventListener('resize', () => this.resize());
   }
@@ -229,8 +231,11 @@ export class View {
     this.fx.update(dt);
     this.updateCamera(S, dt);
     this.drawBoxes(S);
+    this.show.pre(S, dt);                            // 超必殺暗下去的時候，發光的特效改在墨蓋上去之後才畫
     this.renderer.render(this.scene, this.camera);
-    if (this.ink) {                                  // 內線只找角色、地上的東西、飛行道具之間的，場地不畫
+    this.lastS = S;
+    const sil = this.show.draw(S);                // 超必殺：墨蓋上去、亮的再畫一次；剪影那幾幀不畫內線
+    if (this.ink && !sil) {                                  // 內線只找角色、地上的東西、飛行道具之間的，場地不畫
       const k = this.inkKeep;
       k.clear();
       for (const f of this.fighters) if (f) k.add(f.model.root);
@@ -239,12 +244,14 @@ export class View {
       this.renderer.getDrawingBufferSize(this.inkSize);
       this.ink.draw(this.scene, this.camera, [0, 0, this.inkSize.x, this.inkSize.y], k);
     }
+    this.show.drawTop(S);                            // 切入特寫的緞帶蓋在最上面
   }
 
   event(S, e) {
     const col = (s) => CHARS[S.p[s]?.ch]?.pal?.[0] || CHARS[S.p[s]?.ch]?.color || '#ffffff';   // 寶石色
     const HOT = '#fff6e8';       // 能量的白芯（偏一點暖，不是死白）
     const z = (e.z || 0) * U;
+    this.show.event(S, e);
     switch (e.k) {
       case 'round': case 'stage': for (const f of this.fighters) if (f?.mark) f.mark.t = 2.4; break;   // 每回合、每關開頭腳前再浮一次 1P 2P
       case 'hit': {
@@ -1174,6 +1181,7 @@ export class View {
     this.fighters.forEach((f, i) => { f.beam.visible = was[i]; for (const s of f.stars) s.visible = false; });
     fx.update(99);            // 剛剛放的全部收掉
     fx.list = keep;
+    this.show.warm(this.lastS);
   }
 
   // 場上的一點在畫面上的位置（像素），HUD 要把字貼在打中的地方用

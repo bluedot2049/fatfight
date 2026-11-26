@@ -105,12 +105,13 @@ for (const T of Object.values(TRACKS)) {
 }
 
 let cur = null;          // 正在播的：{ T, name, gain, pos, next, loops }
-let timer = null, want = null, turn = -1, duckNode = null, level = 1;
+let timer = null, want = null, turn = -1, duckNode = null, suckNode = null, muffled = false, level = 1;
 
 function output(a) {
   if (!duckNode) {
     duckNode = a.ctx.createBiquadFilter(); duckNode.type = 'lowpass'; duckNode.frequency.value = 18000;
-    duckNode.connect(a.out);
+    suckNode = a.ctx.createGain();           // 超必殺定格時被吸走（跟 level 分開，KO 壓掉的音量不會被它拉回來）
+    duckNode.connect(suckNode); suckNode.connect(a.out);
   }
   return duckNode;
 }
@@ -235,8 +236,19 @@ export const music = {
   muffle(on) {
     const a = audio();
     if (!a) return;
+    muffled = on;
     const f = output(a), t = a.ctx.currentTime;
     f.frequency.cancelScheduledValues(t); f.frequency.setTargetAtTime(on ? 480 : 18000, t, 0.08);
+  },
+  // 超必殺發動：音樂像被吸過去（高音一下子收掉、變小聲），sec 秒後定格結束「轟」那下放回來
+  suck(sec = 0.5) {
+    const a = audio();
+    if (!a) return;
+    const f = output(a), g = suckNode, t = a.ctx.currentTime, back = muffled ? 480 : 18000;
+    f.frequency.cancelScheduledValues(t); f.frequency.setValueAtTime(f.frequency.value, t);
+    f.frequency.setTargetAtTime(muffled ? 480 : 380, t, 0.05); f.frequency.setTargetAtTime(back, t + sec, 0.04);
+    g.gain.cancelScheduledValues(t); g.gain.setValueAtTime(g.gain.value, t);
+    g.gain.setTargetAtTime(0.4, t, 0.06); g.gain.setTargetAtTime(1, t + sec, 0.05);
   },
   // 音量（0–1）：KO、比賽結束時壓低
   level(v, sec = 0.3) {

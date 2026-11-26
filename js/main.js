@@ -109,6 +109,7 @@ view.onEvent = (e, S) => {
   if (e.k === 'entry' && e.s === 0) music.level(0.3, 0.4);
   else if (e.k === 'ko') music.level(0, 0.06);
   else if (e.k === 'round') music.level(1, 0.6);
+  else if (e.k === 'super') music.suck(0.5);         // 定格 30 幀：音樂被吸走，轟那下放回來
   else if (e.k === 'over' || e.k === 'clear') music.level(0, 0.15);
   if (e.k === 'over' && !S.quest) overSound(e, S);
   // 闖關的段落
