@@ -8,7 +8,7 @@ import { sweepFront } from './moves.js';
 import { newHistory, record, pressed, pressedBoth, consume, consumeCommand, command, tapTwice, useTap, holding, dirX, dirZ } from './input.js';
 import { ITEMS, WEAR_SWING } from './items.js';
 import { useTrap } from './trap.js';
-import { heldItem, pickTry, slidePick, itemAct, keepSipping, dropItem, wear, spawnItem, flingItem, hurlItem } from './item.js';
+import { heldItem, pickTry, slidePick, itemAct, keepSipping, dropItem, wear, spawnItem, giveItem, flingItem, hurlItem } from './item.js';
 
 export const FREE = new Set(['stand', 'walk', 'crouch']);
 const GRAB_TIME = 85;           // 抓住最多幾幀，時間到對方掙脫
@@ -212,6 +212,17 @@ export function grabStart(S, f, o) {
   setAct(o, 'grabbed'); o.hold = f.i; o.face = -f.face; o.mv = ''; o.vx = o.vz = 0; o.vy = 0; o.air = 0;   // 空中抓到的（鼻子撈天）：高度由抓的人管，不受重力
   S.ev.push({ k: 'grab', s: f.i });
 }
+// 一次抓好幾個（指令投的 all）：第一個照 grabStart，其他的也變成被 f 抓著（f.hold 只記第一個；誰被 f 抓著看 o.hold）
+export function grabAlso(S, f, o) {
+  if (o.item >= 0) dropItem(S, o, 0);
+  setAct(o, 'grabbed'); o.hold = f.i; o.face = o.x >= f.x ? -1 : 1; o.mv = ''; o.vx = o.vz = 0; o.vy = 0; o.air = 0;
+}
+// f 抓著的所有人（第一個在前面）
+function heldBy(S, f) {
+  const out = [];
+  for (const o of S.p) if (o.hold === f.i && o.act === 'grabbed') { if (o.i === f.hold) out.unshift(o); else out.push(o); }
+  return out;
+}
 
 // 照輸入決定這幀要不要換動作。noInput：開場、KO 後不聽輸入
 export function think(S, f, noInput) {
@@ -395,12 +406,14 @@ function clampStage(S, f) {
 }
 
 function release(S, f) {
-  const o = f.hold >= 0 ? S.p[f.hold] : null;
+  const first = f.hold >= 0 ? S.p[f.hold] : null;
   f.hold = -1;
-  if (o && o.hold === f.i) {
+  for (const o of S.p) {
+    if (o.hold !== f.i || (o !== first && o.act !== 'grabbed')) continue;   // 被抓著的人的 hold 是抓他的人；抓的人自己的 hold 是第一個被抓的
+    if (o.i === f.i) continue;
     o.hold = -1;
     // 鬆手後 REL_IV 幀打不到：以前抓的人先能動，9 幀硬直一結束剛好接下一套（頭暈 → 抓 → 再一套 → 追打，3 秒以上不能動）
-    if (o.act === 'grabbed') { setAct(o, 'hit'); o.stun = 9; o.fallv = 0; o.slide = 400; o.sdir = f.face; o.iv = Math.max(o.iv, REL_IV); if (o.y > 0) { o.air = 1; o.vy = 0; } }   // 在空中被放掉的掉下來
+    if (o.act === 'grabbed') { setAct(o, 'hit'); o.stun = 9; o.fallv = 0; o.slide = 400; o.sdir = o.x >= f.x ? 1 : -1; o.iv = Math.max(o.iv, REL_IV); if (o.y > 0) { o.air = 1; o.vy = 0; } }   // 在空中被放掉的掉下來
   }
 }
 
@@ -526,7 +539,7 @@ function atkStep(S, f, C) {
   // 集氣：到這幀還按著就停住（放開或集滿才往下走）
   if (m.charge && f.t === m.charge.at && f.chg < m.charge.max && (holding(H, BA) || holding(H, BJ))) {
     if (!f.chg) S.ev.push({ k: 'chg', s: f.i, id: m.id });
-    f.chg++; f.t--; f.vx = 0; f.vz = 0;
+    f.chg++; f.t--; f.vx = m.charge.v ? m.charge.v * f.face : 0; f.vz = 0;   // charge.v：集氣中往前挪（象腳踏地抬著腳往前蹬）
     if (f.chg === m.charge.max) S.ev.push({ k: 'chgmax', s: f.i, id: m.id });
     return;
   }
@@ -555,8 +568,11 @@ function atkStep(S, f, C) {
   }
   if (m.hurl && f.t === m.hurl.at) hurlItem(S, f, m.hurl);
   if (m.spawn && f.t === m.spawn.at) {
-    const x = Math.max(S.lo + 300, Math.min(S.hi - 300, f.x + f.face * m.spawn.x));
-    spawnItem(S, m.spawn.k, x, f.z).own = f.i;
+    if (m.spawn.hold && f.item < 0) giveItem(S, f, m.spawn.k).own = f.i;   // hold：直接拿在手上（黃狗叼著骨頭）
+    else {
+      const x = Math.max(S.lo + 300, Math.min(S.hi - 300, f.x + f.face * m.spawn.x));
+      spawnItem(S, m.spawn.k, x, f.z).own = f.i;
+    }
   }
   if (m.wpn && !f.con && f.t === m.hits[m.hits.length - 1].on[1] + 1) wear(S, f, WEAR_SWING);   // 武器揮空也磨
   if (!f.air) {
@@ -609,7 +625,7 @@ function atkStep(S, f, C) {
     if (p.fan) {
       // 好幾個方向各一支（苦無）：往前那支照 face，往前後的照 fan 的第二格；curl 的每支錯開
       p.fan.forEach(([fx, fz], j) => {
-        const e = j ? { ...q, id: S.pid++ } : q;
+        const e = j ? { ...q, id: S.pid++, ...(q.hl ? { hl: [] } : {}) } : q;   // 穿人的每支各記各的打過誰（三道聲波貼臉一起中）
         e.vx = ((p.vx * fx) / 1000 | 0) * f.face; e.vz = (p.vx * fz) / 1000 | 0;
         e.x = f.x + ((f.face * p.x * fx) / 1000 | 0); e.z = f.z + ((p.x * fz) / 1000 | 0);
         if (p.curl) e.cu = j;
@@ -667,8 +683,8 @@ function atkStep(S, f, C) {
   // 指令投抓到之後：先把人捲到身前，到 at 幀丟出去（back 往背後甩）。
   // sw：甩出去之前按攻換成掄人那招；orbit：抓著的人繞著身體轉，at 幀往面向那邊丟；slam：空中抓到的往下拉，at 幀往地上砸
   if (m.grip) {
-    const o = f.hold >= 0 ? S.p[f.hold] : null, G = m.grip;
-    if (o && o.act === 'grabbed') {
+    const G = m.grip, all = heldBy(S, f), o = all[0];
+    if (o && o.i === f.hold) {
       let k;
       if (G.sw && f.t < G.at && f.mp >= G.sw.mp && !command(H) && (k = pressed(H, BA)) >= 0) {
         consume(H, k);
@@ -677,32 +693,39 @@ function atkStep(S, f, C) {
         S.ev.push({ k: 'ext', s: f.i, id: G.sw.to, n: 1 });
         return;
       }
-      const R = C.w + CHARS[o.ch].w - 80;
-      if (f.t < G.at) {
-        if (G.orbit) {
-          const [cx, cz] = ORBIT[((f.t + 64 - G.at) >> 1) & 7], r = R + 330;
-          o.x = f.x + f.face * ((cx * r) / 1000 | 0); o.z = f.z + ((cz * r * 3) / 4000 | 0); o.y = 350;
-        } else {
-          const want = f.x + f.face * R, r = G.reel;
-          o.x += Math.max(-r, Math.min(r, want - o.x));
-          o.z += Math.max(-(r >> 1), Math.min(r >> 1, f.z - o.z));
-          o.y = G.slam ? Math.max(G.slam, o.y - r) : 0;
+      if (f.t === G.at && G.orbit) { const ox = dirX(f.H); if (ox) f.face = ox; }
+      all.forEach((v, j) => {
+        const R = C.w + CHARS[v.ch].w - 80;
+        if (f.t < G.at) {
+          if (G.orbit) {                                 // 好幾個人的時候平均分在圈上
+            const [cx, cz] = ORBIT[(((f.t + 64 - G.at) >> 1) + ((j * 8) / all.length | 0)) & 7], r = R + 330;
+            v.x = f.x + f.face * ((cx * r) / 1000 | 0); v.z = f.z + ((cz * r * 3) / 4000 | 0); v.y = G.lift || 350;
+          } else {
+            const want = f.x + f.face * R, r = G.reel;
+            v.x += Math.max(-r, Math.min(r, want - v.x));
+            v.z += Math.max(-(r >> 1), Math.min(r >> 1, f.z - v.z));
+            v.y = G.slam ? Math.max(G.slam, v.y - r) : 0;
+          }
+          v.face = v.x >= f.x ? -1 : 1;
+          if (!j) v.face = -f.face;
+          pinStage(S, v);
+        } else if (f.t === G.at) {
+          // 第一個往面向那邊（orbit 時按著左右可換邊）；一起抓的其他人往各自在的那邊飛出去
+          const dir = j ? (v.x >= f.x ? 1 : -1) : f.face;
+          if (G.orbit && !j) { v.x = f.x + f.face * R; v.z = f.z; pinStage(S, v); }
+          v.hp -= (G.dmg * f.pow / 100) | 0; if (v.hp < 0) v.hp = 0;
+          v.hold = -1;
+          v.act = 'fall'; v.t = 0; v.air = 1; v.vz = 0; v.fallv = 0;
+          if (G.slam) { v.y = Math.max(v.y, 300); v.vx = dir * G.vx; v.vy = -G.vy; }
+          else { v.y = G.orbit ? v.y : 10; v.vx = (G.back ? -dir : dir) * G.vx; v.vy = G.vy; }
+          v.mv = ''; v.by = f.i; v.bh = 0; v.bnc = 0; v.face = G.back ? dir : -dir;
+          for (let i = 0; i < m.hits.length; i++) if (!f.hitList.includes(i * 16 + v.i)) f.hitList.push(i * 16 + v.i);   // 這招自己的打擊（掄、震波）不打被抓的人
+          S.ev.push({ k: 'hit', s: f.i, d: v.i, x: v.x, y: G.slam ? 300 : 800, z: v.z, big: 1, dmg: G.dmg, kind: 'sp', stop: 8 });
         }
-        o.face = -f.face;
-        pinStage(S, o);
-      } else if (f.t === G.at) {
-        if (G.orbit) { const ox = dirX(f.H); if (ox) f.face = ox; o.x = f.x + f.face * R; o.z = f.z; pinStage(S, o); }
-        o.hp -= (G.dmg * f.pow / 100) | 0; if (o.hp < 0) o.hp = 0;
-        f.hold = -1; o.hold = -1;
-        o.act = 'fall'; o.t = 0; o.air = 1; o.vz = 0; o.fallv = 0;
-        if (G.slam) { o.y = Math.max(o.y, 300); o.vx = f.face * G.vx; o.vy = -G.vy; }
-        else { o.y = G.orbit ? o.y : 10; o.vx = (G.back ? -f.face : f.face) * G.vx; o.vy = G.vy; }
-        o.mv = ''; o.by = f.i; o.bh = 0; o.bnc = 0; o.face = G.back ? f.face : -f.face;
-        for (let i = 0; i < m.hits.length; i++) if (!f.hitList.includes(i * 16 + o.i)) f.hitList.push(i * 16 + o.i);   // 這招自己的打擊（掄、震波）不打被抓的這個
-        S.ev.push({ k: 'hit', s: f.i, d: o.i, x: o.x, y: G.slam ? 300 : 800, z: o.z, big: 1, dmg: G.dmg, kind: 'sp', stop: 8 });
-      }
-    } else f.hold = -1;
-    if (f.t >= m.total - 1) { f.hold = -1; toFree(f); }
+      });
+      if (f.t === G.at) f.hold = -1;
+    } else release(S, f);                                // 第一個不見了（不該發生）：其他一起抓的也放掉，不會一直卡在被抓
+    if (f.t >= m.total - 1) { release(S, f); toFree(f); }
     return;
   }
   // 抓著打、丟：對手是抓住的那個

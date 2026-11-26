@@ -53,7 +53,7 @@ const SU = [
   { id: 'surge', name: '深海霸氣', yomi: 'shinkai haki', d: 'u', btn: 'J', note: '前方大範圍，被防仍鎖住。浪頭可跳過，連打攻追加',
     m: mv('surge', '深海霸氣', 100, { kind: 'su', mp: 400, flash: 1, inv: [0, 16], mash: { at: 54, to: 39, n: 2, mp: 60 },
       sweep: { on: [16, 48], to: 6500, near: 3000, low: 700 },
-      hits: multi(16, 8, 6, BEAM, 34, 80, { zr: 650 }).map((h) => ({ ...h, on: [h.on[0], h.on[0] + 7] })) }) },
+      hits: multi(16, 8, 6, BEAM, 31, 75, { zr: 650 }).map((h) => ({ ...h, on: [h.on[0], h.on[0] + 7] })) }) },   // 2026-11-26 壓一點（對戰每場打 850–1040，別隻的大絕一半）：每下 34→31、最後 80→75（試過 28／70，對戰掉到四成四）。前後寬度試過 650→480，闖關清不掉被圍的雜兵，留著
 ];
 
 export default {

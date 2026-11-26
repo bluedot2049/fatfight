@@ -23,12 +23,12 @@ const N = {
 
 // 吐火：長嘴往下垂，火是斜斜往前掃地面（框矮，跳得過、蹲著躲不掉）。按住攻一直噴、按上下擺頭；被擋也一下一下鎖住
 const FLAME = [150, 0, 1600, 700];
-const puff = (t) => hit([t, t + 1], FLAME, 'S', { dmg: 16, fall: 0, hs: 16, stop: 2, bdef: 3, dvx: 3, zr: 300, fire: 1 });
+const puff = (t) => hit([t, t + 1], FLAME, 'S', { dmg: 20, fall: 0, hs: 16, stop: 2, bdef: 3, dvx: 3, zr: 300, fire: 1 });   // 2026-11-26 每口 16→20、最後一口 30→36（企鵝電腦互打墊底，中距離的主力加一點）
 const SP = [
   { id: 'breath', name: '吐火', yomi: 'fuka', d: 'f', btn: 'A', note: '貼地火焰。長按攻持續，上下調方向',
     m: mv('breath', '吐火', 36, { kind: 'sp', mp: 120, pose: 'breath', keep: { at: 22, to: 10, n: 4, mp: 30 }, aim: [10, 900],
       hits: [puff(8), puff(12), puff(16), puff(20),
-        hit([25, 27], FLAME, 'S', { dmg: 30, kd: 1, dvx: 24, dvy: 52, stop: 8, bdef: 8, zr: 300, fire: 1 })] }) },
+        hit([25, 27], FLAME, 'S', { dmg: 36, kd: 1, dvx: 24, dvy: 52, stop: 8, bdef: 8, zr: 300, fire: 1 })] }) },
   // 火球：拋出去，落地（或打到人）變成一片地上的火，燒一下才熄。拋物線越過前面的人
   { id: 'fireball', name: '火球', yomi: 'kakyu-', d: 'f', btn: 'J', note: '拋物線火球，落地留火',
     m: mv('fireball', '火球', 34, { kind: 'sp', mp: 130, pose: 'toss',
@@ -41,9 +41,9 @@ const SP = [
         boom: { w: 300, h: 1000, t: 12, dmg: 90, kd: 1, dvx: 8, dvy: 110, fire: 1 } } }) },
   // 對空：不跳，用力踩地板，身前的地上噴出火來往上衝
   { id: 'firestomp', name: '踏火衝天', yomi: 'to-ka sho-ten', d: 'u', btn: 'A', note: '對空火柱。出招無敵',
-    m: mv('firestomp', '踏火衝天', 34, { kind: 'sp', mp: 150, pose: 'firestomp', inv: [1, 8], quake: [5],
-      hits: [hit([5, 8], [100, 0, 760, 1800], 'S', { dmg: 40, fall: 0, hs: 22, stop: 6, dvx: 4, dvy: 70, fire: 1 }),
-        hit([11, 15], [100, 0, 760, 2100], 'S', { dmg: 66, kd: 1, dvx: 10, dvy: 120, stop: 12, fire: 1 })] }) },
+    m: mv('firestomp', '踏火衝天', 34, { kind: 'sp', mp: 150, pose: 'firestomp', inv: [1, 11], quake: [5],
+      hits: [hit([5, 8], [-200, 0, 950, 1800], 'S', { dmg: 40, fall: 0, hs: 22, stop: 6, dvx: 4, dvy: 70, fire: 1 }),
+        hit([11, 15], [-200, 0, 950, 2100], 'S', { dmg: 66, kd: 1, dvx: 30, dvy: 120, stop: 12, fire: 1 })] }) },   // 2026-11-26：被貼上的脫身招，前面 760→950、背後也燒得到、無敵 1–8→1–11、最後一下把人往外燒開
 ];
 
 // 地獄之門：身前立起一扇門，面無表情打開，裡面噴出一整排火往前推（整排都高，跳不過；前後比海牛的浪窄）。被擋也一下一下鎖住
@@ -61,6 +61,8 @@ export default {
   pal: ['#ff6a2a', '#5a1608'], card: { attr: '火', type: '冷面法師', lv: 5, art: 'fire' },
   voice: { f0: 100, size: 1.0, mora: 0.13 },
   w: 320, h: 1550, hc: 980,
-  walkX: 14, walkZ: 10, run: 40, runZ: 8, jumpV: 146, jumpX: 17, jumpZ: 11, dashV: 98, dashX: 54,
+  walkX: 16, walkZ: 11, run: 44, runZ: 9,   // 2026-11-26 14→16、40→44（原本跟鼻象一樣全場最慢，遠攻的要能換位置）
+  jumpV: 146, jumpX: 17, jumpZ: 11, dashV: 98, dashX: 54,
+  ai: { style: 'zone', esc: 'firestomp' },   // 電腦的打法：遠攻（ai.js STYLE）；被貼上用踏火衝天頂開
   normals: N, specials: SP, supers: SU,
 };

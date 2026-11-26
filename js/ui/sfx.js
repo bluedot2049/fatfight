@@ -337,9 +337,10 @@ KIT.elephant = {
   super(t) {
     trumpet(t, 1.1, 220); trumpet(t + 0.22, 0.8, 330);
     rumble(t, 0.5, 0.5, 90, 1);
-    const r = t + 0.5;                                                         // 定格結束：一路踩過去
-    for (let i = 0; i < 6; i++) { tone(r + i * 0.13, 0.25, 85, 32, 0.8); noise(r + i * 0.13, 0.12, 300, 0.8, 0.4, 'lowpass'); }
-    rumble(r, 1.2, 0.6, 100); trumpet(r + 0.1, 0.7, 250);
+    const r = t + 0.5;                                                         // 定格結束：鼻子掃一圈、掄兩圈（呼呼呼）、砸地
+    for (let i = 0; i < 6; i++) noise(r + i * 0.13, 0.14, 500, 1.4, 0.3, 'bandpass', 1500 + i * 150);
+    trumpet(r + 0.1, 0.7, 250);
+    tone(r + 0.62, 0.4, 80, 28, 0.9); rumble(r + 0.62, 0.8, 0.6, 90); noise(r + 0.62, 0.3, 260, 0.8, 0.45, 'lowpass');
   },
   hit(t, big, su) {
     tone(t, 0.28, 130, 40, 0.6); noise(t, 0.16, 500, 0.8, 0.35, 'lowpass');

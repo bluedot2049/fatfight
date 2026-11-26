@@ -37,6 +37,7 @@ function trunkAim(m, p) {
   if (id === 'skygrab') { const h = m.hits[0]; return { k: ramp(t, h.on[0], h.on[1]), x: (h.box[0] + h.box[2]) >> 1, y: h.box[3] - 150 }; }
   if (id === 'rock') { const at = m.hurl.at; return t <= at ? { k: Math.min(1, t / 4), x: 650, y: 0 } : { k: Math.max(0, 1 - (t - at) / 8), x: 450, y: 1700 }; }   // 插進土裡 → 甩上去
   if (id === 'skyT') return { k: Math.max(0, 1 - (t - m.grip.at) / 8), x: 650, y: 150 };     // 砸完鼻子還按在地上一下
+  if (id === 'kingspin') { const h = m.hits[0]; return { k: ramp(t, h.on[0], h.on[1] + 2, 6), x: 1400, y: 500 }; }   // 象王大掄：鼻子拉直、身體轉一圈掃過去
   if (id === 'trunkS' || id === 'trunkT') return { k: Math.max(0, 1 - (t - m.grip.at) / 6), x: 800, y: 900 };
   if (m.wpn) {                                       // 鼻子捲著武器揮：起手鼻子往上往後提，打出去往前送（武器的方向 items.js 另外算）
     const a0 = m.hits[0].on[0], a1 = m.hits[m.hits.length - 1].on[1], up = t < a0, k = Math.min(1, (t + 1) / 3) * (t > a1 + 2 ? Math.max(0, 1 - (t - a1 - 2) / 8) : 1);
@@ -144,7 +145,7 @@ export class View {
       this.fighters[i] = this.make(p, key, m, alt);
     });
   }
-  drop(f) { this.scene.remove(f.model.root, f.shadow, f.beam, ...f.stars); if (f.herd) for (const g of f.herd.g) this.scene.remove(g.m.root, g.d.root); if (f.ghost) this.scene.remove(f.ghost.m.root, f.ghost.d.root); if (f.mark) this.scene.remove(f.mark.arc, ...(f.mark.lab ? [f.mark.lab] : [])); if (f.lane) this.scene.remove(f.lane.m); }
+  drop(f) { this.scene.remove(f.model.root, f.shadow, f.beam, ...f.stars); if (f.ghost) this.scene.remove(f.ghost.m.root, f.ghost.d.root); if (f.mark) this.scene.remove(f.mark.arc, ...(f.mark.lab ? [f.mark.lab] : [])); if (f.lane) this.scene.remove(f.lane.m); }
   make(p, key, mk, alt) {
     const model = BUILD[p.ch]();
     if (p.mini && !CHARS[p.ch].npc) shade(model.root);
@@ -673,34 +674,18 @@ export class View {
       }
     }
   }
-  // 鼻象：拔石頭前鼻子插進土裡揚土；萬象奔騰背後衝出一群象的影子
+  // 鼻象：拔石頭前鼻子插進土裡揚土；象王大掄地上一圈、掄人捲起塵土
   elephantFx(S, p, v, m) {
     const id = m && (m.pose || m.id);
     if (id === 'rock' && p.t > 3 && p.t < m.hurl.at && v.fxT % 2 === 0) {
       const x = (p.x + p.face * 650) * U;
       this.fx.dust(x, 0, 2, '#5a4636', p.z * U); this.fx.speck(x, 0.1, '#7a6a5c', 1.4, p.z * U, 5);
     }
-    if (p.ch !== 'elephant' && !v.herd) return;
-    const on = id === 'stampede' && p.t >= m.vx[1][0] - 2;
-    if (on && !v.herd) v.herd = this.makeHerd(p);
-    if (!v.herd) return;
-    const H = v.herd, end = on ? m.vx[m.vx.length - 1][0] : 0;
-    H.a += ((on ? (p.t < end + 6 ? 0.42 : Math.max(0, 0.42 * (1 - (p.t - end - 6) / 24))) : 0) - H.a) * 0.25;
-    H.mat.opacity = H.a;
-    for (const g of H.g) {
-      g.m.root.visible = g.d.root.visible = H.a > 0.02;
-      if (!g.m.root.visible) continue;
-      const run = p.t < end + 4;
-      const s = Math.sin((S.f + g.ph) * 0.55);
-      const pose = run ? { ...ZERO, lean: 0.3, head: -0.2, by: 0.06 * Math.abs(s), lN: 1.0 * s, lF: -1.0 * s, aN: 0.5 * s, aF: -0.5 * s }
-        : { ...ZERO, lN: -0.1, sq: -0.2, lean: 0.12, aN: 0.4, aF: 0.4, head: 0.15, by: 0.02 * Math.abs(s) };
-      const lag = run ? g.dx : g.dx * 0.6;
-      for (const mm of [g.m, g.d]) {
-        applyPose(mm, pose);
-        mm.root.position.set((p.x - p.face * lag) * U, 0, (p.z + g.dz) * U);
-        mm.root.scale.set(p.face * g.s, g.s, g.s);
-      }
-      if (run && v.fxT % 3 === g.i) this.fx.dust(g.m.root.position.x, 0, 1, null, g.m.root.position.z);
+    // 象王大掄：鼻子掃一圈的時候地上亮一圈；掄的時候被甩的人底下一圈塵土捲起來
+    if (id === 'kingspin' && p.t >= 1 && p.t <= m.hits[0].on[1] + 2 && v.fxT % 2 === 0) this.fx.groundRing(p.x * U, p.z * U, CHARS[p.ch].pal[0], (m.hits[0].box[2] + 300) * U, 0.35);
+    if (m && m.id === 'kingT' && p.t < m.grip.at && v.fxT % 2 === 0) {
+      const a = p.t * 0.8;
+      this.fx.dust((p.x + Math.cos(a) * 1000) * U, 0, 1, '#5a4636', (p.z + Math.sin(a) * 700) * U);
     }
   }
   // 爛熊：幻術一道紫光沿著地板竄過去、竄到的那排人腳下亮一圈；豪火球起手嘴前一團火越吸越大；
@@ -832,21 +817,6 @@ export class View {
       if (q.t % 3 === 0) this.fx.embers(x, y, z, 2, q.w * U);
     }
   }
-  // 萬象奔騰的象群：三隻同一個模型的半透明剪影（自己的顏色），跟在後面前後錯開。
-  // 每隻兩份：先畫一份只寫深度的，再畫一份顏色的只留最前面那層（不然每顆球、描邊疊在一起變成一團泡泡）
-  makeHerd(p) {
-    const mat = new THREE.MeshBasicMaterial({ color: CHARS[p.ch].pal[0], transparent: true, opacity: 0, depthWrite: false, depthFunc: THREE.LessEqualDepth });
-    const pre = new THREE.MeshBasicMaterial({ colorWrite: false });
-    const one = (mt, ro) => {
-      const m = BUILD[p.ch]();
-      m.root.traverse((o) => { if (o.isMesh) { o.material = mt; o.renderOrder = ro; } });
-      m.root.visible = false;
-      this.scene.add(m.root);
-      return m;
-    };
-    const g = [[700, -650, 0.9], [1300, 600, 0.95], [1900, -150, 0.85]].map(([dx, dz, sc], i) => ({ m: one(mat, 11), d: one(pre, 10), dx, dz, s: sc, ph: i * 7, i }));
-    return { g, mat, a: 0 };
-  }
   // 臘腸狗：長長長臘腸（前半身往前推、中間拉長；拉的時候轉成正側面，不然會往鏡頭伸）、甩耳旋風耳朵往外甩、鑽褲襠揚土、埋骨頭扒土
   dogFx(S, p, v, m) {
     const M = v.model, id = m && (m.pose || m.id);
@@ -878,10 +848,10 @@ export class View {
     const x = q.x * U, y = q.y * U, z = q.z * U;
     if (!m) { m = soundMesh(); m.userData.gr = 1; this.projs.set(q.id, m); this.scene.add(m); }
     m.position.set(x, y, z);
-    const dir = Math.sign(q.vx) || 1;
+    const sp = Math.hypot(q.vx, q.vz || 0) || 1, ux = q.vx / sp, uz = (q.vz || 0) / sp;   // 三道散射的聲波：尾巴的波紋沿著自己飛的方向拖
     m.children.forEach((s, i) => {
-      const k = ((q.t * 0.12 + i / 3) % 1);
-      s.position.set(-dir * (0.15 + i * 0.22), 0, 0);
+      const k = ((q.t * 0.12 + i / 3) % 1), d = 0.15 + i * 0.22;
+      s.position.set(-ux * d, 0, -uz * d);
       s.scale.set(0.28 + i * 0.06, (0.55 + i * 0.22) * (0.9 + 0.2 * k), 1);
       s.material.opacity = (0.95 - i * 0.25) * (1 - 0.3 * k);
     });

@@ -65,5 +65,6 @@ export default {
   frail: 110,                 // 弱點：挨打多扣一成（投稿表「得癌症，防禦力很弱」）
   // 被動：每 10 秒從最近的敵人背後飛來一群烏鴉，穿過去（不痛，打斷人）
   crow: { every: 600, far: 2400, v: 64, y: 1000, w: 260, h: 220, dmg: 12, fall: 20, life: 80 },
+  ai: { style: 'zone', esc: 'fireball' },   // 電腦的打法：遠攻（ai.js STYLE）；被貼上用 fireball 頂開
   normals: N, specials: SP, supers: SU,
 };

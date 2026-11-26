@@ -4,7 +4,7 @@
 
 import { Z_REACH, DIZZY, KNOCK, BREAK, MP, MP_GAIN, BODY_V, PUSH_Z, BD, JD_WIN, JD_WIN_Q, JD_LOCK, JD_RECOIL, JD_PUSH, JD_STOP, GANG_T } from './const.js';
 import { CHARS, MOVES } from './chars/index.js';
-import { moveOf, strikeInv, isUnder, setAct, release, startMove, GUARD_MIN, crackBoom, grabStart } from './fighter.js';
+import { moveOf, strikeInv, isUnder, setAct, release, startMove, GUARD_MIN, crackBoom, grabStart, grabAlso } from './fighter.js';
 import { itemHits, wear, dropItem, wallBlocks } from './item.js';
 import { WEAR_HIT, WPN_KNOCK } from './items.js';
 import { hitBoxes } from './moves.js';
@@ -261,16 +261,20 @@ export function resolveHits(S, booms = []) {
       }
     }
   }
+  const multi = new Set();               // 這一幀用 all 的指令投抓到第一個人的（同一下框裡的其他人跟著一起抓）
   for (const [a, d, h, kind, i, m] of found) {
     if (h.skip !== undefined && a.hitList.includes(h.skip * 16 + d.i)) continue;   // 裡圈打過的，外圈不再打
     a.hitList.push(i * 16 + d.i);
     if (!hittable(d)) continue;          // 同一幀被兩個人打，第一下打倒了就不再算
-    if (h.grab) {                        // 指令投：擋不住；倒地、已經被抓的抓不到；一次只抓一個。grab 1 只抓地上的，grab 2 只抓空中的（會飛的浮著也算）
+    if (h.grab) {                        // 指令投：擋不住；倒地、已經被抓的抓不到；一次只抓一個（all 1＝框裡的全抓）。grab 1 只抓地上的，grab 2 只抓空中的（會飛的浮著也算）
       const up = d.air || d.y > 0;
-      if ((h.grab === 2 ? !up : up) || d.hold >= 0 || a.hold >= 0 || a.mv !== m.id || d.act === 'fall' || d.act === 'down' || d.act === 'getup') continue;
+      if ((h.grab === 2 ? !up : up) || d.hold >= 0 || d.act === 'fall' || d.act === 'down' || d.act === 'getup') continue;
+      if (h.all && multi.has(a.i)) { grabAlso(S, a, d); continue; }
+      if (a.hold >= 0 || a.mv !== m.id) continue;
       grabStart(S, a, d);
       startMove(S, a, MOVES[a.ch][m.then]);
       a.hold = d.i;
+      if (h.all) multi.add(a.i);
       continue;
     }
     applyHit(S, a, d, h, kind, h.rear ? d.x - d.face * 100 : a.x, false, m);   // rear：從被打的人背後打來（幻術）

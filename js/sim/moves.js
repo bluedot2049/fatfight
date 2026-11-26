@@ -35,7 +35,11 @@ import { MAG_L, MAG_H } from './const.js';
 //         at 幀往面向那邊丟（那幀按著左右就往那邊）；slam 1＝空中抓到的往下拉、at 幀往地上砸（會彈地），招式的 hits 打不到被抓的那個
 //   hurl { at, k, vx, vy, y }：at 幀從地上拔出一個 k（items.js）直接丟出去（算自己丟的，按上下往前後偏）；落地留著誰都撿得到。
 //         一隻一次只有一個自己拔的，再拔的話舊的碎掉
-//   角色表的 near { r, m }：前後有站著的敵人離身體邊緣 r 以內，攻改出 normals[m]（鼻象貼身搧耳朵；不輪 A1 A2）
+//   角色表的 near { r, m }：前後有站著的敵人離身體邊緣 r 以內，攻改出 normals[m]（不輪 A1 A2；鼻象的耳朵搧 2026-11-26 拿掉了，現在沒人用）
+//   鼻象（2026-11-26 近身重做）：
+//   charge 的 v＝集氣中每幀往前挪多快（象腳踏地抬著腳往前蹬，集越久走越遠）
+//   hits 的 grab 寫 all 1＝這一下框裡的人全抓（第一個照平常，其他的一起被抓著；象王大掄）。grip 照樣算：orbit 的話平均分在圈上一起轉，
+//         at 幀第一個往面向那邊、其他人往各自在的那邊丟出去；grip 的 lift＝掄的時候舉多高（沒寫 350）
 //   企鵝（火）：
 //   hits 的 fire 1＝打倒的人著火（f.burn，飛出去撞到人也點著；落地就熄，不扣血）。飛行道具、boom 也能寫 fire
 //   keep  { at, to, n, mp }：到 at 幀還按著攻，跳回 to 幀接著噴（最多 n 次，每次扣 mp；放開或沒魔力就收）
@@ -47,7 +51,7 @@ import { MAG_L, MAG_H } from './const.js';
 //   proj 的 pierce 1＝穿過去（打到人不消失，每個人打一次；也不跟別的飛行道具互消）
 //   flip  第幾幀轉身（鑽過去之後回頭咬）
 //   sweep 的 head＝只有最前面這麼長打得到（咬），咬到人前緣就停在那裡（f.sf）；back [起,迄]＝這段時間前緣縮回來；hurt 1＝受擊框跟著前緣拉長（整條身體都挨得到打）
-//   spawn { at, k, x }：at 幀在身前 x 放一個地上的東西 k（items.js；一隻一次只能有一個自己放的）
+//   spawn { at, k, x, hold }：at 幀在身前 x 放一個地上的東西 k（items.js；一隻一次只能有一個自己放的）；hold 1＝直接拿在手上（黃狗叼骨頭）
 //   第三關（黑森林）：
 //   角色表的 fly＝會飛的（貓頭鷹）：能動的時候浮在這個高度，地上的拳打不到；在空中被打到一定掉下來（躺完再飛起來）
 //   fy   [[從第幾幀, 每幀高度變多少], …]：會飛的出這招時往下衝、往上拉（不過節奏換算；高度夾在 0 到 fly 之間）
@@ -103,7 +107,7 @@ function tune(m) {
   if (m.aim) m.aim = [ZM(m.aim[0]), m.aim[1]];
   if (m.hang) m.hang = T(m.hang);
   if (m.mash) m.mash = { ...m.mash, at: T(m.mash.at), to: T(m.mash.to) };
-  if (m.charge) m.charge = { at: T(m.charge.at), max: T(m.charge.max) };
+  if (m.charge) m.charge = { at: T(m.charge.at), max: T(m.charge.max), ...(m.charge.v ? { v: MOVE_V(m.charge.v) } : {}) };
   if (m.pull) m.pull = { ...m.pull, on: R(m.pull.on), v: MOVE_V(m.pull.v) };
   if (m.it) m.it = { ...m.it, at: T(m.it.at) };
   if (m.grip) m.grip = { ...m.grip, at: T(m.grip.at), reel: MOVE_V(m.grip.reel) };

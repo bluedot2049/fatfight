@@ -42,7 +42,7 @@ const lvOf = (A) => (A.mob ? MOB[Math.min(A.lv, MOB.length - 1)] : LV[A.lv]);
 
 export function newAI(lv, seed, mob = 0) {
   return { lv: Math.max(0, Math.min(LV_MAX, lv | 0)), mob: mob ? 1 : 0, r: (seed >>> 0) || 1, q: [], plan: 'walk', pt: 0, tgt: -1, seen: -1, seenP: -1, seenJ: -1, gt: 0, chain: 0, cx: -1, gc: 0, last: 0, eng: 0, seenF: -1, fg: 0, iw: 0,
-    tok: 0, rest: 0, wk: 0, wkS: -1, pd: 0, bj: -1, bjAt: -1, ig: 0, ib: 0, sx: 1, sxT: -1 };   // tok 攻擊權到第幾幀、rest 退開到第幾幀、wk 躺著要怎麼起來、pd 被格檔過（多用吹飛）、bj 爆氣看過哪一招、ig 正走去撿東西、ib 放棄撿東西到第幾幀、sx 對方在哪一邊（左右差很小時沿用）
+    tok: 0, rest: 0, wk: 0, wkS: -1, pd: 0, bj: -1, bjAt: -1, ig: 0, ib: 0, sx: 1, sxT: -1, fz: 0, esc: 0 };   // tok 攻擊權到第幾幀、rest 退開到第幾幀、wk 躺著要怎麼起來、pd 被格檔過（多用吹飛）、bj 爆氣看過哪一招、ig 正走去撿東西、ib 放棄撿東西到第幾幀、sx 對方在哪一邊（左右差很小時沿用）
 }
 
 // 亂數 0–255
@@ -73,6 +73,17 @@ function projFar(p) {
   while (y > 0 && t < p.life) { y += vy; vy -= p.lob.g; t++; }
   return p.x + p.vx * t;
 }
+// 打法（角色表 ai.style）：plan 裡各種選擇的份量怎麼調（/16，16＝不變）。
+//   rush 突進（胖鼠、黃狗）：多跑、少等少退，衝過去的必殺用得兇
+//   zone 遠攻（企鵝、爛熊）：飛行道具放得勤、少跑。試過站遠（身體之間 2 公尺）和被貼上往後滾：退到牆邊、滾完的硬直被打，同級只贏一成，拿掉了；
+//         脫身靠招式本身（起手打不到的招），不靠電腦跑
+//   grab 重投（鼻象）：一步一步往前壓、不退、少跳，到鼻子的距離就捲
+const STYLE = {
+  mid: { run: 16, wait: 16, back: 16, jump: 16, far: 16, rush: 16 },
+  rush: { run: 32, wait: 8, back: 6, jump: 16, far: 16, rush: 40 },
+  zone: { run: 8, wait: 16, back: 16, jump: 12, far: 32, rush: 12 },
+  grab: { run: 10, wait: 6, back: 2, jump: 6, far: 16, rush: 12 },
+};
 const REACH = {};
 // 角色的必殺分成三種：far 飛行道具、air 對空（起手無敵＋往上跳）、rush 衝過去的；超必殺另外一欄
 export const KIT = {};
@@ -90,9 +101,24 @@ for (const C of ALL) {
     heal: C.specials.filter((s) => s.m.spawn),                       // 放吃的（臘腸狗埋骨頭）：血少、離得遠的時候放，之後撿起來吃（itemAI）
     jump: C.ai?.jump ?? 0,           // 愛跳多少（想下一步時「跳」的份量多這麼多；青蛙）
     flank: C.ai?.flank ?? 0,         // 繞背（狐狸）：對方面向我的時候先往前後錯開、跑到背後才出手
-    keep: C.ai?.keep ?? 0,           // 喜歡站多遠（身體之間的空隙）；角色表可以寫 ai: { keep }。站遠吐泡泡的海牛試過，會被胖鼠衝進來打爆
+    keep: C.ai?.keep ?? 0,   // 喜歡站多遠（身體之間的空隙）；角色表可以寫 ai: { keep }。站遠吐泡泡的海牛試過，會被胖鼠衝進來打爆（沒有脫身的辦法）
+    esc: C.ai?.esc ? C.specials.find((q) => q.id === C.ai.esc) : null,   // 被貼上用哪招頂開（角色表 ai.esc；遠攻的）
+    style: C.ai?.style || 'mid',     // 打法（2026-11-26 使用者：突進和非突進分開想）：rush 突進、zone 遠攻、grab 重投、mid 中間（灰牛）。見 STYLE
   };
 }
+
+// 對方的角色表寫了 ai.zone（鼻象：有大絕的魔力時身邊是死地）：現在算不算數，算的話回傳不能進的距離（身體之間），不然 0。
+// 對方收招、倒著、頭暈、被抓、在空中的時候不怕（那是衝進去打的時候）
+function zoneOf(o) {
+  const Z = CHARS[o.ch].ai?.zone;
+  if (!Z || o.mp < Z.mp || o.air || HELPLESS.has(o.act) || punishable(o)) return 0;
+  return Z.r;
+}
+// 怕的機率（/256）：FEAR + 難度 × FEAR_LV、雜兵 FEAR_MOB；怕的時候想下一步「跳進去」多 FEAR_JUMP 的份量
+const ESCAPE = 700, ESCAPE_GAP = 50;  // 遠攻的被貼到身體之間這麼近，就想放起手打不到的招頂開（每次隔 ESCAPE_GAP 幀才想一次）
+const FEAR = 70, FEAR_LV = 14, FEAR_MOB = 120, FEAR_JUMP = 24;
+// 抓地上的指令投（鼻子捲、象王大掄）：對方在空中、倒著就別出（一定揮空）
+const grabMiss = (s, o) => s.m.hits.some((h) => h.grab === 1) && (o.air || o.y > 0 || LYING.has(o.act));
 
 // 道具（items.js）：回傳要按的鍵，-1＝不管道具照平常打
 function itemAI(S, f, A, rx, adz, tw, zb) {
@@ -382,9 +408,18 @@ function decide(S, f, A) {
         return tw;
       }
       const crowd = !f.mini && engaged(S, f, o) >= 2;      // 雜兵改走攻擊權（hasTok），這條留給頭目、合作的電腦
-      const keep = crowd ? 2600 : K.keep;
-      if ((o.act === 'guard' || o.act === 'block') && K.grab.length && rnd(A) < L.sp) {
-        for (const s of K.grab) if (f.mp >= s.m.mp && inR2(R[s.m.id], rx, adz)) { A.q = cmd(s, tw); return A.q.shift(); }
+      let keep = crowd ? 2600 : K.keep;
+      const zr = A.fz ? zoneOf(o) : 0;                    // 怕鼻象（這次想下一步的時候決定的）：站在死地外面
+      if (zr) keep = Math.max(keep, zr + 250);
+      const gap0 = rx - CHARS[f.ch].w;
+      // 被貼上：放角色表 ai.esc 那招頂開（爛熊豪火球、企鵝吐火）。往後滾試過，滾完的硬直被打，更慘
+      if (K.esc && gap0 < ESCAPE && !HELPLESS.has(o.act) && S.f > A.esc && rnd(A) < (L.sp >> 1) + 8) {
+        A.esc = S.f + ESCAPE_GAP;
+        if (f.mp >= K.esc.m.mp) { A.q = cmd(K.esc, tw); return A.q.shift(); }
+      }
+      const grabP = o.act === 'guard' || o.act === 'block' ? L.sp : K.style === 'grab' && o.act !== 'atk' ? L.sp >> 5 : 0;   // 重投的：對方站著不動也偶爾捲
+      if (grabP && K.grab.length && rnd(A) < grabP) {
+        for (const s of K.grab) if (f.mp >= s.m.mp && inR2(R[s.m.id], rx, adz) && !grabMiss(s, o)) { A.q = cmd(s, tw); return A.q.shift(); }
       }
       if (RW) {                                           // 拿著武器：夠得到就揮，不然停在武器的尖端那麼遠（太近退一點）
         if (inR(RW) && rnd(A) < L.aggr) return tell(S, f, A, BA | tw);
@@ -393,8 +428,7 @@ function decide(S, f, A) {
       }
       if (!crowd && keep < 600 && inR(R.A1) && rnd(A) < L.aggr) return tell(S, f, A, attack(S, f, A, L, K, R, rx, adz, tw));
       if (keep >= 600 && rx < 900 && inR(R.A1) && rnd(A) < L.aggr) return tell(S, f, A, attack(S, f, A, L, K, R, rx, adz, tw));
-      const gap = rx - CHARS[f.ch].w;
-      return (gap > keep + 300 ? tw : gap < keep - 300 && keep > 0 ? aw : 0) | zb;
+      return (gap0 > keep + 300 ? tw : gap0 < keep - 300 && keep > 0 ? aw : 0) | zb;
     }
   }
 }
@@ -416,7 +450,8 @@ const inR2 = (r, rx, adz) => r && rx <= r.far - 40 && adz <= r.zr - 60;
 // 挑一招必殺：combo＝打到人後接的（只挑衝過去的和超必殺）；不然看距離挑
 function pickRush(S, f, A, L, K, R, rx, adz, combo) {
   if (!L.sp || rnd(A) >= L.sp + (combo ? 40 : 0)) return null;
-  const ok = (s) => f.mp >= s.m.mp && inR2(R[s.m.id], rx, adz);
+  const o = S.p[A.tgt];
+  const ok = (s) => f.mp >= s.m.mp && inR2(R[s.m.id], rx, adz) && !(o && grabMiss(s, o));
   if (A.lv >= 2) for (const s of K.su) if (ok(s) && rnd(A) < 110) return s;
   for (const s of K.rush) if (ok(s)) return s;
   return null;
@@ -459,7 +494,7 @@ function busy(S, f, o) {
 }
 // 沒拿到權：站在 1.5–2 公尺外，前後錯開（單號往外、雙號往裡），偶爾往前一步假裝要衝，停著的時候面向對方
 function orbit(S, f, o, rx, sx, tw, aw) {
-  const want = 1500 + ((f.i * 131) & 511);
+  const want = Math.max(1500 + ((f.i * 131) & 511), zoneOf(o) ? zoneOf(o) + CHARS[f.ch].w + 250 : 0);   // 鼻象有大絕的魔力：圍在死地外面
   const zw = Math.max(zFar(S) + 200, Math.min(zNear(S) - 200, o.z + (f.i & 1 ? 700 : -700)));
   const dz = zw - f.z, zb = dz > 150 ? DOWN : dz < -150 ? UP : 0;
   if ((S.f + f.i * 37) % 150 < 8 && rx < want + 400) return tw | zb;
@@ -599,15 +634,20 @@ function react(S, f, A, L, K, tw, aw, sx) {
 // 每 think 幀想一次：照距離挑要走近、跑、跳、站開、等、擋、放飛行道具或大招
 function plan(S, f, A, L, K, R, o, rx, adz) {
   A.pt = L.think + (rnd(A) % (L.think + 1));
+  // 這一陣子怕不怕鼻象的死地（越強越守規矩）；背後快到牆了就不怕（退無可退，拚了）
+  const wall = o.x > f.x ? f.x - S.lo : S.hi - f.x;
+  A.fz = wall > 1800 && rnd(A) < (A.mob ? FEAR_MOB : FEAR + A.lv * FEAR_LV) ? 1 : 0;
+  const W = STYLE[K.style], sc = (w, k) => (w * k) >> 4;
   const opts = [];
   const add = (w, p) => { if (w > 0) opts.push([w, p]); };
   const far = rx > 2600, near = rx < 900;
   const aggr = L.aggr;
+  const zr = A.fz ? zoneOf(o) : 0, gap = rx - CHARS[f.ch].w;
   add(far ? 60 : 50, 'walk');
-  add(far ? aggr >> 2 : near ? 0 : aggr >> 3, 'run');
-  add(near ? K.jump >> 1 : (far ? 6 : 18) + K.jump, 'jump');
-  add((256 - aggr) >> 3, 'wait');
-  add(near ? (256 - aggr) >> 3 : 6, 'back');
+  add(zr && gap < zr + 1500 ? 0 : sc(far ? aggr >> 2 : near ? 0 : aggr >> 3, W.run), 'run');   // 怕鼻象：不跑進去
+  add(sc(near ? K.jump >> 1 : (far ? 6 : 18) + K.jump, W.jump) + (zr && gap < zr + 1200 ? FEAR_JUMP : 0), 'jump');   // 怕鼻象：從上面跳進去（空中的抓不到）
+  add(sc((256 - aggr) >> 3, W.wait), 'wait');
+  add(sc(near ? (256 - aggr) >> 3 : 6, W.back) + (zr && gap < zr + 300 ? 40 : 0), 'back');
   add(near && o.act === 'atk' ? L.guard >> 2 : near ? L.guard >> 4 : 0, 'guard');
   // 飛行道具：對齊了而且隔得遠
   // 地裂會轉彎、打不遠：前後差一點也放，但要在打得到的距離裡
@@ -616,13 +656,14 @@ function plan(S, f, A, L, K, R, o, rx, adz) {
     const P = s.m.proj, r = R[s.m.id];
     if (f.mp < s.m.mp || S.pr.some((q) => q.o === f.i && q.mv === s.m.id)) continue;
     const ok = P.aim ? rx > 1500 && rx < r.far : P.lob ? adz < 300 && rx > r.far - 1400 && rx < r.far + 200
+      : P.fan && P.pierce ? adz < 600 && rx < r.far - 300                       // 散射穿人的（黃狗聲波）：前後差一點也中、貼臉吠最好
       : adz < (P.gr ? 700 : 200) && rx > 1200 && (!P.gr || rx < r.far - 300);
-    if (ok) add(L.sp >> 1, s);
+    if (ok) add(sc(L.sp >> 1, W.far), s);
   }
-  for (const s of K.su) if (f.mp >= s.m.mp && inR2(R[s.m.id], rx, adz)) add(L.sp >> 2, s);
+  for (const s of K.su) if (f.mp >= s.m.mp && inR2(R[s.m.id], rx, adz) && !grabMiss(s, o)) add(L.sp >> 2, s);
   for (const s of K.hurl) if (f.mp >= s.m.mp && adz < 300 && rx > 1000 && rx < 3200) add(L.sp >> 1, s);
   for (const s of K.heal) if (f.mp >= s.m.mp + 100 && f.hp < (f.mhp * 3) / 5 && rx > 2400 && !S.it.some((q) => q.own === f.i)) add(L.sp >> 2, s);
-  for (const s of K.rush) if (f.mp >= s.m.mp + 200 && inR2(R[s.m.id], rx, adz)) add(L.sp >> 3, s);
+  for (const s of K.rush) if (f.mp >= s.m.mp + (W.rush > 16 ? 50 : 200) && inR2(R[s.m.id], rx, adz) && !grabMiss(s, o)) add(sc(L.sp >> 3, W.rush), s);
   let tot = 0;
   for (const [w] of opts) tot += w;
   let v = (rnd(A) * 256 + rnd(A)) % tot;

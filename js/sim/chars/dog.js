@@ -22,18 +22,20 @@ const N = {
 };
 
 const SP = [
-  // 汪汪聲波：直直穿過一整排人，每個人打一次。不痛、不打倒，但倒值高（連吠兩聲就暈）；再按攻多吠一聲
-  { id: 'bark', name: '汪汪聲波', yomi: 'wan wan', d: 'f', btn: 'A', note: '貫穿飛行道具，傷害低、暈值高。追加攻再發',
+  // 汪汪聲波（2026-11-26 使用者：更遠、更有特色、三發散射）：一吠三道，正前一道、往前後斜斜各一道，越遠分越開，都穿過一整排人。
+  // 每道不痛、不打倒、倒值 16：貼臉吠三道疊在一起一次中三下＝直接頭暈（三拳接聲波打暈，再接衝咬、長長長臘腸）；遠的只中一道，吠三聲才暈。約 5.5 公尺
+  { id: 'bark', name: '汪汪聲波', yomi: 'wan wan', d: 'f', btn: 'A', note: '三道散射貫穿。近距離全中頭暈。追加攻再發',
     m: mv('bark', '汪汪聲波', 30, { kind: 'sp', mp: 120, pose: 'bark', mash: { at: 20, to: 6, n: 2, mp: 50 },
-      proj: { at: 8, x: 450, y: 650, vx: 70, w: 160, h: 300, dmg: 32, fall: 24, life: 34, pierce: 1 } }) },
+      proj: { at: 8, x: 450, y: 650, vx: 70, w: 160, h: 300, dmg: 22, fall: 16, life: 48, pierce: 1, fan: [[1000, 0], [940, 340], [940, -340]] } }) },
   // 鑽褲襠：壓低身子衝過去（框很矮，高的攻擊打不到；穿過人），鑽過的人絆一下，鑽過去回頭咬（從背後咬，擋不住）
   { id: 'tunnel', name: '鑽褲襠', yomi: 'kuguri', d: 'f', btn: 'J', note: '穿過對手，背後攻擊',
     m: mv('tunnel', '鑽褲襠', 42, { kind: 'sp', mp: 150, pose: 'tunnel', thru: 1, hurt: [-330, 0, 330, 450], vx: [[0, 0], [4, 62], [20, 0]], flip: 23,
       hits: [hit([5, 20], [0, 0, 500, 450], 'S', { dmg: 30, fall: 0, hs: 28, stop: 3, dvx: 2, zr: 300 }),
         hit([26, 29], [80, 100, 700, 800], 'S', { dmg: 70, kd: 1, dvx: 22, dvy: 60 })] }) },
-  // 埋骨頭：在身前挖一挖，生出一根骨頭（吃的：一口補 50，兩口）。誰都撿得到，隊友吃最好；一次只能有一根
-  { id: 'bone', name: '埋骨頭', yomi: 'hone', d: 'd', btn: 'A', note: '產生骨頭，撿起食用回血（隊友可用）',
-    m: mv('bone', '埋骨頭', 40, { kind: 'sp', mp: 200, pose: 'dig', spawn: { at: 22, k: 'bone', x: 800 } }) },
+  // 埋骨頭：在身前挖一挖，挖出一根骨頭直接叼在嘴裡（2026-11-26：以前放在地上，一對一沒空走過去撿）。按法照拿著吃的：攻吃一口（一口補 50，兩口）、
+  // 攻＋防丟出去、蹲放下（隊友撿去吃）。一次只能有一根
+  { id: 'bone', name: '埋骨頭', yomi: 'hone', d: 'd', btn: 'A', note: '挖出骨頭叼著。攻食用回血，蹲放下給隊友',
+    m: mv('bone', '埋骨頭', 40, { kind: 'sp', mp: 150, pose: 'dig', spawn: { at: 22, k: 'bone', x: 800, hold: 1 } }) },
   // 甩耳旋風：對空，兩隻耳朵甩成螺旋槳往上轉，前兩下帶上去、最後一下打飛
   { id: 'earspin', name: '甩耳旋風', yomi: 'mimi senpu-', d: 'u', btn: 'A', note: '對空。出招無敵',
     m: mv('earspin', '甩耳旋風', 30, { kind: 'sp', mp: 150, pose: 'earspin', inv: [1, 8], jump: [3, 8, 104], land: 4, landW: 11, hang: 6,
@@ -53,10 +55,11 @@ const SU = [
 
 export default {
   id: 'dog', name: '黃狗', full: '黃狗', color: '#ffe066',
-  blurb: '聲波穿一排、鑽褲襠、骨頭補血', stat: [3, 3, 5],
+  blurb: '三道聲波、鑽褲襠、叼骨頭補血', stat: [3, 3, 5],
   pal: ['#ffe066', '#4a3a08'], card: { attr: '風', type: '長身之犬', lv: 4, art: 'sky' },
   voice: { f0: 150, size: 1.05, mora: 0.1 },
   w: 330, h: 1050, hc: 680,        // 身體看起來長，受擊框照一般寬（太寬的話隔很遠就被打到）
   walkX: 19, walkZ: 12, run: 52, runZ: 10, jumpV: 140, jumpX: 20, jumpZ: 13, dashV: 98, dashX: 62,
+  ai: { style: 'rush' },          // 電腦的打法：突進（ai.js STYLE）
   normals: N, specials: SP, supers: SU,
 };

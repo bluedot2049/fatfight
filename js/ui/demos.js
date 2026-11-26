@@ -48,9 +48,9 @@ export const DEMOS = {
     ...normals({ cw: 18, combo: 1100, crouch: 800, cd: 1000, run: 2800, runN: 6, jump: 1800, jumpN: 7, dash: 3400, dashN: 4 }),
     { id: 'trunk', name: '鼻子捲', kind: 'sp', d: 1800, in: cmd(RIGHT, BA), foe: 'guard', len: 110 },
     { id: 'rock', name: '拔石頭', kind: 'sp', d: 4000, in: cmd(RIGHT, BJ), len: 100 },
-    { id: 'stomp', name: '象腳踏地', kind: 'sp', d: 1600, in: cmd(DOWN, BA), len: 90 },
+    { id: 'stomp', name: '象腳踏地', kind: 'sp', d: 2600, in: [...cmd(DOWN, BA), ...H(BA, 20)], len: 100 },
     { id: 'skygrab', name: '鼻子撈天', kind: 'sp', ...antiAir() },
-    { id: 'stampede', name: '萬象奔騰', kind: 'su', d: 2600, in: cmd(UP, BJ), len: 150 },
+    { id: 'kingspin', name: '象王大掄', kind: 'su', d: 1700, in: cmd(UP, BJ), foe: 'guard', len: 140 },
   ],
   penguin: [
     ...normals({ cw: 4, combo: 750, crouch: 800, cd: 900, run: 2600, runN: 6, jump: 1700, jumpN: 7, dash: 3200, dashN: 4 }),
@@ -62,9 +62,9 @@ export const DEMOS = {
   ],
   dog: [
     ...normals({ combo: 700, crouch: 700, cd: 850, run: 2600, runN: 5, jump: 1600, jumpN: 7, dash: 3200, dashN: 4 }),
-    { id: 'bark', name: '汪汪聲波', kind: 'sp', d: 3000, in: [...cmd(RIGHT, BA), ...W(12), BA], len: 90 },
+    { id: 'bark', name: '汪汪聲波', kind: 'sp', d: 1300, in: cmd(RIGHT, BA), len: 100 },
     { id: 'tunnel', name: '鑽褲襠', kind: 'sp', d: 1500, in: cmd(RIGHT, BJ), foe: 'guard', len: 90 },
-    { id: 'bone', name: '埋骨頭', kind: 'sp', d: 3000, in: cmd(DOWN, BA), len: 80 },
+    { id: 'bone', name: '埋骨頭', kind: 'sp', d: 3000, in: [...cmd(DOWN, BA), ...W(40), BA], len: 110 },
     { id: 'earspin', name: '甩耳旋風', kind: 'sp', ...antiAir() },
     { id: 'longdog', name: '長長長臘腸', kind: 'su', d: 3500, in: cmd(UP, BJ), len: 140 },
   ],

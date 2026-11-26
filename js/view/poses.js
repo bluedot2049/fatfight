@@ -153,7 +153,6 @@ Object.assign(ATK, {
     skygrab: { w: { sq: -0.22, head: 0.15, lean: 0.05 }, s: { head: -0.6, lean: -0.22, sq: 0.12, aN: 1.9, aF: 1.6, lN: 0.25 } },                                   // 蹲一下、鼻子直直往上撈
     trunkT: { w: { lean: 0.25, bend: 0.2, head: 0.3, aN: 1.2, aF: 1.1, sq: -0.1 }, s: { lean: -0.45, bend: -0.3, head: -0.6, aN: 2.7, aF: 2.5, sq: 0.08 } },   // 低頭捲住、往後仰把人甩過頭
     runS: { w: { sq: -0.15, lean: -0.1 }, s: { lean: -0.55, by: -0.28, lN: 1.5, lF: 1.5, aN: 0.9, aF: 0.9, aNz: 0.5, aFz: 0.5, head: -0.35, sq: -0.08 } },   // 滑行：一屁股坐下去、腳往前滑
-    stampede: { w: { lean: -0.35, head: -0.6, aN: 2.2, aF: 1.6, sq: 0.1 }, s: { lean: 0.35, aN: 1.3, aF: 1.3, head: 0.2, lN: 0.8, lF: -0.6 } },   // 揚起鼻子叫一聲、衝過去
   },
   penguin: { ...GEN,
     peck: { w: { head: -0.3, lean: -0.1 }, s: { head: 0.4, lean: 0.25, bend: 0.2 } },                     // 長嘴往前啄
@@ -383,6 +382,11 @@ function attackPose(f, m, t, clock) {
     const at = m.grip.at;
     if (t <= at) return { spin: -((t + 64 - at) / 2) * (Math.PI / 4), lean: -0.12, sq: -0.06, aN: 1.4, aF: 1.3, aNz: 0.5, aFz: 0.5, head: 0.1, lN: 0.2 * Math.sin(t * 0.8) };
     return mix({ spin: 0, lean: 0.4, bend: 0.3, head: 0.3, aN: 1.8, aF: 1.6 }, BASE.idle, Math.min(1, (t - at) / Math.max(1, m.total - at)));
+  }
+  if (id === 'kingspin') {                           // 象王大掄：蹲低、鼻子拉直，整隻轉一圈掃過去（掃到人就換成 kingT 的掄人）→ 揮空的話轉完愣在那裡
+    const a1 = m.hits[0].on[1] + 3, low = { lean: 0.2, bend: 0.15, sq: -0.14, aN: 1.1, aF: 1.0, aNz: 0.5, aFz: 0.5, head: 0.3, lN: 0.3 };
+    if (t <= a1) return { ...low, spin: -(t / a1) * Math.PI * 2 };
+    return mix({ ...low, head: -0.2, sq: 0.05, lean: -0.1 }, BASE.idle, Math.min(1, (t - a1) / Math.max(1, m.total - a1)));
   }
   if (id === 'skyT') {                               // 撈天捲到：仰著頭把人拉下來 → 往前低頭砸地
     const at = m.grip.at, up = ATK.elephant.skygrab.s, slam = { head: 0.55, lean: 0.42, bend: 0.32, sq: -0.2, by: -0.04, aN: 0.9, aF: 0.8 };

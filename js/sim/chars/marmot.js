@@ -58,5 +58,6 @@ export default {
   voice: { f0: 175, size: 1.12, mora: 0.095 },   // 念招式名稱的聲音：比海牛高、快
   w: 300, h: 1150, hc: 760,
   walkX: 20, walkZ: 13, run: 54, runZ: 11, jumpV: 156, jumpX: 22, jumpZ: 14, dashV: 105, dashX: 68,
+  ai: { style: 'rush' },          // 電腦的打法：突進（ai.js STYLE）
   normals: N, specials: SP, supers: SU,
 };
