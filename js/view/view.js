@@ -102,7 +102,7 @@ export class View {
     this.ink = /[?&]noink/.test(location.search) ? null : new InkLines(this.renderer);   // 手疊在身上的內線（?noink 關掉對照）
     this.inkKeep = new Set();
     this.inkSize = new THREE.Vector2();
-    this.show = new SuperShow(this);   // 超必殺的演出：全場暗下去、追光、切入特寫、剪影、超必殺 KO
+    this.show = new SuperShow(this);   // 超必殺的演出：全場暗下去、追光、剪影、超必殺 KO
     this.resize();
     addEventListener('resize', () => this.resize());
   }
@@ -244,7 +244,6 @@ export class View {
       this.renderer.getDrawingBufferSize(this.inkSize);
       this.ink.draw(this.scene, this.camera, [0, 0, this.inkSize.x, this.inkSize.y], k);
     }
-    this.show.drawTop(S);                            // 切入特寫的緞帶蓋在最上面
   }
 
   event(S, e) {
