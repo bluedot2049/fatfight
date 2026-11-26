@@ -207,7 +207,6 @@ function flash(S, f, A) {
 
 function decide(S, f, A) {
   const L = lvOf(A), C = CHARS[f.ch], K = KIT[f.ch], R = REACH[f.ch];
-  if (f.act !== 'run') A.sl = 0;                             // 這一趟跑要不要滑行：0 還沒想、1 滑、2 不滑（跑起來想一次）
   if (f.act === 'parried') A.pd = 1;                          // 被格檔過：之後多用吹飛
   if (STUNNED.has(f.act) && f.act !== 'block') {
     A.q.length = 0; A.gt = 0; A.pt = 0; A.chain = 0; A.eng = 0;
@@ -277,8 +276,6 @@ function decide(S, f, A) {
         return b;
       }
     }
-    // 滑行絆倒人：收招前先按攻，起來就追打翻起來的人（會接拳的難度）
-    if (m.cut && f.con === 1 && L.combo >= 1 && f.t >= m.total - 4 && !(A.last & BA)) return BA | tw;
     return f.air ? tw : 0;
   }
   if (FREE_RESET.has(f.act)) A.chain = 0;
@@ -295,8 +292,6 @@ function decide(S, f, A) {
   if (f.act === 'run') {
     if (sx !== f.face) return f.face > 0 ? LEFT : RIGHT;                        // 跑過頭：按反方向煞車
     if (f.mini && (A.tok <= S.f || LYING.has(o.act))) return f.face > 0 ? LEFT : RIGHT;   // 雜兵：沒有攻擊權、對方倒著，就煞車（不衝進去追打）
-    if (!A.sl) A.sl = !f.mini && L.combo >= 1 && rnd(A) < 90 ? 1 : 2;              // 雜兵不滑
-    if (A.sl === 1 && inR(R.runS)) return BS | tw;
     if (inR(R.runA)) return (rnd(A) < 170 ? BA : BJ) | tw;
     return tw | zb;
   }

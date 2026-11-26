@@ -4,7 +4,7 @@
 
 import * as THREE from 'three';
 import { BUILD, recolor, aimTrunk } from './models.js';
-import { markOf, isAlt, footMark, placeMark } from './mark.js';
+import { markOf, isAlt, footMark, placeMark, laneMark, placeLane } from './mark.js';
 import { poseOf, applyPose, ZERO } from './poses.js';
 import { FX, starSprite, bubbleMesh, beamMesh, shapeBeam, fireballMesh, ringMesh, soundMesh, VIOLET } from './fx.js';
 import { Stage } from './stage.js';
@@ -15,7 +15,7 @@ import { MoonStage } from './moon.js';
 import { kit, repaint, merge } from './kit.js';
 import { CHARS, MOVES } from '../sim/chars/index.js';
 import { hitBoxes } from '../sim/moves.js';
-import { STAGE_HALF, Z_NEAR } from '../sim/const.js';
+import { STAGE_HALF, Z_NEAR, Z_REACH } from '../sim/const.js';
 import { QUESTS } from '../sim/quests/index.js';
 import { hurtBoxes } from '../sim/combat.js';
 import { ItemView, handAnchor } from './items.js';
@@ -144,7 +144,7 @@ export class View {
       this.fighters[i] = this.make(p, key, m, alt);
     });
   }
-  drop(f) { this.scene.remove(f.model.root, f.shadow, f.beam, ...f.stars); if (f.herd) for (const g of f.herd.g) this.scene.remove(g.m.root, g.d.root); if (f.ghost) this.scene.remove(f.ghost.m.root, f.ghost.d.root); if (f.mark) this.scene.remove(f.mark.arc, ...(f.mark.lab ? [f.mark.lab] : [])); }
+  drop(f) { this.scene.remove(f.model.root, f.shadow, f.beam, ...f.stars); if (f.herd) for (const g of f.herd.g) this.scene.remove(g.m.root, g.d.root); if (f.ghost) this.scene.remove(f.ghost.m.root, f.ghost.d.root); if (f.mark) this.scene.remove(f.mark.arc, ...(f.mark.lab ? [f.mark.lab] : [])); if (f.lane) this.scene.remove(f.lane.m); }
   make(p, key, mk, alt) {
     const model = BUILD[p.ch]();
     if (p.mini && !CHARS[p.ch].npc) shade(model.root);
@@ -166,7 +166,9 @@ export class View {
     const hand = handAnchor(model);                   // 拿東西的手（量好位置掛在手臂上）
     const mark = mk ? footMark(mk, CHARS[p.ch].w) : null;   // 腳下的弧（認人用）
     if (mark) this.scene.add(mark.arc, ...(mark.lab ? [mark.lab] : []));
-    return { key, ch: p.ch, model, shadow, beam, stars, mark, pose: { ...ZERO }, jig: { x: 0, v: 0 }, flash: 0, px: p.x, mats, white: 0, whiteNow: 0, fxT: 0, hand };
+    const lane = laneMark(CHARS[p.ch].w);             // 對到玩家那條線時腳下亮一圈
+    this.scene.add(lane.m);
+    return { key, ch: p.ch, model, shadow, beam, stars, mark, lane, pose: { ...ZERO }, jig: { x: 0, v: 0 }, flash: 0, px: p.x, mats, white: 0, whiteNow: 0, fxT: 0, hand };
   }
 
   // 對戰是競技場，闖關照關卡表的場景
@@ -517,6 +519,7 @@ export class View {
     v.shadow.position.set(p.x * U, 0.005, p.z * U);
     v.shadow.scale.set(C.w * U * 1.35 * sh, C.w * U * 0.75 * sh, 1);
     if (v.mark) placeMark(v.mark, p.x * U, p.z * U, p.face, this.marks && p.gone !== 2, this.dt);   // 跳起來、鑽地都留在地上，看得出人在哪一條線
+    placeLane(v.lane, p.x * U, p.z * U, this.laneOf(S, p), this.dt);
     v.flash *= 0.94;
     // 必殺、超必殺衝出去的時候往後拉殘影；跑步腳下揚土
     const dx = (p.x - v.px) * U;
@@ -746,7 +749,20 @@ export class View {
     if (!on || v.gk < 0.3) return;
     if (v.fxT % 2 === 0) this.fx.flame(x - p.face * 0.8 + (Math.random() - 0.5) * 2.0, 0.2 + Math.random() * 2.8 * k, z - 1.5, 0.9, 0, 1.2, 0.45, VIOLET);   // 大熊身上冒紫火
     const a0 = m.hits[0].on[0] - 4, a1 = m.hits[m.hits.length - 1].on[1];
-    if (p.t < a0 || p.t > a1) return;
+    // 起手的預告：地上的敵人腳下一圈紫光往內縮、冒小火苗，縮到底閃白＝該跳了（實測定格後第 11～27 幀起跳躲得掉，取中間 18 幀前）
+    if (p.t < a0) {
+      const cue = m.hits[0].on[0] - 18, k = Math.min(1, Math.max(0, p.t) / Math.max(1, cue)), key = S.f - p.t, go = p.t >= cue && v.cueK !== key;
+      if (go) v.cueK = key;
+      for (const o of S.p) {
+        if (o.team === p.team || o.hp <= 0 || o.gone === 2 || o.y > 400) continue;
+        const ox = o.x * U, oz = o.z * U;
+        if (p.t <= cue && v.fxT % 3 === 0) this.fx.groundRing(ox, oz, '#9b6cff', 2.8 - 2.2 * k, 0.12);
+        if (v.fxT % 4 === 0) this.fx.flame(ox + (Math.random() - 0.5) * 0.8, 0.05, oz + (Math.random() - 0.5) * 0.3, 0.2 + 0.25 * k, 0, 0.5, 0.25, VIOLET);
+        if (go) this.fx.groundRing(ox, oz, '#ffffff', 1.4, 0.3);
+      }
+      return;
+    }
+    if (p.t > a1) return;
     for (const o of S.p) {                               // 全場地上的敵人腳下冒紫火（跳起來的不冒：躲掉了）
       if (o.team === p.team || o.hp <= 0 || o.gone === 2 || o.y > 400) continue;
       for (let i = 0; i < 2; i++) this.fx.flame(o.x * U + (Math.random() - 0.5) * 0.9, 0.08, o.z * U + (Math.random() - 0.5) * 0.4, 0.7, 0, 2.4, 0.4, VIOLET);
@@ -755,6 +771,17 @@ export class View {
       const cx = this.cam?.x ?? x;
       for (let i = 0; i < 4; i++) this.fx.flame(cx + (Math.random() - 0.5) * 16, 0.05, (Math.random() - 0.5) * 2.6, 0.5, 0, 0.8, 0.35, VIOLET);
     }
+  }
+  // 對到線：有 1P 2P 的玩家，前後在他拳打得到的範圍、左右 3.5 公尺內的敵人，回傳那個玩家的顏色（腳下亮一圈）
+  laneOf(S, p) {
+    if (!this.marks || p.gone || p.hp <= 0) return null;
+    for (const h of S.p) {
+      if (h.team === p.team || h.hp <= 0 || h.gone) continue;
+      if (Math.abs(h.z - p.z) > Z_REACH || Math.abs(h.x - p.x) > 3500) continue;
+      const mk = markOf(S, h);
+      if (mk?.label) return mk.c;
+    }
+    return null;
   }
   // 須左能乎的大熊：同一個模型兩份（先寫深度的、再畫顏色的只留最前面那層），紫色、疊亮；中間淡、輪廓亮（像一團紫火的靈）
   makeGhost(p) {

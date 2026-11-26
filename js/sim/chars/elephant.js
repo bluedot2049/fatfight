@@ -9,7 +9,7 @@ import { hit, mv, multi, slide } from '../moves.js';
 const N = {
   A1: mv('A1', '鼻子甩', 23, { pose: 'sA', tr: 1, cancel: 1, hits: [hit([5, 7], [80, 400, 940, 1250], 'L', { dmg: 34 })] }),
   A2: mv('A2', '鼻子回甩', 24, { pose: 'tback', tr: 1, cancel: 1, hits: [hit([6, 8], [80, 350, 880, 1200], 'L', { dmg: 34 })] }),
-  An: mv('An', '耳朵搧', 22, { pose: 'sC', cancel: 1, armor: [0, 6], hits: [hit([5, 8], [-700, 450, 700, 1500], 'L', { dmg: 40, hs: 16, dvx: 80, zr: 600 })] }),
+  An: mv('An', '耳朵搧', 22, { pose: 'sC', cancel: 1, armor: [0, 6], hits: [hit([5, 8], [-700, 450, 700, 1500], 'L', { dmg: 40, hs: 16, dvx: 60, zr: 600 })] }),   // dvx 80 會搧到鼻子最遠那邊，接鼻子甩打暈之後人滑出去、回甩打不到，連段斷掉
   A3: mv('A3', '象鼻重鎚', 34, { pose: 'chop', tr: 1, cancel: 1, hits: [hit([10, 13], [100, 0, 940, 1500], 'H', { dmg: 80, kd: 1, dvx: 18, dvy: 60 })] }),
   crA: mv('crA', '蹲踢', 17, { pose: 'crB', cr: 1, cancel: 1, next: 'crB', hits: [hit([5, 7], [80, 0, 640, 300], 'L', { dmg: 34 })] }),
   crB: mv('crB', '蹲鼻戳', 15, { pose: 'crA', tr: 1, cr: 1, cancel: 1, next: 'crD', vx: [[0, 6], [4, 0]], hits: [hit([3, 5], [80, 250, 800, 700], 'L', { dmg: 30 })] }),
@@ -19,7 +19,7 @@ const N = {
   runA: mv('runA', '衝撞', 36, { pose: 'cC', vx: [[0, 38], [14, 10], [20, 0]],
     hits: [hit([6, 14], [100, 300, 820, 1300], 'H', { dmg: 70, kd: 1, dvx: 28, dvy: 55 })] }),
   // 滑行（跑＋蹲）：坐著滑，短、慢，撞到的直接撞飛趴倒（飛出去撞到別人一起倒），被擋也把人推開
-  runS: slide('屁股滑', { total: 36, on: [4, 19], vx: [[0, 0], [3, 36], [14, 16], [22, 6], [27, 0]], hurt: [-450, 0, 450, 640], box: [100, 0, 700, 520], h: { dmg: 64, dvx: 26, dvy: 50, bdef: 45 } }),
+  runS: slide('屁股滑', { total: 36, on: [4, 19], vx: [[0, 0], [3, 36], [14, 16], [22, 6], [27, 0]], hurt: [-450, 0, 450, 640] }),
   jA: mv('jA', '空中鼻甩', 22, { pose: 'jC', tr: 1, air: 1, hits: [hit([5, 14], [80, 150, 840, 800], 'L', { dmg: 52, fall: 45 })] }),
   dashA: mv('dashA', '象屁股坐', 32, { pose: 'jD', air: 1, hits: [hit([5, 16], [100, -100, 760, 520], 'H', { dmg: 76, kd: 1 })] }),
 };

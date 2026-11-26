@@ -17,7 +17,7 @@ const N = {
   runA: mv('runA', '衝鋒頭槌', 32, { pose: 'cC', vx: [[0, 42], [14, 10], [20, 0]],
     hits: [hit([6, 14], [100, 300, 820, 1150], 'H', { dmg: 62, kd: 1, dvx: 24, dvy: 55 })] }),
   // 滑行（跑＋蹲）：整隻趴平成大字滑過去
-  runS: slide('大字滑', { pose: 'spread', hurt: [-400, 0, 400, 520], box: [100, 0, 620, 440], h: { dvy: 86 } }),
+  runS: slide('大字滑', { pose: 'spread', hurt: [-400, 0, 400, 520] }),
   jA: mv('jA', '空中熊掌', 20, { pose: 'jC', air: 1, hits: [hit([5, 14], [80, 150, 660, 750], 'L', { dmg: 48, fall: 45 })] }),
   dashA: mv('dashA', '饅頭壓頂', 30, { pose: 'jD', air: 1, hits: [hit([5, 16], [100, -80, 720, 500], 'H', { dmg: 70, kd: 1 })] }),
 };
@@ -47,11 +47,12 @@ const SP = [
 ];
 
 // 須左能乎（投稿表的新系統「必中」）：全場地上的敵人都打得到、擋不住；最後一下打暈；收招幾乎沒有硬直。
-// 起手沒有無敵（定格後 22 幀才燒到），看到了跳起來就躲得掉
+// 起手沒有無敵，看到了跳起來就躲得掉。使用者 2026-11-26 嫌太強：第一下從 24 延到 38、五下擠在 38～43（原本 24～37），
+// 一次跳就蓋得住。實測定格結束後第 11～27 幀起跳躲得掉（小象、臘腸狗跳得低，14～26）；太早跳會先落地被燒到，畫面上腳下的圈縮到底那下跳
 const SU = [
   { id: 'susanoo', name: '須左能乎', yomi: 'susano-o', d: 'u', btn: 'J', note: '全場、不能防禦，打中頭暈。可跳過',
-    m: mv('susanoo', '須左能乎', 40, { kind: 'su', mp: 400, flash: 1, pose: 'susanoo',
-      hits: [flame(24), flame(27), flame(30), flame(33), flame(37, { dmg: 110, daze: 1, hs: 30, stop: 14 })] }) },
+    m: mv('susanoo', '須左能乎', 46, { kind: 'su', mp: 400, flash: 1, pose: 'susanoo',
+      hits: [flame(38), flame(39), flame(40), flame(41), flame(43, { dmg: 110, daze: 1, hs: 30, stop: 14 })] }) },
 ];
 
 export default {
