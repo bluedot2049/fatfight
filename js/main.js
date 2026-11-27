@@ -59,6 +59,24 @@ const G = {
   vote: null, otherVote: null,   // 線上打完：兩邊選了同一個（再來／下一關）才開始
   events: [],
 };
+
+// 煉金畫廊地下室的機台（?cab=1）：畫廊把這一頁開成全畫面的 iframe，走開、按「離開機台」就收回去。
+// 站在機台前的每一台都在背景開一間不上大廳的房間等人，房間碼告訴畫廊，畫廊轉給站到另一邊的人，他開 ?cab=1&room=房間碼 直接進來。
+// 跟畫廊說的話：ready 讀好了、room 現在等人的房間碼（null＝在跟人打或開不了房）、alive 玩家有在按（畫廊才不當掛機）、exit 要離開
+const CAB = qs.has('cab') && window.parent !== window;
+const CAB_TO = (() => { try { return new URL(document.referrer).origin; } catch { return '*'; } })();
+const cabSay = (m) => { if (CAB) window.parent.postMessage({ fatfight: 1, ...m }, CAB_TO); };
+const cabExit = () => cabSay({ t: 'exit' });
+function cabArm() {
+  if (!CAB || G.net || G.wait) return;
+  goOnline(newCode(), true, { cab: true });
+}
+if (CAB) {
+  document.body.classList.add('cab');
+  let aliveT = 0;
+  const alive = () => { const t = Date.now(); if (t - aliveT > 20000) { aliveT = t; cabSay({ t: 'alive' }); } };
+  for (const ev of ['keydown', 'pointerdown']) addEventListener(ev, alive, { passive: true, capture: true });
+}
 // 手機觸控（橫拿）：搖桿和按鈕變成跟鍵盤一樣的輸入位元；按到鍵盤的遊戲鍵就換回鍵盤的介面
 const touch = new Touch({
   pause: () => { if (G.mode === 'fight' && !G.paused && !menu.open && overlay.hidden) pauseMenu(); },
@@ -77,8 +95,8 @@ addEventListener('wheel', (e) => { if (e.ctrlKey) e.preventDefault(); }, { passi
 document.addEventListener('contextmenu', (e) => { if (!e.target.closest('input')) e.preventDefault(); });
 document.addEventListener('dragstart', (e) => e.preventDefault());
 document.addEventListener('fullscreenchange', () => menu.render());
-// 首頁右上角的全螢幕鈕；iPhone 點了教加到主畫面（ui/screen.js）
-fullscreenButton();
+// 首頁右上角的全螢幕鈕；iPhone 點了教加到主畫面（ui/screen.js）。機台裡不放：全螢幕、加到主畫面是畫廊那一頁的事
+if (!CAB) fullscreenButton();
 // 自己操作的那隻（觸控要看牠是不是在走、在跑；只讀）
 const mine = () => (G.S.quest ? G.S.p.find((f) => f.pl === G.side) : G.S.p[G.kind === 'online' ? G.side : 0]);
 // 左下角招式表開不開（記在這台瀏覽器；讀不到就當沒開）
@@ -203,7 +221,8 @@ function dummyBits() {
 let titleAt = '';
 function toTitle() {
   if (G.net) { G.net.close(); G.net = null; }
-  G.wait?.stop(); closeLobby();
+  if (!G.wait?.cab) G.wait?.stop();
+  closeLobby();
   G.side = 0; G.room = null;
   titleBg();
   G.mode = 'title';
@@ -222,8 +241,10 @@ function toTitle() {
       { label: '招式表', on: () => showOverlay(moveListHtml()) },
       { label: device.touch ? '操作' : '按鍵', on: () => showOverlay(keysHtml()) },
       { label: '聲音', value: () => SOUND_NAMES[soundMode()], on: () => setSoundMode(soundMode() + 1) },
+      ...(CAB ? [{ label: '離開機台', on: cabExit }] : []),
     ] },
   ];
+  cabArm();
   menu.show({
     cls: 'title',
     logo: `<div class="tcircle">${magicCircle({ seed: 'title', runes: 22, star: 6 })}</div>
@@ -257,7 +278,7 @@ function toSelect(kind, onlineSide = 0) {
   hud.show(false);
   const scr = selectScreen({
     mode: kind, side: onlineSide, coop: kind === 'online' && G.room?.mode === 'quest',
-    back: kind === 'online' ? () => toRoom(true) : () => (G.wait ? backToWait() : toTitle()),
+    back: kind === 'online' ? () => toRoom(true) : () => (G.wait && !G.wait.cab ? backToWait() : toTitle()),
     onPick: kind === 'online' ? (ch, ok, col) => G.net?.ctl({ t: 'pick', ch, ok, col }) : null,
     done: (c0, c1, cols) => {
       G.cols = cols;
@@ -285,7 +306,7 @@ function startFight(c0, c1) {
   if (G.kind === 'train' && G.dummy === 5) setCpu(G.S, 1, TRAIN_CPU);
   G.mode = 'fight'; G.paused = false; acc = 0; G.overShown = false; view.fresh();
   hud.show(true); hud.setNames(G.S); hud.setMoves(G.S, 0); hud.showMoves(movesOn);
-  hud.net(G.wait ? (G.wait.quick ? '找對手中' : `房間開著等人・${G.wait.code}`) : '');
+  hud.net(G.wait && !G.wait.cab ? (G.wait.quick ? '找對手中' : `房間開著等人・${G.wait.code}`) : '');
   document.body.classList.remove('at-title');
   music.muffle(false); music.level(1); music.battle();
 }
@@ -339,6 +360,7 @@ function pauseMenu() {
   items.push({ label: '判定框', value: () => (view.debug ? '顯示' : '不顯示'), on: () => { view.debug = !view.debug; }, cycle: () => { view.debug = !view.debug; } });
   if (G.kind === 'quest') items.push({ label: '從頭再打', on: () => startQuest(G.chars[0], G.quest) });
   items.push(soundItem(), { label: '換角色', on: () => toSelect(G.kind) }, { label: '回標題', on: toTitle });
+  if (CAB) items.push({ label: '離開機台', on: cabExit });
   menu.show({ title: '暫停', items, back: resume });
 }
 
@@ -425,6 +447,8 @@ addEventListener('keydown', (e) => {
   if (e.code === 'F1') { if (fight) setMovesOn(!movesOn); else showOverlay(moveListHtml(G.mode === 'fight' ? mine()?.ch : '')); stop(); return; }
   if (e.code === 'F2') { view.debug = !view.debug; stop(); return; }
   if (e.code === 'Escape' && G.mode === 'fight' && !menu.open) { pauseMenu(); stop(); }
+  // 機台的首頁按 Esc：離開機台（打到一半是暫停，暫停選單裡也有「離開機台」）
+  else if (CAB && e.code === 'Escape' && G.mode === 'title' && menu.cur?.cls === 'title') { cabExit(); stop(); }
 }, true);
 
 // ---------- 線上 ----------
@@ -535,14 +559,16 @@ async function shareLink(code, status) {
 // o.quick：找人打開的房間（大廳上標著，兩個都在找的人互相看到時，房間碼大的去進小的）
 // o.bg：找人打在背景加入別人（自己正在打電腦），不換畫面；o.onFail(e)：失敗不寫在畫面上，交給呼叫的人（找人打重找）
 async function goOnline(code, host, o = {}) {
-  const { card, quick, bg, onFail } = o;
+  const { card, quick, bg, onFail, cab } = o;
+  // 機台背景等人的那間先收掉（自己去開房、找人打、加入別人），回首頁再開一間
+  if (!cab && G.wait?.cab) { G.wait.stop(); cabSay({ t: 'room', code: null }); }
   const pub = o.pub || quick;
   if (!pub) closeLobby();
   const abort = new AbortController();
   let msg = '', hostName = '', cardScr = null, goRes;
   const go = card ? new Promise((r) => { goRes = r; }) : null;
   const stop = () => { abort.abort(); if (G.wait?.code === code) G.wait = null; lobbyIfOpen()?.then((L) => L.unhost(), () => {}); };
-  const cancel = () => { stop(); onlineMenu(); };
+  const cancel = () => { stop(); if (o.home) toTitle(); else onlineMenu(); };   // o.home：機台從畫廊直接進房的，取消回首頁
   const cpuKey = KEYMAP[0].D[0];
   const title = quick ? '找人打' : pub ? '開一間等人' : host ? '建立房間' : hostName ? `加入${hostName}的房間` : '加入房間';
   const scr = {
@@ -563,7 +589,9 @@ async function goOnline(code, host, o = {}) {
     openLobby().then((L) => { if (!abort.signal.aborted) L.host({ code, name: myName(), ...(quick ? { q: 1 } : {}) }); }, () => status('連不上大廳，朋友還是可以用連結進來'));
   }
   if (bg && !host) G.wait = { code, scr, stop, quick: true };   // 背景加入中：回標題要能收掉，選角返回看得到進度
-  if (!bg) menu.show(scr);
+  // 機台：背景等人，回標題不收（toTitle 看 cab），不換畫面
+  if (cab) { G.wait = { code, scr, stop, cab: true }; cabSay({ t: 'room', code }); }
+  if (!bg && !cab) menu.show(scr);
   const status = (t) => { msg = t; if (menu.cur === scr || (cardScr && menu.cur === cardScr)) menu.render(); };
   scr.status = status;
   const enter = () => {
@@ -595,8 +623,10 @@ async function goOnline(code, host, o = {}) {
     linked = true;
     if (abort.signal.aborted) { net.close(); return; }
     const peer = cleanName(net.peerName) || hostName || (host ? '朋友' : '房主');
-    const away = (pub || bg) && menu.cur !== scr;   // 等的時候跑去打電腦、練習了
-    if (pub || quick || bg) { G.wait = null; closeLobby(); }
+    // 等的時候跑去打電腦、練習了。機台在首頁、選單裡等到人就直接進房間，在打、在選角才先問
+    const away = cab ? G.mode === 'fight' || G.mode === 'select' : (pub || bg) && menu.cur !== scr;
+    if (pub || quick || bg || cab) { G.wait = null; closeLobby(); }
+    cabSay({ t: 'room', code: null });
     net.peerName = peer;
     G.net = net; G.side = host ? 0 : 1;
     G.room = { code, mode: 'fight', stage: ORDER[0], names: host ? [myName(), peer] : [peer, myName()], greet: host ? `${peer} 進來了` : `你進入了${peer}的遊戲` };
@@ -608,6 +638,7 @@ async function goOnline(code, host, o = {}) {
   } catch (e) {
     if (e.message === '取消') return;
     if (onFail) { onFail(e); return; }
+    if (cab) { if (G.wait?.code === code) G.wait = null; cabSay({ t: 'room', code: null }); return; }   // 機台開不了房：自己玩照常，隔壁進不來
     if (pub && menu.cur !== scr) { G.wait = null; return; }   // 在打電腦，不把人拉回來
     if (menu.cur !== scr) menu.show(scr);
     status(`連不上：${e.message}`);
@@ -658,7 +689,11 @@ function askComeBack(peer, host) {
   const fighting = G.mode === 'fight';
   if (fighting) { G.paused = true; music.muffle(true); }
   closeOverlay();
-  const decline = () => { G.net?.close(); G.net = null; G.room = null; resumeAfterAway(fighting); };
+  const decline = () => {
+    G.net?.close(); G.net = null; G.room = null;
+    if (CAB && !fighting) toTitle();   // 機台：回首頁，再開一間等人
+    else { resumeAfterAway(fighting); cabArm(); }
+  };
   menu.show({
     title: host ? `${peer} 進來了` : `找到對手：${peer}`, sub: '在房間等你',
     items: [
@@ -867,8 +902,9 @@ else if (qs.has('fight')) {
   qs.delete('room');
   history.replaceState(null, '', location.pathname + (qs.size ? '?' + qs : '') + location.hash);
   titleBg(); G.mode = 'title';
-  goOnline(code, false, { card: true });
+  goOnline(code, false, { card: !CAB, home: CAB });
 } else toTitle();
 requestAnimationFrame(loop);
 // 首頁（或直接開打）先畫幾個畫面才拿掉讀取卡：第一次畫的那一下頓藏在讀取卡底下
 if (booted) { await frames(10); booted.done(); }
+cabSay({ t: 'ready' });

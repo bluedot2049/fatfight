@@ -205,7 +205,7 @@ function applyHit(S, a, d, h, kind, fromX, isProj, m = null) {
   d.stop = h.stop;
   if (!isProj) { a.stop = h.stop; a.con = 1; }
   if (d.item >= 0 && (d.ik !== 1 || d.act === 'fall' || h.fall >= WPN_KNOCK || kind === 'sp' || kind === 'su')) dropItem(S, d, dir);   // 被打：重物、吃的一定掉，武器被重擊、必殺、打飛才掉
-  S.ev.push({ k: 'hit', s: a.i, d: d.i, x: ex, y: ey, z: ez, big: h.fall >= KNOCK || kind === 'su' || h.kd ? 1 : 0, dmg: h.dmg, combo: d.combo, kind, stop: h.stop, src: h.src, fx: h.fx });   // src：丟的東西 item、炸的 boom、撞的 body、甲板炮 shot（闖關的打法分看）
+  S.ev.push({ k: 'hit', s: a.i, d: d.i, x: ex, y: ey, z: ez, big: h.fall >= KNOCK || kind === 'su' || h.kd ? 1 : 0, dmg: h.dmg, combo: d.combo, kind, stop: h.stop, src: h.src, fx: h.fx, mv: m ? m.id : h.mv });   // mv：哪一招打的（飛行道具是放出它的那招；音效照這個挑）。src：丟的東西 item、炸的 boom、撞的 body、甲板炮 shot（闖關的打法分看）
 }
 
 // 打飛：a 是打的人（飛出去撞到別人算他的）
@@ -334,13 +334,13 @@ export function resolveHits(S, booms = []) {
       if (!hurtBoxes(d).some((b) => overlap(qb, box(d, b)))) continue;
       if (q.pierce) {                                    // 聲波：穿過去，每個人打一次
         q.hl.push(d.i);
-        applyHit(S, S.p[q.o], d, { dmg: q.dmg, fall: q.fall, bdef: 30, hs: 19, stop: q.kd ? 9 : 5, dvx: q.dvx ?? 16, dvy: q.dvy ?? 50, kd: q.kd ?? 0, fire: q.fire, y: q.y }, 'sp', q.x - q.vx, true);
+        applyHit(S, S.p[q.o], d, { dmg: q.dmg, fall: q.fall, bdef: 30, hs: 19, stop: q.kd ? 9 : 5, dvx: q.dvx ?? 16, dvy: q.dvy ?? 50, kd: q.kd ?? 0, fire: q.fire, y: q.y, mv: q.mv }, 'sp', q.x - q.vx, true);
         continue;
       }
       q.life = 0;
       // 集滿的大泡泡：一定打倒、飛得遠、頓得重
-      const h = q.big ? { dmg: q.dmg, fall: 80, bdef: 60, hs: 24, stop: 14, dvx: 40, dvy: 85, kd: 1, y: q.y }
-        : { dmg: q.dmg, fall: q.fall, bdef: 40, hs: 19, stop: 9, dvx: q.dvx ?? 26, dvy: q.dvy ?? 55, kd: q.kd ?? 0, fire: q.fire, y: q.y };
+      const h = q.big ? { dmg: q.dmg, fall: 80, bdef: 60, hs: 24, stop: 14, dvx: 40, dvy: 85, kd: 1, y: q.y, mv: q.mv }
+        : { dmg: q.dmg, fall: q.fall, bdef: 40, hs: 19, stop: 9, dvx: q.dvx ?? 26, dvy: q.dvy ?? 55, kd: q.kd ?? 0, fire: q.fire, y: q.y, mv: q.mv };
       applyHit(S, S.p[q.o], d, h, 'sp', q.x - q.vx, true);
       // 火球打到人：就地變成地上的火（打到的這個不再被火燒一次）
       if (q.lob) { q.hl.push(d.i); crackBoom(S, q, MOVES[S.p[q.o].ch][q.mv].proj.boom); }
@@ -358,7 +358,7 @@ function crackHits(S, q) {
   for (const d of S.p) {
     if (q.hl.includes(d.i) || !reach(d)) continue;
     q.hl.push(d.i);
-    applyHit(S, a, d, { dmg: b.dmg ?? q.dmg, fall: q.fall, bdef: 45, hs: 22, stop: 11, dvx: b.dvx ?? q.dvx ?? 16, dvy: b.dvy ?? q.dvy ?? 90, kd: b.kd ?? q.kd ?? 1, fire: b.fire ?? q.fire, y: 600 },
+    applyHit(S, a, d, { dmg: b.dmg ?? q.dmg, fall: q.fall, bdef: 45, hs: 22, stop: 11, dvx: b.dvx ?? q.dvx ?? 16, dvy: b.dvy ?? q.dvy ?? 90, kd: b.kd ?? q.kd ?? 1, fire: b.fire ?? q.fire, y: 600, mv: q.mv },
       'sp', q.aim ? a.x : q.x - q.vx, true);           // 火柱從腳下冒：面對企鵝擋得住
   }
 }

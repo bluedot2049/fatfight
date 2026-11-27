@@ -260,6 +260,11 @@ function decide(S, f, A) {
   // 抓住人：打幾下再丟（往場中間丟）
   if (f.act === 'grab') {
     if (S.f & 7) return 0;
+    // 會接拳的難度：抓著打中過一下，看魔力直接接必殺（fighter.js grabCancel）
+    if (f.gp && L.combo >= 2) {
+      const s = pickRush(S, f, A, L, K, R, rx, adz, true);
+      if (s) { A.gc = 0; A.q = cmd(s, tw); return A.q.shift(); }
+    }
     if (A.gc++ < 1 + (L.combo >> 1)) return BA;
     A.gc = 0;
     return (f.x > 0 ? LEFT : RIGHT) | BA;

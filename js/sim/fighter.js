@@ -16,7 +16,10 @@ const REL_IV = 22;              // 被抓的人掙脫（或對方鬆手）後幾
 export const GUARD_MIN = 4;     // 按一下防至少擋幾幀才放得開
 const CHAIN_BUF = 10;           // 打到人之後接下一拳：這麼久以前按的攻也算（含頓格，連打才不會掉拳）
 const HOVER = new Set(['stand', 'walk', 'run', 'brake', 'guard', 'crouch']), FLY_UP = 28;   // 會飛的：哪些狀態會浮回去、每幀升多少
-const MASH_DIZZY = 4, MASH_GRAB = 7;   // 頭暈、被抓的時候每按一下（任何鍵，剛按下的才算）早幾幀掙脫
+const MASH_DIZZY = 4, MASH_GRAB = 7;
+// 抓著打接必殺（使用者 2026-11-27）：抓著打第 GA_HIT 幀打中，之後（抓著、或那一拳還沒收完）輸入必殺指令就鬆手直接出招。
+//   被放開的人硬直 GC_STUN 幀、不給鬆手的打不到（REL_IV），必殺的起手接得上；倒值留著，所以接上的必殺多半直接打倒、不會再暈再抓
+const GA_HIT = 6, GC_STUN = 18;   // 頭暈、被抓的時候每按一下（任何鍵，剛按下的才算）早幾幀掙脫
 const FORK_BUF = 32;            // 頂點追加：停住前多久按的攻也算（整段往上衝的時間都算，提早按就好）
 
 export function newFighter(ch, i, team, x, face) {
@@ -32,7 +35,7 @@ export function newFighter(ch, i, team, x, face) {
     air: 0, airAtk: 0, dash: 0, runJ: 0, cr: 0,   // cr 蹲著（受擊框變矮）
     fallv: 0, bdef: 0,            // 倒值、防禦累積
     alt: 0, jug: 0, combo: 0, calm: 0,
-    hold: -1, grabT: 0,           // 抓著誰（或被誰抓著）、還能抓多久
+    hold: -1, grabT: 0, gp: 0,    // 抓著誰（或被誰抓著）、還能抓多久、這次抓著打中了幾下（打中過就能接必殺）
     ext: 0, chg: 0, hang: 0,      // 這招連按加了幾段、集氣幾幀、頂點還停幾幀（-1 停過了）
     by: -1, bh: 0, bnc: 0,        // 被打飛：誰打的（撞到人算他的）、撞過誰（位元）、彈過地了沒
     slm: 0,                       // 被往下砸（hits 的 slam），落地那一下送 slam 事件
@@ -210,10 +213,23 @@ function whiffCancel(S, f) {
 
 export function grabStart(S, f, o) {
   if (o.item >= 0) dropItem(S, o, 0);
-  setAct(f, 'grab'); f.hold = o.i; f.grabT = GRAB_TIME; f.vx = f.vz = 0; f.mv = '';
+  setAct(f, 'grab'); f.hold = o.i; f.grabT = GRAB_TIME; f.gp = 0; f.vx = f.vz = 0; f.mv = '';
   setAct(o, 'grabbed'); o.hold = f.i; o.face = -f.face; o.mv = ''; o.vx = o.vz = 0; o.vy = 0; o.air = 0;   // 空中抓到的（grab 2）：高度由抓的人管，不受重力
   S.ev.push({ k: 'grab', s: f.i });
 }
+// 抓著打打中過：必殺指令＝放開抓住的人、直接出那招（魔力不夠就照平常，攻＋方向還是丟）
+function grabCancel(S, f) {
+  if (!command(f.H)) return false;
+  const held = heldBy(S, f);
+  if (!trySpecial(S, f)) return false;
+  f.hold = -1;
+  for (const o of held) {
+    o.hold = -1; setAct(o, 'hit'); o.stun = GC_STUN; o.slide = 0; o.vx = o.vz = 0;
+    if (o.y > 0) { o.air = 1; o.vy = 0; }
+  }
+  return true;
+}
+
 // 一次抓好幾個（指令投的 all）：第一個照 grabStart，其他的也變成被 f 抓著（f.hold 只記第一個；誰被 f 抓著看 o.hold）
 export function grabAlso(S, f, o) {
   if (o.item >= 0) dropItem(S, o, 0);
@@ -253,6 +269,7 @@ export function think(S, f, noInput) {
 
   // 抓住人：攻＝抓著打、方向＋攻或跳＝丟
   if (f.act === 'grab') {
+    if (f.gp && grabCancel(S, f)) return;
     if ((k = pressed(H, BA)) >= 0) {
       consume(H, k);
       if (dx) { f.face = dx; startMove(S, f, MOVES[f.ch].toss); } else startMove(S, f, MOVES[f.ch].gA);
@@ -275,6 +292,7 @@ export function think(S, f, noInput) {
 
   // 出招中：普通技打到人之後可以接必殺、打完那下就能接下一拳；揮空的話收招最後一段可以翻滾、防、跳
   if (m) {
+    if (m.id === 'gA' && f.gp && f.t > GA_HIT && grabCancel(S, f)) return;   // 抓著打打中之後：必殺指令直接接
     if ((m.wpn || m.id === 'iDrink') && f.t <= 2 && tryToss(S, f)) return;   // 先按攻、兩幀內補按防：還是丟
     // 喝東西中：攻＝把瓶子丟出去，防、跳、翻滾＝不喝了
     if (m.id === 'iDrink') {
@@ -778,8 +796,8 @@ function atkStep(S, f, C) {
     const o = f.hold >= 0 ? S.p[f.hold] : null;
     if (!o || o.act !== 'grabbed') { f.hold = -1; if (f.t >= m.total - 1) toFree(f); return; }
     pin(f, o);
-    if (m.id === 'gA' && f.t === 6) {
-      o.hp -= 30; f.grabT -= 25;
+    if (m.id === 'gA' && f.t === GA_HIT) {
+      o.hp -= 30; f.grabT -= 25; f.gp++;
       S.ev.push({ k: 'hit', s: f.i, x: o.x, y: 800, z: o.z, dmg: 30 });
       if (o.hp <= 0) { o.hp = 0; throwOut(S, f, o, 16, 40); }
     }

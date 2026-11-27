@@ -309,7 +309,7 @@ export function selectScreen({ mode, side = 0, coop = false, done, back, onPick,
       if (st.ok[p]) return;
       if (st.cur[p] === RAND) st.cur[p] = (Math.random() * ROSTER.length) | 0;   // 隨機：介面這邊抽，線上傳出去的是抽到的那隻
       st.col[p] = col; st.ok[p] = true; play('pick');
-      play('entry', { s: p, ch: idOf(p) });                                       // 鑼一聲、念詩號
+      play('entry', { s: p, ch: idOf(p), mute: true });                           // 鑼一聲（詩號留到出場再念）
       onPick?.(idOf(p), true, col);
       if (solo && st.step === 0) { if (one) st.ok[1] = true; else st.step = 1; }
       scr.hover(); scr.refresh();

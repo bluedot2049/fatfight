@@ -179,3 +179,5 @@ body.touch #hud .pp.p1 { right: calc(26px + env(safe-area-inset-right, 0px) / va
   .movelist .sysgrid h4 { padding-top: 4px; }
   #overlay .close { margin-top: 8px; }
 }
+/* 煉金畫廊的機台裡（main.js 的 CAB）：全螢幕、加到主畫面是畫廊那一頁的事，只留「請橫拿」 */
+body.cab #turn .home, body.cab #turn .full { display: none !important; }

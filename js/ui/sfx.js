@@ -3,15 +3,17 @@
 // 音效：全部現場合成（雜訊＋低頻），不載檔。打中要悶要重、擋住是清脆的一下、連擊越打音越高、聲音跟著位置偏左偏右。
 // 必殺、超必殺每隻角色一套（KIT：海牛深海水壓、胖鼠閃電拳手），念招式名稱在 voice.js。音樂在 music.js，共用這裡的輸出。
 // 出場、回合、開打、KO、勝敗、頭目是戲台的段落（drama.js 鑼鼓嗩吶吉他＋台語戲腔念角色表的 say）。
+// 打中、揮空（2026-11-27）改放 sfxbank.js 預先合成的音檔：底（阻尼打擊）＋每一招的材質＋角色元素，變體照事件雜湊挑；還沒合成好之前照舊現場合成。
 
 import { ITEMS } from '../sim/items.js';
 import { MOVES, CHARS } from '../sim/chars/index.js';
 import { speak, speakTai, grunt } from './voice.js';
 import * as D from './drama.js';
+import * as BK from './sfxbank.js';
 const JP = typeof location !== 'undefined' && new URLSearchParams(location.search).has('jp');   // ?jp 念回日語，對照用
 export const TAI_SP = 0.8;   // 台語念必殺比超必殺快兩成（一拍的秒數乘這個）
 
-let ctx = null, master = null, sfxBus = null, musicBus = null, echoIn = null, verbIn = null, hallIn = null, noiseBuf = null;
+let ctx = null, master = null, sfxBus = null, musicBus = null, duckG = null, echoIn = null, verbIn = null, hallIn = null, noiseBuf = null;
 const HALL = { gap: 0.3, fb: 0.5 };   // 大招回音：每一聲隔幾秒、每彈一次剩多少
 // 聲音設定：0 全開、1 只有音效、2 靜音（記在這台瀏覽器）
 const SOUND_KEY = 'fatfight.sound';
@@ -29,7 +31,9 @@ function init() {
   const comp = ctx.createDynamicsCompressor();
   master.connect(comp); comp.connect(ctx.destination);
   sfxBus = ctx.createGain(); sfxBus.connect(master);
-  musicBus = ctx.createGain(); musicBus.connect(master);
+  // 音樂先過 duckG：重的打中那一下音樂讓一點路（打擊感），馬上回來
+  duckG = ctx.createGain(); duckG.connect(master);
+  musicBus = ctx.createGain(); musicBus.connect(duckG);
   // 回音：重的那幾下送一點進來，場地聽起來比較大
   echoIn = ctx.createGain(); echoIn.gain.value = 0.35;
   const dl = ctx.createDelay(0.5); dl.delayTime.value = 0.13;
@@ -58,6 +62,7 @@ function init() {
     if (ctx.createStereoPanner) { const s = ctx.createStereoPanner(); s.pan.value = p; d.connect(s); s.connect(sfxBus); } else d.connect(sfxBus);
   }
   applyMode();
+  BK.bankInit(ctx);
   return true;
 }
 function applyMode() {
@@ -129,6 +134,27 @@ function tone(t, dur, f0, f1, peak, type = 'sine', a = 0.004) {
   o.connect(g); g.connect(dest);
   o.start(t); o.stop(t + dur + a + 0.05);
 }
+
+// 放一個合成好的音檔（接到現在的 dest）。rate 音高（播放速度）、g 音量、late 晚幾秒
+function buf(b, rate = 1, g = 1, late = 0) {
+  const s = ctx.createBufferSource(); s.buffer = b; s.playbackRate.value = rate;
+  const n = ctx.createGain(); n.gain.value = g;
+  s.connect(n); n.connect(dest);
+  s.start(ctx.currentTime + late);
+  return { s, n };
+}
+// 音樂讓路：depth 掉多少（0–1），重的打中用
+const DUCK = [0, 0.12, 0.25, 0.4];
+function duck(w) {
+  if (!duckG || !DUCK[w]) return;
+  const t = ctx.currentTime, g = duckG.gain;
+  g.cancelScheduledValues(t); g.setValueAtTime(g.value, t);
+  g.setTargetAtTime(1 - DUCK[w], t, 0.008); g.setTargetAtTime(1, t + 0.05 + w * 0.03, 0.12 + w * 0.05);
+}
+// 事件 → 32 位元雜湊（挑變體、音高偏一點；回滾重算同一下拿到同一個）
+const evHash = (e) => (Math.imul((e.f | 0) + 1, 73856093) ^ Math.imul((e.s | 0) + 7, 19349663) ^ Math.imul((e.d ?? 0) + 3, 83492791) ^ Math.imul((e.combo | 0) + 1, 2654435761)) >>> 0;
+const jit = (h, sh, a) => 1 + ((((h >>> sh) & 255) / 255) - 0.5) * a;
+let voices = 0;                                  // 現在同時在響幾個打中（場上人多一起打，太多就只放底）
 
 // ---------- 超能力的零件 ----------
 // 劈啪：一把很短的雜訊點（電弧、碎石）。late 越大越擠在後面（蓄力越來越密）
@@ -735,7 +761,25 @@ const say = (tai, o, t) => speakTai(ctx, dest, noiseBuf, tai, o, t);
 
 const SND = {
   // 打中。big 重的；combo 第幾下（越後面音越高）；kind 'su' 超必殺多一層金屬聲
-  hit({ big, combo = 1, kind, ch }) {
+  // 新的：底（阻尼打擊，輕中重超四級）＋這一招的材質（角色的元素）。都是合成好的音檔，一下最多三個聲源
+  hit(a) {
+    const { big, combo = 1, kind, ch, dmg = 0, mv } = a;
+    const w = kind === 'su' ? 3 : big ? 2 : dmg >= 45 ? 1 : 0, h = a.h >>> 0;
+    const base = BK.pick('core:' + w, h);
+    if (!base) return SND.hitLive(a);
+    if (voices > 14) return;
+    const up = 1 + Math.min(8, Math.max(0, combo - 1)) * 0.025;     // 連擊越後面音越高（比以前收斂，底不要變尖）
+    const v = buf(base, up * jit(h, 0, 0.07), 1);
+    voices++; v.s.onended = () => voices--;
+    const acc = voices < 10 && mv && BK.pick('hit:' + ch + ':' + mv, h >>> 3);
+    if (acc) buf(acc, jit(h, 8, 0.08), 0.85);
+    else if (KIT[ch] && (kind === 'sp' || kind === 'su')) KIT[ch].hit(ctx.currentTime, big, kind === 'su');
+    else if (kind !== 'sp' && kind !== 'su' && !BK.VOICE[ch]) KIT[ch]?.hitN?.(ctx.currentTime, big);
+    if (kind === 'su') { const t = ctx.currentTime; tone(t, 0.25, 1320, 990, 0.08, 'square'); tone(t, 0.3, 1980, 1480, 0.05, 'square'); }
+    duck(w);
+  },
+  // 舊的現場合成（音效庫還沒合成好的那幾秒用）
+  hitLive({ big, combo = 1, kind, ch }) {
     const t = ctx.currentTime, up = 1 + Math.min(8, Math.max(0, combo - 1)) * 0.045;
     noise(t, 0.018, 3600, 0.7, 0.5, 'highpass');                                   // 最前面那一下脆的
     noise(t, big ? 0.2 : 0.09, (big ? 850 : 1500) * up, 0.8, big ? 0.9 : 0.6);     // 肉聲
@@ -837,14 +881,14 @@ const SND = {
   // 魔力夠放超必殺了
   ready() { const t = ctx.currentTime; tone(t, 0.1, 880, 880, 0.12, 'triangle'); tone(t + 0.09, 0.22, 1320, 1320, 0.14, 'triangle'); },
   // ── 戲台的段落 ──
-  // 第一回合出場：s 第幾隻（-1＝跳過，念到一半的詩號收掉）
-  entry({ s, ch }) {
+  // 第一回合出場：s 第幾隻（-1＝跳過，念到一半的詩號收掉）；mute 只敲鑼不念（選角確定時，詩號留到開打前的出場）
+  entry({ s, ch, mute }) {
     const t = ctx.currentTime;
     entryG?.gain.setTargetAtTime(0, t, 0.03); entryG = null;
     D.bind(ctx, noiseBuf, dest);
     if (s < 0) { D.skip(t); return; }
     const v = D.entry(t, s & 1), c = CHARS[ch];
-    if (!c?.say) return;
+    if (mute || !c?.say) return;
     route(0, 0, 0.2, 0.35);
     entryG = ctx.createGain(); entryG.connect(dest);
     speakTai(ctx, entryG, noiseBuf, c.say.in[1], { amp: 0.6, ...c.voice, mora: (c.voice.mora || 0.11) * 0.85 }, v);   // 念快一點，一隻 150 幀念得完
@@ -933,7 +977,7 @@ export function play(name, arg = {}, pan = 0) {
 export function sfxEvent(e, pan = 0, S = null) {
   const ch = S?.p[e.s]?.ch;
   switch (e.k) {
-    case 'hit': play('hit', { ...e, ch }, pan); if (e.d !== undefined && !e.armor) tryGrunt(S, e.d, 'hurt', e.big, pan, ctx && cutVoice(e.d)); break;
+    case 'hit': play('hit', { ...e, ch, mv: e.src ? '' : e.mv || S?.p[e.s]?.mv, h: evHash(e) }, pan); if (e.d !== undefined && !e.armor) tryGrunt(S, e.d, 'hurt', e.big, pan, ctx && cutVoice(e.d)); break;
     case 'block': play('block', e, pan); break;
     case 'break': play('shatter', e, pan); break;
     case 'dizzy': play('dizzy', e, pan); break;
@@ -985,8 +1029,12 @@ export function sfxEvent(e, pan = 0, S = null) {
 
 // 沒有事件的聲音：每個畫面看一次狀態，跟上一次比（揮拳、起跑、翻滾、舉防、泡泡破掉、魔力滿到可以放超必殺）
 let prev = null;
+const swing = [];                                // 每隻現在在響的揮空（被打斷要收掉）
 export function sfxState(S, panOf = () => 0) {
   if (!ctx || ctx.state !== 'running') { prev = null; return; }
+  if (!prev || prev.f > S.f || prev.p.length !== S.p.length) {
+    for (const f of S.p) if (!f.gone) BK.wantChar(f.ch);   // 場上的角色：每一招的音檔排進去合成（一隻大約 70 毫秒，分段做）
+  }
   if (!prev || prev.f > S.f || prev.p.length !== S.p.length) prev = { f: S.f, p: S.p.map((f) => ({ act: f.act, mv: f.mv, mp: f.mp, t: f.t })), pr: S.pr.filter((q) => !q.gr).map((q) => q.x) };
   S.p.forEach((f, i) => {
     const o = prev.p[i], pan = panOf(f.x);
@@ -995,9 +1043,16 @@ export function sfxState(S, panOf = () => 0) {
       if (f.mv === 'roll') play('roll', {}, pan);
       else if (f.mv === 'runS') play('slide', { ch: f.ch }, pan);
       else if (m && (m.kind === 'n' || !m.kind)) {
-        const heavy = (m.hits?.[0]?.dmg || 0) >= 55;
-        play('swing', { heavy, ch: f.ch }, pan);
+        const b = BK.pick('sw:' + f.ch + ':' + f.mv, (S.f * 2654435761 + i * 40503) >>> 0);
+        if (b) { route(pan); swing[i] = { ...buf(b, jit((S.f * 97 + i) >>> 0, 0, 0.08), 1), mv: f.mv }; }
+        else play('swing', { heavy: (m.hits?.[0]?.dmg || 0) >= 55, ch: f.ch }, pan);
       }
+    }
+    // 揮到一半被打斷（挨打、被抓、換招）：風聲馬上收掉，不會拳都沒了還在響
+    const sw = swing[i];
+    if (sw && (f.act !== 'atk' || f.mv !== sw.mv)) {
+      if (f.act !== 'stand' && f.act !== 'crouch' && f.act !== 'walk' && f.act !== 'air') { const t = ctx.currentTime; sw.n.gain.cancelScheduledValues(t); sw.n.gain.setValueAtTime(sw.n.gain.value, t); sw.n.gain.setTargetAtTime(0, t, 0.015); }
+      swing[i] = null;
     }
     if (f.act === 'atk' && o.mv !== f.mv && KIT[f.ch]?.cue?.[f.mv]?.start) play('cue', { ch: f.ch, id: f.mv, cue: 'start' }, pan);   // 換成這招就響（大掄捲到）
     // 招式中途：起跳那幀（鑽地飛出來）
@@ -1016,3 +1071,24 @@ export function sfxState(S, panOf = () => 0) {
   prev.pr = flying.map((q) => q.x);
   prev.f = S.f;
 }
+
+// 試聽（tools/sfx-board.html、之後的招式表）：照遊戲裡的路放一招的揮空、打中。what 'sw' 只揮、'hit' 只打中、'both' 揮完在打得到的那幀打中；live 1＝舊的現場合成對照
+export function sfxPreview(ch, mv, what = 'both', live = 0) {
+  if (!init()) return;
+  unlockAudio();
+  BK.wantChar(ch);
+  const m = MOVES[ch]?.[mv], hs = m?.hits || [];
+  let dmg = 0, kd = 0;
+  for (const x of hs) { dmg = Math.max(dmg, x.dmg || 0); kd |= x.kd ? 1 : 0; }
+  if (mv === 'toss') { dmg = 70; kd = 1; } else if (mv === 'gA') dmg = 30;
+  const kind = m?.kind === 'sp' || m?.kind === 'su' ? m.kind : 'n';
+  const h = (Math.random() * 4294967296) >>> 0;
+  const hitIt = () => play(live ? 'hitLive' : 'hit', { ch, mv, kind, dmg, big: kd || dmg >= 60 || kind === 'su' ? 1 : 0, combo: 1, h });
+  const sw = what !== 'hit' && kind === 'n' && hs.length && BK.pick('sw:' + ch + ':' + mv, h);
+  if (sw && !live) { route(0); buf(sw, 1, 1); }
+  else if (what !== 'hit' && kind === 'n' && hs.length) play('swing', { heavy: dmg >= 55, ch });
+  if (what === 'sw') return;
+  if (what === 'hit') return hitIt();
+  setTimeout(hitIt, BK.crestOf(m) * 1000);
+}
+export const sfxReady = (ch) => BK.has('core:0') && (!ch || BK.keysOf(ch).every(BK.has));
