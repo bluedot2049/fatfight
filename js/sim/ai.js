@@ -5,6 +5,7 @@
 import { Z_REACH, zNear, zFar, JD_WIN_Q, DOWN_QUICK, UP, DOWN, LEFT, RIGHT, BA, BJ, BD, BS } from './const.js';
 import { CHARS, MOVES, ALL } from './chars/index.js';
 import { moveOf } from './fighter.js';
+import { kit } from './card.js';
 import { ITEMS } from './items.js';
 import { TRAPS } from './traps.js';
 
@@ -87,11 +88,9 @@ const STYLE = {
 const REACH = {};
 // 角色的必殺分成三種：far 飛行道具、air 對空（起手無敵＋往上跳）、rush 衝過去的；超必殺另外一欄
 export const KIT = {};
-for (const C of ALL) {
-  const R = (REACH[C.id] = {});
-  for (const [id, m] of Object.entries(MOVES[C.id])) R[id] = reachOf(m);
+function kitOf(C) {
   const kind = (s) => (s.m.inv && s.d === 'u' ? 'air' : s.m.proj ? 'far' : s.m.hurl ? 'hurl' : 'rush');   // 對空：上＋起手打不到（往上跳的、企鵝原地踩火的、爛熊噴大火球的）
-  KIT[C.id] = {
+  return {
     far: C.specials.filter((s) => kind(s) === 'far'),
     air: C.specials.filter((s) => kind(s) === 'air'),
     rush: C.specials.filter((s) => kind(s) === 'rush'),
@@ -106,6 +105,26 @@ for (const C of ALL) {
     style: C.ai?.style || 'mid',     // 打法（2026-11-26 使用者：突進和非突進分開想）：rush 突進、zone 遠攻、grab 重投、mid 中間（灰牛）。見 STYLE
   };
 }
+for (const C of ALL) {
+  const R = (REACH[C.id] = {});
+  for (const [id, m] of Object.entries(MOVES[C.id])) R[id] = reachOf(m);
+  KIT[C.id] = kitOf(C);
+}
+// 身上有強化卡的（card.js）：照他自己的招式表另算一份（卡改了框、飛行道具、魔力），算過的照 kit 存著
+const CARD_AI = new WeakMap();
+function cardAI(f) {
+  const k = kit(f);
+  let a = CARD_AI.get(k);
+  if (!a) {
+    const R = {};
+    for (const [id, m] of Object.entries(k.M)) R[id] = reachOf(m);
+    a = { R, K: kitOf(k.C) };
+    CARD_AI.set(k, a);
+  }
+  return a;
+}
+const reachFor = (f) => (f.ck ? cardAI(f).R : REACH[f.ch]);
+const kitFor = (f) => (f.ck ? cardAI(f).K : KIT[f.ch]);
 
 // 對方的角色表寫了 ai.zone（鼻象：有大絕的魔力時身邊是死地）：現在算不算數，算的話回傳不能進的距離（身體之間），不然 0。
 // 對方收招、倒著、頭暈、被抓、在空中的時候不怕（那是衝進去打的時候）
@@ -232,7 +251,7 @@ function flash(S, f, A) {
 }
 
 function decide(S, f, A) {
-  const L = lvOf(A), C = CHARS[f.ch], K = KIT[f.ch], R = REACH[f.ch];
+  const L = lvOf(A), C = kit(f).C, K = kitFor(f), R = reachFor(f);
   if (f.act === 'parried') A.pd = 1;                          // 被格檔過：之後多用撞飛
   if (STUNNED.has(f.act) && f.act !== 'block') {
     A.q.length = 0; A.gt = 0; A.pt = 0; A.chain = 0; A.eng = 0;
@@ -552,7 +571,7 @@ function burstAI(S, f, A, L) {
     if (!m || !m.hits.length || m.flash) continue;
     const key = e.i * 65536 + ((S.f - e.t) & 0xffff);
     if (key === A.bj) continue;
-    const r = REACH[e.ch][m.id], ex = Math.abs(e.x - f.x) - CHARS[f.ch].w, ez = Math.abs(e.z - f.z);
+    const r = reachFor(e)[m.id], ex = Math.abs(e.x - f.x) - CHARS[f.ch].w, ez = Math.abs(e.z - f.z);
     const k = m.hits[0].on[0] - e.t + e.stop;
     if (!r || k < 0 || k > 10 || ex > r.far + 200 || ez > r.zr) continue;
     A.bj = key;
@@ -581,7 +600,7 @@ function react(S, f, A, L, K, tw, aw, sx) {
     if (m && e.t >= L.react) {
       const key = e.i * 65536 + ((S.f - e.t) & 0xffff);
       if (key === A.seen) continue;
-      const r = REACH[e.ch][m.id];
+      const r = reachFor(e)[m.id];
       if (!r || e.t > r.end) continue;
       const facing = (f.x - e.x) * e.face >= -100;
       if (!facing || ex > r.far + 300 || ez > r.zr + 150) continue;
@@ -593,7 +612,7 @@ function react(S, f, A, L, K, tw, aw, sx) {
         return -1;
       }
       // 格檔：打到前 2 幀按，故意偏 ±3（會失手）；超必殺、撞飛不格
-      if (L.parry && k >= 0 && !m.flash && m !== CHARS[e.ch].normals.CD && rnd(A) < L.parry) {
+      if (L.parry && k >= 0 && !m.flash && m !== kit(e).C.normals.CD && rnd(A) < L.parry) {
         const wait = Math.max(0, k - 2 + (rnd(A) % 7) - 3);
         A.q = [f.face !== sx ? tw : 0, ...Array(Math.max(0, wait - 1)).fill(0), ...Array(14).fill(BD)];
         if (!wait) A.q.shift();

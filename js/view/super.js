@@ -3,7 +3,8 @@
 // 超必殺的演出：發動時全場暗成墨黑、只留放招的那隻和特效（頂上一道追光）、最後一下全畫面剪影、用超必殺 KO 換成寶石色光芒的背景。只讀狀態和事件，不改遊戲。
 
 import * as THREE from 'three';
-import { CHARS, MOVES } from '../sim/chars/index.js';
+import { CHARS } from '../sim/chars/index.js';
+import { movesOf } from '../sim/card.js';
 
 const U = 1 / 1000;
 const LIT = 1, SIL = 2;                 // 圖層：暗下去之後再畫一次亮的、剪影
@@ -15,7 +16,7 @@ const IVORY = new THREE.Color('#f2e8d4');
 const WARM = new THREE.Color('#fff0d0');
 
 const gemOf = (S, i) => { const C = CHARS[S.p[i]?.ch]; return new THREE.Color(C?.pal?.[0] || C?.color || '#ffffff'); };
-const inSuper = (p) => !!p && p.act === 'atk' && MOVES[p.ch]?.[p.mv]?.kind === 'su';
+const inSuper = (p) => !!p && p.act === 'atk' && movesOf(p)?.[p.mv]?.kind === 'su';
 function layer(o, L, on) { o.traverse((c) => { if (on) c.layers.enable(L); else c.layers.disable(L); }); }
 
 // 追光：一個開口的圓錐，中間亮、邊緣和上面淡掉（前後兩面疊起來中間更亮）
@@ -106,7 +107,7 @@ export class SuperShow {
     if (e.stop >= 14) return true;
     const p = S.p[e.s];
     if (!inSuper(p)) return false;
-    const hs = MOVES[p.ch][p.mv].hits, L = hs?.[hs.length - 1];
+    const hs = movesOf(p)[p.mv].hits, L = hs?.[hs.length - 1];
     return !!L && p.t >= L.on[0];
   }
 

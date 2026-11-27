@@ -4,6 +4,7 @@
 // 連擊數、回合字卡（緞帶）、超必殺的緞帶和魔法陣、左下角可開的招式表。排版照 1600 寬畫，整塊照視窗縮放（.fit）。顏色照角色的寶石色（arcane.js 的 pal）。
 // 第一回合出場（root 加 entry）：上下黑邊、玩家牌收起來，輪到的那隻旁邊寫名字、種族和直書的詩號（一個字一個字浮出來，跟念的速度差不多）。
 // 闖關（root 加 quest）：回合章和勝場收起來，玩家牌多命和分數；下面頭目的大血條、敵人頭上的小血條、往右的箭頭、接關倒數。
+// 強化卡（sim/card.js）：打完一段中間出三張卡（S.pick，游標、選了哪張照狀態畫）；玩家牌底下一排小章是身上的卡。
 
 import { HP, MP, CONT_TIME } from '../sim/const.js';
 import { entryAt, entryLen, step, newMatch } from '../sim/match.js';
@@ -19,6 +20,14 @@ import { setPal, seal, ROMAN, studs } from './arcane.js';
 import { portraitURL } from '../view/portrait.js';
 import { markOf, isAlt } from '../view/mark.js';
 import { frame } from './ornate.js';
+import { BY as CARD, ACT, cardList } from '../sim/card.js';
+import { CARDS } from '../sim/cards.js';
+import { FLOORS, KIND } from '../sim/route.js';
+
+// 路線圖上的房間特色（關卡表每間房的 tag）
+const roomTag = (S, n) => { const Q = QUESTS[S.quest]; return (n.k === 'f' ? Q.fights[n.t] : n.k === 'e' ? Q.elites[n.t] : null)?.tag || ''; };
+const WAY_NAME = { f: '戰鬥', e: '精英', r: '營火', c: '寶箱', b: '頭目' };
+const WAY_NOTE = { f: '打完選一張卡', e: '打完選稀有卡', r: '不用打　休息（補滿血　命＋1）或疊一張卡', c: '不用打　選一張稀有卡　拿了扣三成血', b: '' };
 
 const FREE_CUE = new Set(['stand', 'walk', 'crouch']);   // 這幾個動作按蹲才會撿
 
@@ -40,6 +49,7 @@ export class Hud {
         <div class="wins"><b></b><b></b></div>
         <div class="pas"><b></b><em></em></div>
         <div class="qi"><span class="lives"></span><b class="score">0</b></div>
+        <div class="deck"></div>
       </div>`;
     root.innerHTML = `
       <div class="lbox"><i></i><i></i></div>
@@ -57,6 +67,8 @@ export class Hud {
         <div class="goarrow"><b>前進</b><i></i></div>
         <div class="tide"><i class="l"></i><b>洋流</b><i class="r"></i></div>
         <div class="cont"><h3>接關</h3><b class="n"></b><p></p></div>
+        <div class="kpick"><div class="kh"></div><p class="kb"></p><div class="kg"></div><p class="kf"></p></div>
+        <div class="kway"><div class="kh"></div><div class="wm"></div><p class="wd"></p><p class="kf"></p></div>
       </div>
       <div class="ebars">${'<i class="eb"><b></b></i>'.repeat(16)}</div>
       <div class="pops">${'<i class="pop"></i>'.repeat(12)}</div>
@@ -68,7 +80,7 @@ export class Hud {
       const pp = $(`.pp.p${i}`, root);
       return { pp, img: $('.medal .img', pp), tag: $('.tag', pp), nm: $('.nm b', pp), fill: $('.hp .fill', pp), trail: $('.hp .trail', pp),
         mp: [...pp.querySelectorAll('.mp i')], sp: $('.sp', pp), wins: [...pp.querySelectorAll('.wins b')], combo: $(`.combo.p${i}`, root), sup: $(`.super.p${i}`, root),
-        lives: $('.lives', pp), score: $('.score', pp), pas: $('.pas', pp), pasB: $('.pas b', pp), pasV: $('.pas em', pp) };
+        lives: $('.lives', pp), score: $('.score', pp), pas: $('.pas', pp), pasB: $('.pas b', pp), pasV: $('.pas em', pp), deck: $('.deck', pp) };
     });
     this.trail = [HP, HP];
     this.last = [{}, {}];          // 上一次畫的值，沒變就不碰 DOM
@@ -90,7 +102,8 @@ export class Hud {
   // 讀取時先要一次會用到的字和頭像：思源宋體是分包下載的，招式名第一次出現才抓的話會頓一下、字還會跳。回傳字載好的 promise
   warm() {
     const names = Object.values(CHARS).flatMap((c) => [c.name, c.full, ...(c.say ? [c.say.in[0], c.say.win[0], c.say.lose[0]] : []), c.blurb || '', c.card?.type || '', c.card?.attr || '', ...c.specials.map((s) => s.name), ...c.supers.map((s) => s.name)]).join('');
-    const text = names + Object.values(QUESTS).map((q) => q.name + (q.bossName || '') + (q.bossSay || '') + (q.rageName || '')).join('') + '連擊傷害第一二三四五回合開打勝平手破防超必殺練習木樁選角色好了等對方力距速定發動關海底沉船前進接關按繼續分數歸零頭目出局過結束電腦';
+    const text = names + Object.values(QUESTS).map((q) => q.name + (q.bossName || '') + (q.bossSay || '') + (q.rageName || '')).join('') + '連擊傷害第一二三四五回合開打勝平手破防超必殺練習木樁選角色好了等對方力距速定發動關海底沉船前進接關按繼續分數歸零頭目出局過結束電腦'
+      + CARDS.map((c) => c.name + c.ico + c.note).join('') + '選一張卡拿了疊第數值性質觸發規則專屬合體搖桿左右';
     let fonts = Promise.resolve();
     try {
       fonts = Promise.all([
@@ -178,6 +191,29 @@ export class Hud {
     upd();
     await frames(8);
     S.ph = 'fight';
+    // 強化卡三選一：三種稀有度的框、游標浮起來、蓋「拿了」；玩家牌底下的小章
+    me.ck = 'reach,reach,pierce,dj';
+    S.pick = { o: [['reach', 'pierce', 'dj']], c: [1], d: [-1], t: 0, then: 'go' };
+    upd();
+    await frames(10);
+    S.pick.d = [2];
+    upd();
+    await frames(8);
+    S.pick = null; me.ck = '';
+    upd();
+    // 選路：路線圖、走得到的閃、游標那個
+    S.way = { o: S.rt[1].map((n, i) => i), c: 0, d: -1, t: 0 };
+    upd();
+    await frames(8);
+    S.way = null;
+    this.event({ k: 'rest', s: 0 }, S);
+    // 營火的選項（休息那張是 ACT 的特別卡）
+    me.ck = 'reach';
+    S.pick = { o: [['@rest', 'reach']], c: [0], d: [-1], t: 0, then: 'go' };
+    upd();
+    await frames(8);
+    S.pick = null; me.ck = '';
+    upd();
     this.event({ k: 'clear' }, S);
     upd();
     await frames(12);
@@ -247,6 +283,9 @@ export class Hud {
     for (const o of this.pops) { o.t = 9; o.el.classList.remove('on'); }
     $('.tide', this.root).className = 'tide'; $('.thint', this.root).classList.remove('on');
     for (const c of this.cues) { c.t = 0; c.el.classList.remove('on'); }
+    this.kKey = ''; $('.kpick', this.root).classList.remove('on'); this.root.classList.remove('kon');
+    this.wKey = ''; $('.kway', this.root).classList.remove('on');
+    for (const e of this.el) { e.dk = null; e.deck.innerHTML = ''; }
   }
 
   update(S, dt) {
@@ -327,7 +366,15 @@ export class Hud {
       const e = this.el[i], lv = S.lives[i], sc = S.score[i];
       if (lv !== e.lv) { e.lv = lv; e.lives.innerHTML = '<i></i>'.repeat(Math.max(0, lv)); }
       if (sc !== e.sc) { e.sc = sc; e.score.textContent = sc.toLocaleString('en-US'); }
+      if ((p.ck || '') !== e.dk) {                     // 身上的卡：一張一顆小章，疊了寫幾張
+        e.dk = p.ck || '';
+        e.deck.innerHTML = cardList(p).map(([c, n]) => `<i class="r${c.rare}" title="${c.name}">${c.ico}${n > 1 ? `<sub>${n}</sub>` : ''}</i>`).join('');
+      }
     });
+    this.cardPick(S, ps);
+    this.wayMap(S, ps);
+    const kon = (!!S.pick && S.pick.t >= 0) || !!S.way;
+    if (kon !== q.kon) { q.kon = kon; this.root.classList.toggle('kon', kon); }   // 選卡、選路時藏起頭上的血條、浮字、提示
     const boss = S.boss >= 0 ? S.p[S.boss] : null, bel = $('.boss', this.root);
     // 一起上的頭目（營火三冒險者）：一條血條算三個人加起來的，名字照關卡表的 bossName
     const pack = boss && boss.pack ? S.p.filter((f) => f.pack && f.team === boss.team) : null;
@@ -362,6 +409,75 @@ export class Hud {
       const left = Math.max(0, Math.ceil((CONT_TIME - S.pt) / 60));
       if (left !== q.left) { q.left = left; gtSet($('.n', cel), String(left), 0.05, 0.05); }
     }
+  }
+
+  // 強化卡三選一（S.pick）：每個玩家一排三張，游標那張浮起來，選了的蓋章、其他的暗下去。狀態沒變就不碰 DOM
+  cardPick(S, ps) {
+    const P = S.pick, el = $('.kpick', this.root), on = !!P && P.t >= 0;
+    const key = on ? JSON.stringify([P.o, P.c, P.d, P.cost, P.b, device.touch]) : '';
+    if (key === this.kKey) return;
+    this.kKey = key;
+    el.classList.toggle('on', on);
+    if (!on) return;
+    const two = ps.filter(Boolean).length > 1;
+    const kind = (c) => (c.id === '@reroll' ? '評價 A' : c.id[0] === '@' ? '營火' : c.need ? '合體' : c.ch ? '專屬' : c.rule ? '規則' : c.trig ? '觸發' : c.rare === 1 ? '數值' : '性質');
+    const row = (f) => {
+      const k = f.pl, o = P.o[k] || [], had = cardList(f).reduce((m, [c, n]) => ((m[c.id] = n), m), {});
+      if (!o.length) return '';
+      const cards = o.map((id, i) => {
+        const c = CARD[id] || ACT[id], cur = P.c[k] === i, got = P.d[k] === i, n = had[id] || 0;
+        return `<div class="kc r${c.rare}${cur && P.d[k] < 0 ? ' cur' : ''}${got ? ' got' : P.d[k] >= 0 ? ' off' : ''}">
+          <small class="kk">${kind(c)}</small><b class="ki">${c.ico}</b><h5>${c.name}</h5><p>${c.note}</p>
+          ${n ? `<em class="kn">疊第 ${n + 1} 張</em>` : ''}${got ? '<span class="ks">拿了</span>' : ''}</div>`;
+      }).join('');
+      return `<div class="krow">${two ? `<span class="kp">${k + 1}P</span>` : ''}${cards}</div>`;
+    };
+    setPal(el, ps.find(Boolean)?.ch);
+    el.classList.toggle('two', two);
+    const fire = P.o.some((o) => o?.includes('@rest'));   // 營火：休息或疊一張
+    $('.kh', el).innerHTML = gt(fire ? '休息或疊一張' : '選一張卡', { cls: 't', sw: 0.05, k: 0.06, tag: 'b' });
+    $('.kg', el).innerHTML = ps.filter(Boolean).map(row).join('');
+    // 這次的加成：評價 S 四選一、A 可以重抽、連勝必有傳說（quest.js bonusOf）
+    const bon = (f) => {
+      const B = P.b?.[f.pl];
+      if (!B) return '';
+      const t = [B.n === 4 ? '評價 S　多一張' : '', B.re ? '評價 A　可以重抽' : '', B.leg ? `連勝 ${B.st}　必有傳說` : ''].filter(Boolean).join('　');
+      return t && (two ? `<span>${f.pl + 1}P　${t}</span>` : `<span>${t}</span>`);
+    };
+    $('.kb', el).innerHTML = ps.filter(Boolean).map(bon).filter(Boolean).join('');
+    const cost = P.cost ? `　拿了扣${'零一二三四五六七八九'[P.cost / 10 | 0]}成血` : '';
+    $('.kf', el).innerHTML = (device.touch ? `搖桿左右 選　<b>${btnName('A')}</b> 拿` : `<kbd>${keyName(KEYMAP[0].left[0])}</kbd><kbd>${keyName(KEYMAP[0].right[0])}</kbd> 選　<kbd>${btnName('A')}</kbd> 拿`) + cost;
+  }
+
+  // 選路（S.way，route.js）：六站一排往右，每站上中下三條路；走過的路亮金線，現在這站一圈，走得到的閃、游標那個放大；底下寫那站是什麼
+  wayMap(S, ps) {
+    const W = S.way, el = $('.kway', this.root), on = !!W;
+    const key = on ? JSON.stringify([S.sec, S.path, W.c, W.d, device.touch]) : '';
+    if (key === this.wKey) return;
+    this.wKey = key;
+    el.classList.toggle('on', on);
+    if (!on) return;
+    const rt = S.rt, DX = 128, DY = 92, R = 30, w = DX * (FLOORS - 1) + R * 2 + 16, h = DY * 2 + R * 2 + 16;
+    const X = (f) => R + 8 + f * DX, Y = (l) => R + 8 + l * DY;
+    const walked = (f, i) => f <= S.sec && S.path[f] === i;
+    const opt = (f, i) => f === S.sec + 1 && W.o.includes(i);
+    let lines = '', dots = '';
+    rt.forEach((row, f) => row.forEach((n, i) => {
+      if (f + 1 < rt.length) rt[f + 1].forEach((o, j) => {
+        if (Math.abs(o.l - n.l) > 1) return;
+        const c = walked(f, i) && (walked(f + 1, j) || (f === S.sec && opt(f + 1, j))) ? (walked(f + 1, j) ? 'walk' : j === W.o[W.c] ? 'walk next' : 'can') : f < S.sec ? 'past' : '';
+        lines += `<line class="${c}" x1="${X(f)}" y1="${Y(n.l)}" x2="${X(f + 1)}" y2="${Y(o.l)}"/>`;
+      });
+      const cls = [`w${n.k}`, walked(f, i) ? 'done' : '', f === S.sec && walked(f, i) ? 'here' : '', opt(f, i) ? 'opt' : '', opt(f, i) && W.o[W.c] === i ? 'cur' : '', f <= S.sec && !walked(f, i) ? 'gone' : ''].filter(Boolean).join(' ');
+      const tag = f > S.sec ? roomTag(S, n) : '';
+      dots += `<g class="${cls}" transform="translate(${X(f)} ${Y(n.l)})"><circle r="${R}"/><text dy=".36em">${KIND[n.k]}</text>${tag ? `<text class="tg" y="${R + 20}">${tag}</text>` : ''}</g>`;
+    }));
+    $('.wm', el).innerHTML = `<svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">${lines}${dots}</svg>`;
+    const nx = rt[S.sec + 1][W.o[W.c]], k = nx.k, tg = roomTag(S, nx);
+    $('.wd', el).innerHTML = `<b class="w${k}">${WAY_NAME[k]}</b>${tg ? `<em>${tg}</em>` : ''}${WAY_NOTE[k]}`;
+    $('.kh', el).innerHTML = gt('選路', { cls: 't', sw: 0.05, k: 0.06, tag: 'b' });
+    setPal(el, ps.find(Boolean)?.ch);
+    $('.kf', el).innerHTML = device.touch ? `搖桿上下 選　<b>${btnName('A')}</b> 走` : `<kbd>${keyName(KEYMAP[0].up[0])}</kbd><kbd>${keyName(KEYMAP[0].down[0])}</kbd> 選　<kbd>${btnName('A')}</kbd> 走`;
   }
 
   // 場地機關：洋流的預告和方向（上面中間）、甲板炮能點的時候站旁邊的玩家頭上寫按哪顆；打法分的浮字跟著打中的地方往上飄
@@ -477,12 +593,15 @@ export class Hud {
         break;
       }
       case 'grade': {                                 // 一段打完的評價（最後一段跟著過關一起，不另外出字卡）
-        if (e.n >= QUESTS[S.quest].secs.length - 1) break;
+        if (e.n >= FLOORS - 1) break;
         const ps = this.players(S).filter(Boolean), G = 'SABC';
         const txt = ps.map((f) => (ps.length > 1 ? `${f.pl + 1}P ` : '') + (G[S.grade[f.pl][e.n]] || '')).join('　');
         this.announce(txt, 1.6, 'round', '這段評價');
         break;
       }
+      case 'rest': this.flash(0.25); break;            // 休息：補滿血（營火字卡在進站時出）
+      case 'lock': if (e.kind === 'e') this.announce('精英', 1.4, 'round', '帶卡的雜兵'); else if (e.kind === 'c') this.announce('寶箱', 1.4, 'go', '拿了扣三成血'); else if (e.kind === 'r') this.announce('營火', 1.4, 'go', '休息或疊一張'); break;
+      case 'card': if (S.quest) break; this.callout(sideOf(e.s), CARD[e.id]?.name || '', '強化卡'); break;   // 闖關有三選一的畫面，不另外出緞帶（之後對戰抽卡用）
       case 'out': if (this.players(S).filter(Boolean).length > 1) this.callout(this.players(S).indexOf(S.p[e.s]) === 1 ? 1 : 0, `按 ${btnName('A')} 接關`, '出局'); break;
       case 'round': if (!S.opt.train) this.announce(`第${N[e.n - 1] || e.n}回合`, 1.5, 'round', `ROUND ${ROMAN[e.n - 1] || e.n}`); else this.announce('練習', 1.2); break;
       case 'fight': this.announce('開打', 0.8, 'go'); break;

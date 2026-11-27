@@ -566,6 +566,89 @@ body:not(:has(#menu.title:not([hidden]))) #a2hs { display: none; }   /* 沒按�
 @keyframes tideBlink { 50% { opacity: .35; } }
 body.touch #hud .tide { top: 222px; scale: 1.5; }   /* 手機：上面中間是暫停鈕，放在它底下、字放大 */
 
+/* 強化卡（2026-11-27，sim/card.js）：打完一段中間三選一。牌面羊皮紙、上面一顆圓章寫一個字；框照稀有度：普通銅、稀有寶石藍、傳說金＋光。
+   游標那張浮起來、選了蓋「拿了」、其他暗下去。兩個人的時候左右各一排、縮小一點。玩家牌底下一排小章是身上的卡 */
+#hud .kpick { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; opacity: 0; pointer-events: none; transition: opacity .25s;
+  background: radial-gradient(ellipse at 50% 55%, rgba(13, 10, 12, .78), rgba(13, 10, 12, .35) 70%, transparent); }
+#hud .kpick.on { opacity: 1; }
+#hud.kon .ebars, #hud.kon .pops, #hud.kon .pcue, #hud.kon .thint, #hud.kon .goarrow { visibility: hidden; }
+#hud .kpick .kh { margin-bottom: 0; }
+#hud .kpick .kb { display: flex; gap: 48px; min-height: 1.4em; margin: 6px 0 58px; font-size: 22px; font-weight: 900; letter-spacing: .14em; color: #f0c860; text-shadow: 0 2px 0 #000, 0 0 12px rgba(240, 200, 96, .5); }
+body.touch #hud .kpick .kh { visibility: hidden; }   /* 手機：上面中間是暫停鈕，標題拿掉（底下有按法） */
+#hud .kpick .kh b { font-size: 46px; font-weight: 900; letter-spacing: .3em; }
+#hud .kpick .kg { display: flex; gap: 60px; }
+#hud .kpick .krow { position: relative; display: flex; gap: 28px; }
+#hud .kpick.two .krow { gap: 16px; zoom: .74; }
+#hud .kpick .kp { position: absolute; left: 50%; top: -46px; translate: -50% 0; font: 900 24px/1 var(--cinzel); letter-spacing: .1em; color: var(--brown); background: var(--parchbg); padding: 6px 18px 5px;
+  clip-path: polygon(0 0, 100% 0, calc(100% - 8px) 50%, 100% 100%, 0 100%, 8px 50%); }
+#hud .kc { --rc: #b08a5a; --rg: #5a3c1c; position: relative; width: 236px; height: 330px; box-sizing: border-box; padding: 64px 16px 14px; display: flex; flex-direction: column; align-items: center; text-align: center;
+  color: var(--brown); background: var(--noise), var(--parchbg); border: 3px solid var(--rc); border-radius: 10px;
+  box-shadow: 0 0 0 1px #0a0604, inset 0 0 0 4px rgba(255, 250, 235, .35), inset 0 0 0 5px color-mix(in srgb, var(--rc) 60%, transparent), 0 14px 26px rgba(0, 0, 0, .6);
+  transition: translate .15s, scale .15s, filter .2s, box-shadow .2s; }
+#hud .kc.r0 { --rc: #e08a3c; --rg: #5a2a0c; }   /* 營火的「休息」 */
+#hud .kc.r2 { --rc: #5fa3e8; --rg: #173a66; }
+#hud .kc.r3 { --rc: #f0c860; --rg: #6b4a14; box-shadow: 0 0 0 1px #0a0604, inset 0 0 0 4px rgba(255, 250, 235, .35), inset 0 0 0 5px rgba(240, 200, 96, .6), 0 14px 26px rgba(0, 0, 0, .6), 0 0 26px rgba(240, 200, 96, .55); }
+#hud .kc .kk { position: absolute; top: 10px; left: 12px; font-size: 14px; font-weight: 700; letter-spacing: .2em; color: color-mix(in srgb, var(--rg) 85%, #000); }
+#hud .kc .ki { position: absolute; top: -34px; left: 50%; width: 84px; height: 84px; margin-left: -42px; display: grid; place-items: center; border-radius: 50%; font-size: 40px; font-weight: 900; line-height: 1;
+  color: #fff6e2; text-shadow: 0 2px 0 rgba(0, 0, 0, .6); background: radial-gradient(circle at 50% 32%, color-mix(in srgb, var(--rc) 60%, #fff) 0, var(--rc) 35%, var(--rg) 100%);
+  border: 3px solid #e6d3a0; box-shadow: 0 0 0 1px #0a0604, inset 0 -6px 12px rgba(0, 0, 0, .4), 0 6px 12px rgba(0, 0, 0, .5); }
+#hud .kc h5 { margin: 0 0 10px; font-size: 30px; font-weight: 900; letter-spacing: .2em; padding-left: .2em; }
+#hud .kc p { margin: 0; font-size: 18px; font-weight: 700; line-height: 1.5; letter-spacing: .04em; color: #4a3418; }
+#hud .kc .kn { position: absolute; bottom: 12px; left: 0; right: 0; font-style: normal; font-size: 15px; font-weight: 700; letter-spacing: .2em; color: color-mix(in srgb, var(--rg) 85%, #000); }
+#hud .kc.cur { translate: 0 -18px; scale: 1.06; box-shadow: 0 0 0 1px #0a0604, inset 0 0 0 4px rgba(255, 250, 235, .35), 0 0 0 4px #fff6e2, 0 0 30px var(--rc), 0 22px 30px rgba(0, 0, 0, .65); }
+#hud .kc.off { filter: brightness(.45) saturate(.5); scale: .94; }
+#hud .kc.got { translate: 0 -18px; scale: 1.06; animation: stamp .35s; }
+#hud .kc .ks { position: absolute; left: 50%; top: 52%; translate: -50% -50%; rotate: -12deg; padding: 4px 18px; font-size: 34px; font-weight: 900; letter-spacing: .3em; padding-left: calc(18px + .3em);
+  color: var(--blood); border: 4px solid var(--blood); border-radius: 6px; background: rgba(243, 230, 196, .7); }
+#hud .kpick .kf { margin: 4px 0 0; font-size: 20px; font-weight: 700; letter-spacing: .14em; color: var(--parch); text-shadow: 0 2px 0 #000; }
+#hud .kpick .kf kbd, #hud .kpick .kf b { display: inline-block; min-width: 1.6em; margin: 0 3px; padding: 2px 6px; font: 700 15px/1.3 var(--cinzel); color: var(--brown); background: var(--parchbg); border-radius: 4px; }
+/* 選路（hud.js wayMap）：六站一排、三條路；走過的金線，走得到的閃，游標那個放大 */
+#hud .kway { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; opacity: 0; pointer-events: none; transition: opacity .25s;
+  background: radial-gradient(ellipse at 50% 50%, rgba(13, 10, 12, .9) 30%, rgba(13, 10, 12, .55) 70%, rgba(13, 10, 12, .25)); }
+#hud .kway.on { opacity: 1; }
+#hud .kway .kh { margin-bottom: 10px; }
+body.touch #hud .kway .kh { visibility: hidden; }
+#hud .kway .kh b { font-size: 46px; font-weight: 900; letter-spacing: .3em; }
+#hud .kway svg { overflow: visible; }
+#hud .kway line { stroke: rgba(243, 230, 196, .28); stroke-width: 3; stroke-dasharray: 2 7; stroke-linecap: round; }
+#hud .kway line.past { stroke: rgba(243, 230, 196, .1); }
+#hud .kway line.can { stroke: rgba(243, 230, 196, .6); stroke-dasharray: 3 6; }
+#hud .kway line.walk { stroke: #f0c860; stroke-width: 5; stroke-dasharray: none; filter: drop-shadow(0 0 4px rgba(240, 200, 96, .7)); }
+#hud .kway line.next { animation: waydash .7s linear infinite; stroke-dasharray: 10 6; }
+@keyframes waydash { to { stroke-dashoffset: -16; } }
+#hud .kway g { --rc: #b08a5a; --rg: #5a3c1c; }
+#hud .kway g.we { --rc: #c23a2a; --rg: #4a0f0a; }
+#hud .kway g.wr { --rc: #e08a3c; --rg: #5a2a0c; }
+#hud .kway g.wc { --rc: #f0c860; --rg: #6b4a14; }
+#hud .kway g.wb { --rc: #8a4ab8; --rg: #2a0f40; }
+#hud .kway circle { fill: var(--rg); stroke: var(--rc); stroke-width: 3; filter: brightness(.55) saturate(.6); }
+#hud .kway text { fill: #f3e6c4; font-size: 26px; font-weight: 900; text-anchor: middle; opacity: .55; }
+#hud .kway g.done circle, #hud .kway g.opt circle { filter: none; }
+#hud .kway g.done text, #hud .kway g.opt text { opacity: 1; }
+#hud .kway g.gone { opacity: .35; }
+#hud .kway g.here circle { stroke: #fff6e2; stroke-width: 5; }
+#hud .kway g.opt circle { animation: waypulse 1s ease-in-out infinite; }
+@keyframes waypulse { 50% { stroke: #fff6e2; } }
+#hud .kway g.cur circle { stroke: #fff6e2; stroke-width: 5; animation: none; filter: drop-shadow(0 0 10px var(--rc)); }
+#hud .kway g.cur circle { r: 38px; }
+#hud .kway g.cur text:not(.tg) { font-size: 32px; }
+#hud .kway .wd { margin: 6px 0 0; min-height: 1.5em; font-size: 22px; font-weight: 700; letter-spacing: .14em; color: var(--parch); text-shadow: 0 2px 0 #000; }
+#hud .kway text.tg { font-size: 15px; font-weight: 700; letter-spacing: .06em; opacity: .75; }
+#hud .kway g.opt text.tg { opacity: 1; fill: #fff6e2; }
+#hud .kway .wd em { margin-right: .8em; font-style: normal; color: #fff6e2; }
+#hud .kway .wd b { margin-right: .8em; font-size: 28px; font-weight: 900; letter-spacing: .2em; color: #f0c860; }
+#hud .kway .wd b.we { color: #ff7a5c; } #hud .kway .wd b.wr { color: #f0a860; } #hud .kway .wd b.wf { color: #e6c89a; }
+#hud .kway .kf { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: .14em; color: var(--parch); text-shadow: 0 2px 0 #000; }
+#hud .kway .kf kbd, #hud .kway .kf b { display: inline-block; min-width: 1.6em; margin: 0 3px; padding: 2px 6px; font: 700 15px/1.3 var(--cinzel); color: var(--brown); background: var(--parchbg); border-radius: 4px; }
+#hud .deck { display: none; }
+#hud.quest .deck { display: flex; flex-wrap: wrap; gap: 4px; position: absolute; left: 150px; top: 132px; width: 520px; }
+#hud.quest .pp.p1 .deck { transform: scaleX(-1); flex-direction: row-reverse; }
+#hud .deck i { position: relative; width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%; font-style: normal; font-size: 14px; font-weight: 900; line-height: 1; color: #fff6e2; text-shadow: 0 1px 0 #000;
+  --rc: #b08a5a; --rg: #5a3c1c; background: radial-gradient(circle at 50% 32%, color-mix(in srgb, var(--rc) 55%, #fff), var(--rc) 45%, var(--rg)); border: 1px solid #e6d3a0; box-shadow: 0 0 0 1px #0a0604; }
+#hud .deck i.r2 { --rc: #5fa3e8; --rg: #173a66; }
+#hud .deck i.r3 { --rc: #f0c860; --rg: #6b4a14; box-shadow: 0 0 0 1px #0a0604, 0 0 8px rgba(240, 200, 96, .7); }
+#hud .deck i sub { position: absolute; right: -5px; bottom: -4px; font: 700 11px/1 var(--cinzel); color: var(--ivoryc); text-shadow: 0 1px 0 #000, 0 0 3px #000; }
+
 /* 讀取畫面（js/ui/loading.js）：墨黑底、中間一行字、一條細金線是進度、底下小字寫在準備什麼和幾秒 */
 #load { position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
   background: radial-gradient(ellipse at 50% 45%, #1c1517 0%, var(--ink) 70%); --p: 0; }

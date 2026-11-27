@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import { kit, merge } from './kit.js';
 import { tagInkAll } from './inkline.js';
 import { ITEMS, ITEM_LIFE } from '../sim/items.js';
-import { MOVES } from '../sim/chars/index.js';
+import { movesOf } from '../sim/card.js';
 
 const U = 1 / 1000;
 
@@ -132,7 +132,7 @@ const TIP = { sword: 0.96, harpoon: 1.29, pick: 0.78, torch: 0.85 };   // 握的
 // 手上的武器在揮：把武器轉到 SWING 的方向（g 掛在手上，算出相對手的轉法；面向左整隻是鏡像，鏡像的手配鏡像的武器）
 // 回傳 true＝正在甩出去（有效幀附近，要留殘影；_p 握的地方、_d 方向）
 function aimHeld(f, v, g) {
-  const m = f.act === 'atk' ? MOVES[f.ch][f.mv] : null, K = m && m.wpn && SWING[m.pose];
+  const m = f.act === 'atk' ? movesOf(f)[f.mv] : null, K = m && m.wpn && SWING[m.pose];
   if (!K) return false;
   v.model.root.updateMatrixWorld(true);
   g.matrixWorld.decompose(_p, _qh, _s);              // 平常拿著的樣子（世界）

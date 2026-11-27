@@ -13,10 +13,12 @@ import { TunnelStage } from './tunnel.js';
 import { ForestStage } from './forest.js';
 import { MoonStage } from './moon.js';
 import { kit, repaint, merge } from './kit.js';
-import { CHARS, MOVES } from '../sim/chars/index.js';
+import { CHARS } from '../sim/chars/index.js';
+import { movesOf } from '../sim/card.js';
 import { hitBoxes, paceLen } from '../sim/moves.js';
 import { STAGE_HALF, Z_REACH } from '../sim/const.js';
 import { QUESTS } from '../sim/quests/index.js';
+import { spanOf, bossX } from '../sim/route.js';
 import { hurtBoxes } from '../sim/combat.js';
 import { entryAt } from '../sim/match.js';
 import { ItemView, handAnchor } from './items.js';
@@ -196,8 +198,7 @@ export class View {
     const name = Q ? Q.scene : 'arena';
     if (name === this.sceneName) return;
     if (!this.scenes[name]) {
-      const last = Q.secs[Q.secs.length - 1];
-      this.scenes[name] = new SCENES[name](this.scene, Q.span, (last.lo + last.hi) >> 1);
+      this.scenes[name] = new SCENES[name](this.scene, spanOf(), bossX());   // 路線圖（route.js）一關六站往右排
     }
     for (const [k, st] of Object.entries(this.scenes)) st.show(this.scene, k === name);
     this.stage = this.scenes[name];
@@ -337,7 +338,7 @@ export class View {
         break;
       }
       case 'chgmax': {
-        const p = S.p[e.s], m = MOVES[p.ch][p.mv], c = col(e.s);
+        const p = S.p[e.s], m = movesOf(p)[p.mv], c = col(e.s);
         if (!m?.proj) break;
         const x = (p.x + p.face * m.proj.x) * U, y = m.proj.y * U;
         this.fx.flare(x, y, c, 4, p.z * U, 0.3); this.fx.rays(x, y, c, 2.4, p.z * U); this.fx.shock(x, y, HOT, 1.6, p.z * U, 0.25);
@@ -610,7 +611,7 @@ export class View {
     v.model.root.visible = p.gone !== 2 && !blink;
     v.shadow.visible = p.gone !== 2;
     // 鑽地的時候埋進土裡，冒點土
-    const m = p.act === 'atk' ? MOVES[p.ch][p.mv] : null;
+    const m = p.act === 'atk' ? movesOf(p)[p.mv] : null;
     if (m && m.under && p.t >= m.under[0] && p.t <= m.under[1] && (S.f + p.i) % 3 === 0) this.fx.dust(p.x * U, 0, 1, '#4a3f26', p.z * U);
     const sh = Math.max(0.3, 1 - p.y * U * 0.4) * (m && m.under && p.t >= 8 && p.t <= m.under[1] ? 0.4 : 1);
     v.shadow.position.set(p.x * U, 0.005, p.z * U);
@@ -1195,7 +1196,7 @@ export class View {
     for (const f of S.p) {
       if (f.gone === 2) continue;
       for (const b of hurtBoxes(f)) rect(f, b, [0.3, 1, 0.4]);
-      const m = f.act === 'atk' ? MOVES[f.ch][f.mv] : null;
+      const m = f.act === 'atk' ? movesOf(f)[f.mv] : null;
       if (m) for (const h of m.hits) if (f.t >= h.on[0] && f.t <= h.on[1]) rect(f, h.box, [1, 0.25, 0.2]);
     }
     for (const q of S.pr) rect({ x: q.x, y: q.y, z: q.z, face: 1 }, [-q.w, -q.h, q.w, q.h], [1, 0.25, 0.2]);

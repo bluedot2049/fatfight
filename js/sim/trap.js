@@ -3,7 +3,7 @@
 // 闖關的場地機關每幀做什麼：擺出來、洋流推人、甲板炮點火和轟出炮彈。數字在 traps.js，這裡只有規則。純整數，狀態在 S.tr。
 
 import { TRAPS } from './traps.js';
-import { CHARS, MOVES } from './chars/index.js';
+import { movesOf, charOf } from './card.js';
 import { spawnItem, rnd } from './item.js';
 import { dirX } from './input.js';
 
@@ -40,7 +40,7 @@ function current(S, q, T) {
   const by = (v) => d * (((v * k) / RAMP) | 0);
   for (const f of S.p) {
     if (f.gone >= 2 || f.act === 'grab' || f.act === 'grabbed') continue;
-    const w = CHARS[f.ch].w;
+    const w = charOf(f).w;
     if (f.act === 'fall') { if (f.vx * d < T.cap) f.vx += d * T.fling; continue; }   // 被打飛：左右速度往流的方向加（撞牆、撞人照 combat 的規則）
     const v = f.y > 0 || f.air ? T.air : f.act === 'down' || f.act === 'getup' || f.act === 'ko' ? (T.push * 2 / 3) | 0 : f.act === 'guard' || f.act === 'block' ? T.push >> 1 : T.push;
     f.x = Math.max(S.lo + w, Math.min(S.hi - w, f.x + by(v)));
@@ -66,7 +66,7 @@ function gun(S, q, T) {
 // 站在炮旁邊、手上沒東西按攻：點火（往面向那邊；這幀按著左右就往那邊）。只有玩家那隊點得了。回傳有沒有點
 export function useTrap(S, f, startMove) {
   if (!S.tr || f.team !== 0 || f.item >= 0) return false;
-  const C = CHARS[f.ch];
+  const C = charOf(f);
   for (const q of S.tr) {
     if (q.k !== 'gun' || q.cd > 0 || q.fire > 0) continue;
     const T = TRAPS[q.k];
@@ -74,7 +74,7 @@ export function useTrap(S, f, startMove) {
     const dx = dirX(f.H);
     if (dx) f.face = dx;
     q.dir = f.face; q.by = f.i; q.fire = T.fire; q.cd = T.cd;
-    startMove(S, f, MOVES[f.ch].tFire);
+    startMove(S, f, movesOf(f).tFire);
     S.ev.push({ k: 'tlight', id: q.id, s: f.i, x: q.x, z: q.z, dir: q.dir });
     return true;
   }

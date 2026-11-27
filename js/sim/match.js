@@ -11,6 +11,7 @@ import { newAI, aiBits } from './ai.js';
 import { questStep } from './quest.js';
 import { itemsStep, arenaDrop } from './item.js';
 import { trapsStep } from './trap.js';
+import { keepCards } from './card.js';
 
 // 對戰：兩隻，隊伍 0 和 1。opt：{ train: 練習模式（血會回、魔力無限）, cpu: 難度（有給的話 2P 換電腦）}
 export function newMatch(ch0, ch1, opt = {}) {
@@ -50,7 +51,7 @@ function resetRound(S) {
   for (const f of S.p) {
     const H = f.H, x = f.team ? START_X : -START_X;
     const ai = f.ai ? newAI(f.ai.lv, f.ai.r) : null;           // 電腦：難度和亂數接著用，其他重來
-    Object.assign(f, newFighter(f.ch, f.i, f.team, x, f.team ? -1 : 1), { H, pad: f.pad, main: f.main, ai });
+    Object.assign(f, keepCards(f, newFighter(f.ch, f.i, f.team, x, f.team ? -1 : 1)), { H, pad: f.pad, main: f.main, ai });   // 強化卡跟著人走（之後的對戰卡片模式）
   }
 }
 

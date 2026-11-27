@@ -22,6 +22,8 @@ import { prewarm, compile, castOf } from './view/prewarm.js';
 import { loading } from './ui/loading.js';
 import { newMatch, step, setCpu } from './sim/match.js';
 import { newQuest } from './sim/quest.js';
+import { KIND } from './sim/route.js';
+import { cardList } from './sim/card.js';
 import { ORDER, QUESTS } from './sim/quests/index.js';
 import { LV_MAX } from './sim/ai.js';
 import { CHARS } from './sim/chars/index.js';
@@ -364,6 +366,15 @@ function pauseMenu() {
   menu.show({ title: '暫停', items, back: resume });
 }
 
+// 結算：這關走的路（route.js）：戰寶戰休戰王
+const pathLine = (S) => (S.path || []).map((i, f) => KIND[S.rt[f][i].k]).join('');
+// 闖關第 k 個玩家身上的強化卡（f.ck）；結算畫面寫一行「卡 長手×2 穿透」
+const ckOf = (S, k) => S.p.find((f) => f.pl === k)?.ck || '';
+function cardsLine(S, k, tag = '') {
+  const f = S.p.find((p) => p.pl === k);
+  const l = f ? cardList(f) : [];
+  return l.length ? `<br>${tag}卡 ${l.map(([c, n]) => c.name + (n > 1 ? `×${n}` : '')).join(' ')}` : '';
+}
 function showResult() {
   if (G.kind === 'online') {
     const Q = !!G.S.quest, won = Q && G.S.winner === 0;
@@ -375,7 +386,7 @@ function showResult() {
     items.push({ label: '回房間', on: () => toRoom(true) }, { label: '離開', on: toTitle });
     const sc = (k) => (G.S.score[k] | 0).toLocaleString('en-US');
     const gr = (k) => (G.S.grade?.[k] || []).map((g) => 'SABC'[g] || '－').join(' ');   // 每段評價（quest.js grade）
-    G.resultSub = Q ? `1P ${sc(0)}　2P ${sc(1)}${G.S.conts ? `　接關 ${G.S.conts} 次` : ''}${won && !next ? '　下一關還在蓋' : ''}<br>評價 1P ${gr(0)}　2P ${gr(1)}<br>掉命 1P ${G.S.dead[0]}　2P ${G.S.dead[1]}` : '';
+    G.resultSub = Q ? `1P ${sc(0)}　2P ${sc(1)}${G.S.conts ? `　接關 ${G.S.conts} 次` : ''}${won && !next ? '　下一關還在蓋' : ''}<br>走的路 ${pathLine(G.S)}<br>評價 1P ${gr(0)}　2P ${gr(1)}<br>掉命 1P ${G.S.dead[0]}　2P ${G.S.dead[1]}${cardsLine(G.S, 0, '1P ')}${cardsLine(G.S, 1, '2P ')}` : '';
     menu.show({ title: Q ? (won ? '過關' : '結束') : '比賽結束', cls: 'result', sub: G.resultSub, items, back: () => {}, tapBack: () => toRoom(true) });
     if (G.otherVote) voteLine(`對方想${G.otherVote === 'next' ? '打下一關' : '再來'}`);
     return;
@@ -384,13 +395,13 @@ function showResult() {
     const k = G.side;                                  // 線上闖關朋友斷線、電腦接手之後，自己可能是 2P
     const won = G.S.winner === 0, sc = G.S.score[k].toLocaleString('en-US');
     const next = won ? ORDER[ORDER.indexOf(G.quest) + 1] : null;
-    const carry = { score: [G.S.score[k]] };           // 只帶分數；命每關補滿（quest.js newQuest）
+    const carry = { score: [G.S.score[k]], cards: [ckOf(G.S, k)], streak: [G.S.streak?.[k] | 0] };   // 帶分數、強化卡、連勝；命每關補滿（quest.js newQuest）
     // 難度的尺（docs/方向.md「闖關難度的尺」）：這一關掉了幾條命、每一段被打掉幾條血。跟 tools/quest-balance.mjs 的表同一個單位，對一下就知道自己大約是代打幾級
-    const toll = `掉 ${G.S.dead[k]} 條命　每段掉血 ${G.S.hurt[k].map((h) => (h / G.S.p[k].mhp).toFixed(1)).join('／')} 條`;
+    const toll = `掉 ${G.S.dead[k]} 條命　每站掉血 ${G.S.hurt[k].map((h) => (h / G.S.p[k].mhp).toFixed(1)).join('／')} 條`;
     const items = [{ label: '再打一次', on: () => startQuest(G.chars[0], G.quest) }, { label: '換角色', on: () => toSelect('quest') }, { label: '回標題', on: toTitle }];
     if (next) items.unshift({ label: '下一關', on: () => startQuest(G.chars[0], next, carry) });
     menu.show({
-      title: won ? '過關' : '結束', sub: `分數 ${sc}${G.S.conts ? `　接關 ${G.S.conts} 次` : ''}${won && !next ? '　下一關還在蓋' : ''}<br>每段評價 ${(G.S.grade?.[k] || []).map((g) => 'SABC'[g] || '－').join(' ')}<br>${toll}`, cls: 'result',
+      title: won ? '過關' : '結束', sub: `分數 ${sc}${G.S.conts ? `　接關 ${G.S.conts} 次` : ''}${won && !next ? '　下一關還在蓋' : ''}<br>走的路 ${pathLine(G.S)}<br>每站評價 ${(G.S.grade?.[k] || []).map((g) => 'SABC'[g] || '－').join(' ')}<br>${toll}${cardsLine(G.S, k)}`, cls: 'result',
       items, back: () => {}, tapBack: toTitle,
     });
     return;
@@ -815,7 +826,7 @@ function maybeStart() {
     const next = ORDER[ORDER.indexOf(S.quest) + 1];
     if (!next) return;
     G.room.stage = next;
-    startOnline(...G.chars, { score: [...S.score] });
+    startOnline(...G.chars, { score: [...S.score], cards: [ckOf(S, 0), ckOf(S, 1)], streak: [S.streak?.[0] | 0, S.streak?.[1] | 0] });
   } else {
     if (S.quest) G.room.stage = S.quest;
     startOnline(...G.chars);

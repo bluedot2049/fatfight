@@ -7,6 +7,7 @@
 
 import { ITEMS } from '../sim/items.js';
 import { MOVES, CHARS } from '../sim/chars/index.js';
+import { movesOf } from '../sim/card.js';
 import { speak, speakTai, grunt } from './voice.js';
 import * as D from './drama.js';
 import * as BK from './sfxbank.js';
@@ -1024,6 +1025,14 @@ export function sfxEvent(e, pan = 0, S = null) {
     case 'trap': if (e.ph === 1) play('tide'); break;
     case 'bonus': play('bonus', e, pan); break;
     case 'grade': if (S?.quest && e.n < (S.grade[0]?.length ?? 0) - 1 && e.pl === 0) play('grade'); break;   // 最後一段跟著過關，不另外響
+    case 'pick': play('grade'); break;                               // 強化卡：出三張卡、移游標、拿走
+    case 'pickmv': play('move'); break;
+    case 'card': if (!S?.quest || S.p[e.s]?.pl >= 0) play('ok'); break;   // 精英進場帶的卡不響
+    case 'way': play('grade'); break;                                 // 選路（route.js）
+    case 'wayok': play('ok'); break;
+    case 'pickx': play('ok'); break;                                // 營火選了休息
+    case 'rest': play('sip', { ...e, big: 1 }); break;                // 營火補血
+    case 'cardfx': if (e.id === 'riposte') play('parry', e, pan); break;   // 反擊卡加重的那下（彈返已經有 clash）
   }
 }
 
@@ -1039,7 +1048,7 @@ export function sfxState(S, panOf = () => 0) {
   S.p.forEach((f, i) => {
     const o = prev.p[i], pan = panOf(f.x);
     if (f.act === 'atk' && (o.act !== 'atk' || o.mv !== f.mv)) {
-      const m = MOVES[f.ch][f.mv];
+      const m = movesOf(f)[f.mv];
       if (f.mv === 'roll') play('roll', {}, pan);
       else if (f.mv === 'runS') play('slide', { ch: f.ch }, pan);
       else if (m && (m.kind === 'n' || !m.kind)) {
@@ -1057,7 +1066,7 @@ export function sfxState(S, panOf = () => 0) {
     if (f.act === 'atk' && o.mv !== f.mv && KIT[f.ch]?.cue?.[f.mv]?.start) play('cue', { ch: f.ch, id: f.mv, cue: 'start' }, pan);   // 換成這招就響（大掄捲到）
     // 招式中途：起跳那幀（鑽地飛出來）
     if (f.act === 'atk' && o.act === 'atk' && o.mv === f.mv && KIT[f.ch]?.cue?.[f.mv]) {
-      const j = MOVES[f.ch][f.mv]?.jump?.[0];
+      const j = movesOf(f)[f.mv]?.jump?.[0];
       if (j !== undefined && o.t < j && f.t >= j) play('cue', { ch: f.ch, id: f.mv, cue: 'up' }, pan);
     }
     if (f.act === 'run' && o.act !== 'run') play('dash', {}, pan);

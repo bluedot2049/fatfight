@@ -3,7 +3,8 @@
 // 一隻角色每幀做什麼：think 照輸入決定出什麼（必殺指令 > 兩鍵同按 > 跑步中的招 > 防、跳、攻 > 蹲、跑、走），advance 照目前的動作算位置和時間。場上幾個人都行，打誰看隊伍。
 
 import { MP, MP_REGEN, HP, GRAV, zNear, zFar, SLOW, WALK, WALK_Z, RUN, DASH_X, JUMP_XZ, MAG_X, MAG_Z, TURN_X, AIR_STEER, BOUNCE_V, WALL_V, WAKE_IV, DOWN_T, DOWN_QUICK, Z_REACH, DOWN, LEFT, RIGHT, BA, BJ, BD, BS } from './const.js';
-import { CHARS, MOVES } from './chars/index.js';
+import { CHARS } from './chars/index.js';
+import { movesOf, charOf } from './card.js';
 import { sweepFront, orbitStep, paceLen } from './moves.js';
 import { newHistory, record, pressed, pressedBoth, consume, consumeCommand, command, tapTwice, useTap, holding, dirX, dirZ } from './input.js';
 import { ITEMS, WEAR_SWING } from './items.js';
@@ -53,7 +54,7 @@ export function newFighter(ch, i, team, x, face) {
   };
 }
 
-export const moveOf = (f) => (f.act === 'atk' ? MOVES[f.ch][f.mv] : null);
+export const moveOf = (f) => (f.act === 'atk' ? movesOf(f)[f.mv] : null);
 const inR = (r, t) => r && t >= r[0] && t <= r[1];
 export const isUnder = (f) => { const m = moveOf(f); return !!(m && inR(m.under, f.t)); };
 export function strikeInv(f) {
@@ -65,7 +66,8 @@ export function strikeInv(f) {
 
 export function setAct(f, act) { f.act = act; f.t = -1; }
 export function toFree(f) {
-  f.mv = ''; f.con = 0; f.hitList = []; f.air = 0; f.y = CHARS[f.ch].fly ? f.y : 0; f.vy = 0; f.vx = 0; f.vz = 0; f.airAtk = 0; f.dash = 0; f.combo = 0; f.cr = 0; f.dz = 0; f.burn = 0;
+  f.mv = ''; f.con = 0; f.hitList = []; f.air = 0; f.y = charOf(f).fly ? f.y : 0; f.vy = 0; f.vx = 0; f.vz = 0; f.airAtk = 0; f.dash = 0; f.combo = 0; f.cr = 0; f.dz = 0; f.burn = 0;
+  if (f.kx) f.kx.dj = 0;
   setAct(f, 'stand');
 }
 
@@ -84,7 +86,7 @@ export function startMove(S, f, m) {
 function trySpecial(S, f) {
   const c = command(f.H);
   if (!c) return false;
-  const C = CHARS[f.ch];
+  const C = charOf(f);
   const btn = c.btn === BA ? 'A' : 'J';
   for (const s of [...C.supers, ...C.specials]) {
     if (s.d !== c.d || s.btn !== btn) continue;
@@ -102,7 +104,7 @@ function trySpecial(S, f) {
 
 // 前面近處有沒有頭暈的敵人（有的話攻擊變重拳、走過去會抓住）
 function dizzyAhead(S, f, reach) {
-  const C = CHARS[f.ch];
+  const C = charOf(f);
   for (const o of S.p) {
     if (o.team === f.team || o.act !== 'dizzy') continue;
     const dx = (o.x - f.x) * f.face;
@@ -113,7 +115,7 @@ function dizzyAhead(S, f, reach) {
 
 // 前後 r 以內（身體邊緣算起、前後對得上）有站著的敵人
 function closeBy(S, f, r) {
-  const C = CHARS[f.ch];
+  const C = charOf(f);
   for (const o of S.p) {
     if (o.team === f.team || o.hp <= 0 || o.act === 'down' || o.act === 'getup' || o.act === 'fall' || o.y > 0) continue;
     if (Math.abs(o.x - f.x) - C.w - CHARS[o.ch].w < r && Math.abs(o.z - f.z) < Z_REACH) return true;
@@ -125,7 +127,7 @@ function closeBy(S, f, r) {
 function faceInput(S, f) {
   const dx = dirX(f.H);
   if (dx) { f.face = dx; return; }
-  const C = CHARS[f.ch];
+  const C = charOf(f);
   let back = 0;
   for (const o of S.p) {
     if (o.team === f.team || o.hp <= 0 || o.gone) continue;
@@ -162,11 +164,11 @@ function magnet(S, f, m) {
 
 function punch(S, f) {
   faceInput(S, f);
-  const N = CHARS[f.ch].normals;
+  const N = charOf(f).normals;
   let m;
   const q = f.ik === 1 ? heldItem(S, f) : null;
-  if (q) { m = MOVES[f.ch][ITEMS[q.k].swing[f.alt]]; f.alt ^= 1; startMove(S, f, m); return; }   // 拿著武器：攻＝揮武器
-  const near = CHARS[f.ch].near;
+  if (q) { m = movesOf(f)[ITEMS[q.k].swing[f.alt]]; f.alt ^= 1; startMove(S, f, m); return; }   // 拿著武器：攻＝揮武器
+  const near = charOf(f).near;
   if (dizzyAhead(S, f, 300)) m = N.A3;
   else if (near && closeBy(S, f, near.r)) m = N[near.m];   // 貼身換招（鼻象：有人貼著就搧耳朵）
   else { m = f.alt ? N.A2 : N.A1; f.alt ^= 1; }
@@ -180,7 +182,7 @@ function tryToss(S, f) {
   if (!b) return false;
   consume(f.H, b[0]); consume(f.H, b[1]);
   faceInput(S, f);
-  startMove(S, f, MOVES[f.ch][f.ik === 2 ? 'iHThrow' : 'iThrow']);
+  startMove(S, f, movesOf(f)[f.ik === 2 ? 'iHThrow' : 'iThrow']);
   return true;
 }
 
@@ -188,7 +190,7 @@ function tryToss(S, f) {
 function tryCombo(S, f) {
   const H = f.H;
   let b;
-  if ((b = pressedBoth(H, BA, BJ))) { consume(H, b[0]); consume(H, b[1]); startMove(S, f, CHARS[f.ch].normals.CD); return true; }
+  if ((b = pressedBoth(H, BA, BJ))) { consume(H, b[0]); consume(H, b[1]); startMove(S, f, charOf(f).normals.CD); return true; }
   return tryRoll(S, f);
 }
 function tryRoll(S, f) {
@@ -197,7 +199,7 @@ function tryRoll(S, f) {
   consume(H, b[0]); consume(H, b[1]);
   const dx = dirX(H);
   if (dx) f.face = dx;
-  startMove(S, f, MOVES[f.ch].roll);
+  startMove(S, f, movesOf(f).roll);
   return true;
 }
 
@@ -272,17 +274,27 @@ export function think(S, f, noInput) {
     if (f.gp && grabCancel(S, f)) return;
     if ((k = pressed(H, BA)) >= 0) {
       consume(H, k);
-      if (dx) { f.face = dx; startMove(S, f, MOVES[f.ch].toss); } else startMove(S, f, MOVES[f.ch].gA);
-    } else if ((k = pressed(H, BJ)) >= 0) { consume(H, k); startMove(S, f, MOVES[f.ch].toss); }
+      if (dx) { f.face = dx; startMove(S, f, movesOf(f).toss); } else startMove(S, f, movesOf(f).gA);
+    } else if ((k = pressed(H, BJ)) >= 0) { consume(H, k); startMove(S, f, movesOf(f).toss); }
     return;
   }
 
   // 空中：攻一次；按左右可以轉身（不改速度）
   if (f.act === 'air') {
     if (dx && dx !== f.face && (H.k[H.k.length - 1] & (LEFT | RIGHT)) && H.t[H.k.length - 1] === H.n) f.face = dx;
+    // 二段跳（卡 dj）：空中再按跳，往上再跳一次（原地跳的八成高），這次跳還能再空中攻擊一次
+    if (f.kx && !f.kx.dj && charOf(f).rule.dj && (k = pressed(H, BJ)) >= 0) {
+      consume(H, k);
+      const C = charOf(f);
+      f.kx.dj = 1; f.airAtk = 0;
+      f.vy = ((SLOW(C.jumpV) * 4) / 5) | 0;
+      if (dx) f.vx = JUMP_XZ(C.jumpX) * dx;
+      S.ev.push({ k: 'jump', s: f.i, x: f.x, z: f.z, dj: 1 });
+      return;
+    }
     if (!f.airAtk && (k = pressed(H, BA)) >= 0) {
       consume(H, k);
-      const N = CHARS[f.ch].normals;
+      const N = charOf(f).normals;
       f.airAtk = 1;
       if (f.ik === 1 || f.ik === 3) { setAct(f, 'atk'); f.mv = 'iAThrow'; f.hitList = []; f.con = 0; return; }   // 拿著輕的：空中按攻丟出去
       setAct(f, 'atk'); f.mv = (f.dash ? N.dashA : N.jA).id; f.hitList = []; f.con = 0;
@@ -296,7 +308,7 @@ export function think(S, f, noInput) {
     if ((m.wpn || m.id === 'iDrink') && f.t <= 2 && tryToss(S, f)) return;   // 先按攻、兩幀內補按防：還是丟
     // 喝東西中：攻＝把瓶子丟出去，防、跳、翻滾＝不喝了
     if (m.id === 'iDrink') {
-      if ((k = pressed(H, BA)) >= 0) { consume(H, k); faceInput(S, f); startMove(S, f, MOVES[f.ch].iThrow); return; }
+      if ((k = pressed(H, BA)) >= 0) { consume(H, k); faceInput(S, f); startMove(S, f, movesOf(f).iThrow); return; }
       if (whiffCancel(S, f)) return;
       return;
     }
@@ -309,7 +321,7 @@ export function think(S, f, noInput) {
     const last = m.hits[m.hits.length - 1].on[1];
     if (f.t > last + 3 && (k = pressed(H, BA, CHAIN_BUF)) >= 0) {
       consume(H, k);
-      if (m.cr || holding(H, BS)) { faceInput(S, f); startMove(S, f, MOVES[f.ch][m.next || 'crA']); } else punch(S, f);   // 下段打到人：再按攻就接下一段，不用一直按著蹲
+      if (m.cr || holding(H, BS)) { faceInput(S, f); startMove(S, f, movesOf(f)[m.next || 'crA']); } else punch(S, f);   // 下段打到人：再按攻就接下一段，不用一直按著蹲
     }
     return;
   }
@@ -320,7 +332,7 @@ export function think(S, f, noInput) {
   // 舉著重物：攻＝丟、蹲或防＝放下，只能走（慢），不能跑跳、不能出必殺
   if (f.ik === 2) {
     if (tryToss(S, f)) return;
-    if ((k = pressed(H, BA)) >= 0) { consume(H, k); faceInput(S, f); startMove(S, f, MOVES[f.ch].iHThrow); return; }
+    if ((k = pressed(H, BA)) >= 0) { consume(H, k); faceInput(S, f); startMove(S, f, movesOf(f).iHThrow); return; }
     if ((k = pressed(H, BS)) >= 0) { consume(H, k); dropItem(S, f, 0); setAct(f, 'stand'); return; }
     if ((k = pressed(H, BD)) >= 0 && H.n - H.t[k] >= 2) { consume(H, k); dropItem(S, f, 0); setAct(f, 'stand'); return; }   // 等兩幀，看是不是防＋攻
     if (dx) f.face = dx;
@@ -334,10 +346,10 @@ export function think(S, f, noInput) {
   if (tryCombo(S, f)) return;
 
   if (f.act === 'run') {
-    if ((k = pressed(H, BA)) >= 0) { consume(H, k); startMove(S, f, f.ik ? MOVES[f.ch].iThrow : CHARS[f.ch].normals.runA); return; }   // 拿著東西跑＋攻＝丟出去
+    if ((k = pressed(H, BA)) >= 0) { consume(H, k); startMove(S, f, f.ik ? movesOf(f).iThrow : charOf(f).normals.runA); return; }   // 拿著東西跑＋攻＝丟出去
     if ((k = pressed(H, BJ)) >= 0) { consume(H, k); f.runJ = 1; setAct(f, 'pre'); return; }
-    if ((k = pressed(H, BD)) >= 0) { consume(H, k); startMove(S, f, MOVES[f.ch].roll); return; }
-    if ((k = pressed(H, BS)) >= 0) { consume(H, k); startMove(S, f, MOVES[f.ch].runS); return; }   // 跑＋蹲＝滑行
+    if ((k = pressed(H, BD)) >= 0) { consume(H, k); startMove(S, f, movesOf(f).roll); return; }
+    if ((k = pressed(H, BS)) >= 0) { consume(H, k); startMove(S, f, movesOf(f).runS); return; }   // 跑＋蹲＝滑行
     if (dx === -f.face) { setAct(f, 'brake'); return; }
     if (grabTry(S, f)) return;
     return;
@@ -353,11 +365,11 @@ export function think(S, f, noInput) {
   if ((k = pressed(H, BD)) >= 0) { consume(H, k); setAct(f, 'guard'); f.cr = 0; f.vx = f.vz = 0; return; }
   if ((k = pressed(H, BJ)) >= 0) { consume(H, k); f.runJ = 0; f.cr = 0; setAct(f, 'pre'); return; }
   // 蹲下去撿：空手、腳邊有東西。蹲跟攻一起按（同一幀）是下段，不撿
-  if (!f.ik && (k = pressed(H, BS)) >= 0 && pressed(H, BA) < 0 && pickTry(S, f, startMove, MOVES)) { consume(H, k); return; }
+  if (!f.ik && (k = pressed(H, BS)) >= 0 && pressed(H, BA) < 0 && pickTry(S, f, startMove)) { consume(H, k); return; }
   if ((k = pressed(H, BA)) >= 0) {
     consume(H, k);
-    if (crouching) { faceInput(S, f); startMove(S, f, MOVES[f.ch].crA); }
-    else if (f.ik === 3) { faceInput(S, f); startMove(S, f, MOVES[f.ch].iDrink); }          // 拿著吃的：攻＝吃一口
+    if (crouching) { faceInput(S, f); startMove(S, f, movesOf(f).crA); }
+    else if (f.ik === 3) { faceInput(S, f); startMove(S, f, movesOf(f).iDrink); }          // 拿著吃的：攻＝吃一口
     else if (f.ik || !useTrap(S, f, startMove)) punch(S, f);   // 站在甲板炮旁邊就點火，不然出拳（撿東西是蹲）
     return;
   }
@@ -383,7 +395,8 @@ export function think(S, f, noInput) {
 export function pasStep(S, ko) {
   if (ko) return;
   for (const f of S.p) {
-    const P = CHARS[f.ch].pas;
+    if (f.kx && f.kx.rp > 0) f.kx.rp--;                  // 卡的計時（反擊）
+    const P = charOf(f).pas;
     if (!P || f.hp <= 0 || f.gone || f.act === 'ko') continue;
     if (P.k === 'crow') crow(S, f, P);
     else if (P.k === 'zoom') { if (f.pv > 0 && S.f % P.drop === 0) f.pv--; }
@@ -395,21 +408,25 @@ export function pasStep(S, ko) {
 }
 function crow(S, f, K) {
   if (f.pv < K.every) { f.pv++; return; }
+  if (crowAt(S, f, K)) f.pv = 0;                        // 沒有站著的敵人：等到有再飛
+}
+// 一群烏鴉從最近的站著的敵人背後 K.far 遠飛過來，穿過去、每人打一次（爛熊的被動、鴉群卡）。回傳有沒有飛
+export function crowAt(S, f, K) {
   let o = null, bd = 1e9;
   for (const e of S.p) {
     if (e.team === f.team || e.hp <= 0 || e.gone || e.act === 'down' || e.act === 'ko') continue;
     const d = Math.abs(e.x - f.x) + Math.abs(e.z - f.z);
     if (d < bd) { bd = d; o = e; }
   }
-  if (!o) return;                                       // 沒有站著的敵人：等到有再飛
-  f.pv = 0;
+  if (!o) return false;
   const dir = o.face, x = Math.max(S.lo - 500, Math.min(S.hi + 500, o.x - dir * K.far));
   S.pr.push({ o: f.i, team: f.team, x, y: K.y, z: o.z, vx: dir * K.v, w: K.w, h: K.h, dmg: K.dmg, fall: K.fall, big: 0, life: K.life, t: 0, id: S.pid++, mv: 'crow', pierce: 1, hl: [], look: 'crow' });
   S.ev.push({ k: 'crow', s: f.i, x, z: o.z });
+  return true;
 }
 // 被動現在怎樣（HUD 畫圖示用，不改狀態）：k 0–1 滿了多少、on 1＝好了（亮著）、v 數字（臘腸狗加了幾 %、企鵝回魔幾倍×10）
 export function pasMeter(f) {
-  const P = CHARS[f.ch].pas;
+  const P = charOf(f).pas;
   if (!P) return null;
   if (P.k === 'crow') return { k: f.pv / P.every, on: 0 };
   if (P.k === 'zoom') return { k: f.pv / P.max, on: f.pv > 0 ? 1 : 0, v: (f.pv / 10) | 0 };
@@ -438,7 +455,7 @@ function sched(list, t) {
 
 // 左右照場地的邊界（對戰固定，闖關會往右推進）
 function clampStage(S, f) {
-  const w = CHARS[f.ch].w, lo = S.lo + w, hi = S.hi - w;
+  const w = charOf(f).w, lo = S.lo + w, hi = S.hi - w;
   const out = f.x < lo ? -1 : f.x > hi ? 1 : 0;
   if (f.x < lo) f.x = lo;
   if (f.x > hi) f.x = hi;
@@ -467,7 +484,7 @@ function release(S, f) {
 export function advance(S, f) {
   if (f.stop > 0) { f.stop--; return; }
   f.t++;
-  const C = CHARS[f.ch];
+  const C = charOf(f);
   const H = f.H;
 
   // 魔力慢慢回，血少回得快。企鵝（被動 ember）換成照扣掉的血一路加快：mpT 改算百分之一幀
@@ -528,7 +545,7 @@ export function advance(S, f) {
 
   // 會飛的（貓頭鷹）：能動的時候浮回自己的高度；俯衝的招照 fy 一幀一幀往下、往上
   if (C.fly && !f.air) {
-    const m = f.act === 'atk' ? MOVES[f.ch][f.mv] : null;
+    const m = f.act === 'atk' ? movesOf(f)[f.mv] : null;
     if (m) { if (m.fy && f.stop <= 0) f.y = Math.max(0, Math.min(C.fly, f.y + sched(m.fy, f.t))); }
     else if (HOVER.has(f.act)) f.y = Math.min(C.fly, f.y + FLY_UP);
   }
@@ -548,8 +565,8 @@ function wakeUp(S, f) {
   const dx = dirX(f.H);
   if (f.t < DOWN_QUICK || (!f.wk && !dx && f.t < DOWN_T)) return;
   f.fallv = 0; f.jug = 0; f.bdef = 0;
-  if (f.wk) { f.wk = 0; toFree(f); startMove(S, f, MOVES[f.ch].wake); f.iv = 2; S.ev.push({ k: 'wake', s: f.i }); return; }   // 跟翻滾一樣補兩幀：第 0 幀還沒無敵，滾過來的石頭剛好再打倒一次（可以連三次）
-  if (dx) { toFree(f); f.face = dx; startMove(S, f, MOVES[f.ch].roll); f.iv = 2; return; }   // 翻滾第 0 幀還沒無敵，補兩幀
+  if (f.wk) { f.wk = 0; toFree(f); startMove(S, f, movesOf(f).wake); f.iv = 2; S.ev.push({ k: 'wake', s: f.i }); return; }   // 跟翻滾一樣補兩幀：第 0 幀還沒無敵，滾過來的石頭剛好再打倒一次（可以連三次）
+  if (dx) { toFree(f); f.face = dx; startMove(S, f, movesOf(f).roll); f.iv = 2; return; }   // 翻滾第 0 幀還沒無敵，補兩幀
   setAct(f, 'getup');
 }
 
@@ -577,12 +594,12 @@ function pinStage(S, o) {
 
 // 被抓的人貼在抓的人前面
 function pin(f, o) {
-  o.x = f.x + f.face * (CHARS[f.ch].w + CHARS[o.ch].w - 80);
+  o.x = f.x + f.face * (charOf(f).w + CHARS[o.ch].w - 80);
   o.z = f.z; o.y = 0; o.face = -f.face;
 }
 
 function atkStep(S, f, C) {
-  const m = MOVES[f.ch][f.mv];
+  const m = movesOf(f)[f.mv];
   const H = f.H;
   // 集氣：到這幀還按著就停住（放開或集滿才往下走）
   if (m.charge && f.t === m.charge.at && f.chg < m.charge.max && (holding(H, BA) || holding(H, BJ))) {
@@ -613,7 +630,7 @@ function atkStep(S, f, C) {
       if (k2 >= 0) consume(H, k2);
       const hd = H.prev | (k2 >= 0 ? H.ad : 0);   // 現在按著的＋按攻那一刻按著的
       const id = k2 < 0 ? F.def : hd & (f.face > 0 ? RIGHT : LEFT) || hd & (DOWN | BS) ? F.d : F.f;
-      startMove(S, f, MOVES[f.ch][id]);
+      startMove(S, f, movesOf(f)[id]);
       S.ev.push({ k: 'fork', s: f.i, id, x: f.x, y: f.y, z: f.z });
       return;
     }
@@ -748,7 +765,7 @@ function atkStep(S, f, C) {
       let k;
       if (G.sw && f.t < G.at && f.mp >= G.sw.mp && !command(H) && (k = pressed(H, BA)) >= 0) {
         consume(H, k);
-        startMove(S, f, MOVES[f.ch][G.sw.to]);
+        startMove(S, f, movesOf(f)[G.sw.to]);
         f.mp -= G.sw.mp;
         S.ev.push({ k: 'ext', s: f.i, id: G.sw.to, n: 1 });
         return;
@@ -824,6 +841,7 @@ function throwOut(S, f, o, vx, vy) {
 }
 
 function land(S, f) {
+  if (f.kx) f.kx.dj = 0;
   const vy = f.vy;                 // 落地前往下多快（先記下來，下面歸零；以前先歸零再判斷，彈地從來沒發生過）
   f.y = 0; f.vy = 0; f.air = 0;
   S.ev.push({ k: 'land', s: f.i, x: f.x, z: f.z, hard: f.act === 'fall' ? 1 : 0 });
@@ -839,7 +857,7 @@ function land(S, f) {
     return;
   }
   if (f.act === 'atk') {
-    const m = MOVES[f.ch][f.mv];
+    const m = movesOf(f)[f.mv];
     // 跳上去的必殺：打中落地快（land），揮空或被擋慢一點（landW）
     setAct(f, 'land'); f.lag = m.air ? 3 : f.con === 1 ? (m.land || 4) : (m.landW || m.land || 4); f.mv = ''; f.vx = 0; f.vz = 0;
     return;

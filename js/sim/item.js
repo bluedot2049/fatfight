@@ -4,7 +4,7 @@
 
 import { MP, Z_REACH, zNear, zFar, LEFT, RIGHT, UP, DOWN, BA, BJ, BD } from './const.js';
 import { ITEMS, ARENA_POOL, ITEM_GAP, ITEM_MAX, ITEM_LIFE, ITEM_REACH } from './items.js';
-import { CHARS } from './chars/index.js';
+import { movesOf, charOf } from './card.js';
 import { TRAPS } from './traps.js';
 
 // 亂數（整數 xorshift，狀態放在 S.rs，存讀檔、兩台電腦都一樣）
@@ -56,7 +56,7 @@ export function hurlItem(S, f, H) {
     S.ev.push({ k: 'ibreak', id: q.id, x: q.x, y: q.y + (ITEMS[q.k].h >> 1), z: q.z, ik: q.k });
     remove(S, q);
   }
-  const C = CHARS[f.ch], I = ITEMS[H.k];
+  const C = charOf(f), I = ITEMS[H.k];
   const x = Math.max(S.lo + I.w, Math.min(S.hi - I.w, f.x + f.face * (C.w + 250)));
   const q = spawnItem(S, H.k, x, f.z, H.y);
   q.own = f.i;
@@ -78,7 +78,7 @@ export function dropItem(S, f, toss = 0) {
 
 // 腳邊最近的、撿得起來的東西（light：只要輕的和吃的）
 function underfoot(S, f, light) {
-  const C = CHARS[f.ch];
+  const C = charOf(f);
   let best = null, bd = 1e9;
   for (const q of S.it) {
     if (q.hold >= 0 || q.y > 0 || q.harm || (light && catOf(q.k) === 2)) continue;
@@ -102,13 +102,13 @@ export function pickKind(S, f) {
 }
 
 // 按蹲：腳邊有東西就撿（重物舉起來）。回傳有沒有撿
-export function pickTry(S, f, startMove, MOVES) {
+export function pickTry(S, f, startMove) {
   if (f.item >= 0) return false;
   const best = underfoot(S, f, 0);
   if (!best) return false;
   take(S, f, best);
   f.face = best.x >= f.x ? 1 : -1;
-  startMove(S, f, MOVES[f.ch][f.ik === 2 ? 'iLift' : 'iPick']);
+  startMove(S, f, movesOf(f)[f.ik === 2 ? 'iLift' : 'iPick']);
   return true;
 }
 
@@ -125,7 +125,7 @@ export function itemAct(S, f, m) {
   if (!q) return;
   const I = ITEMS[q.k];
   if (m.it.do === 'throw') {
-    const C = CHARS[f.ch], T = I.thr, air = !!m.air;
+    const C = charOf(f), T = I.thr, air = !!m.air;
     q.hold = -1; f.item = -1; f.ik = 0;
     q.x = f.x + f.face * (C.w + 100); q.z = f.z;
     q.y = air ? f.y + ((C.h * 2) / 5 | 0) : I.cat === 'heavy' ? C.h : (C.h >> 1);
@@ -185,7 +185,7 @@ export function itemsStep(S) {
     if (q.hold >= 0) {
       const f = S.p[q.hold];
       if (!f || f.item !== q.id || f.gone >= 2) { q.hold = -1; if (f && f.item === q.id) { f.item = -1; f.ik = 0; } continue; }
-      const C = CHARS[f.ch];
+      const C = charOf(f);
       q.x = f.x + f.face * (I.cat === 'heavy' ? 0 : C.w); q.z = f.z;
       q.y = f.y + (I.cat === 'heavy' ? C.h : (C.h >> 1));
       continue;
