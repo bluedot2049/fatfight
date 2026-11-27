@@ -38,6 +38,21 @@ function leaveURL() {
   if (/Android/i.test(UA)) return `intent://${u.host}${u.pathname}${u.search}${u.hash}#Intent;scheme=https;end`;
   return 'x-safari-' + u.href;
 }
+// 已經是從主畫面的圖示開的（全螢幕）就不用教
+const fromHome = () => matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches || navigator.standalone === true;
+const isIOS = /iPhone|iPad|iPod/.test(UA) || (/Macintosh/.test(UA) && navigator.maxTouchPoints > 1);
+// 加到主畫面的步驟，一步一個圖示：iPhone 是 分享 → 加入主畫面；Android 是 右上角 ⋮ → 加到主畫面
+const ICON = {
+  share: '<svg viewBox="0 0 24 24"><path d="M8 9H6v11h12V9h-2M12 3v12M8.5 6.5 12 3l3.5 3.5"/></svg>',
+  add: '<svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M12 8.5v7M8.5 12h7"/></svg>',
+  menu: '<svg viewBox="0 0 24 24"><circle cx="12" cy="5.5" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="12" cy="18.5" r="1.3"/></svg>',
+};
+const homeSteps = () => (isIOS ? [['share', '分享'], ['add', '加入主畫面']] : [['menu', '選單'], ['add', '加到主畫面']])
+  .map(([k, t]) => `<span class="step">${ICON[k]}<em>${t}</em></span>`).join('<i class="to">›</i>');
+// Android Chrome 認得是 App 時會給一個「安裝」的機會：先收著，「請橫拿」卡上的鈕按了才跳系統的安裝框；沒給就照上面的圖示自己點
+let install = null;
+addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); install = e; document.body.classList.add('can-install'); });
+addEventListener('appinstalled', () => { install = null; document.body.classList.remove('can-install'); document.body.classList.add('installed'); });
 export const canFull = () => !!document.documentElement.requestFullscreen;
 export const isFull = () => !!document.fullscreenElement;
 // 全螢幕，進去以後鎖成橫的（Android 鎖得住；iPhone 的 Safari 沒有全螢幕，靠「請橫拿」那張卡）
@@ -63,7 +78,8 @@ export class Touch {
     </div>`);
     this.backBtn = add(`<button id="tback" hidden>${button(96, 40, 'sub')}<span>返回</span></button>`);
     this.turn = add(`<div id="turn"><div><i class="ph"></i><b>請橫拿</b><button class="full" ${canFull() && !inApp ? '' : 'hidden'}>全螢幕</button>
-      ${inApp ? `<p>${inApp} 裡轉不過來<br>請用手機的瀏覽器開</p><button class="leave">用瀏覽器開</button><button class="copy">複製網址</button>` : ''}</div></div>`);
+      ${inApp ? `<p>${inApp} 裡轉不過來<br>請用外部的 Chrome 或 Safari 開</p><button class="leave">用瀏覽器開</button><button class="copy">複製網址</button>`
+        : fromHome() ? '' : `<div class="home"><p>加到主畫面，開起來就是全螢幕</p><button class="install">加到主畫面</button><div class="steps">${homeSteps()}</div></div>`}</div></div>`);
     const $ = (s) => this.root.querySelector(s);
     this.stickEl = $('.stick'); this.knob = $('.knob'); this.base = $('.base');
     this.btns = [['D', BD], ['S', BS], ['A', BA], ['J', BJ]].map(([c, bit]) => ({ el: $(`.tb.${c}`), bit }));
@@ -88,6 +104,11 @@ export class Touch {
     $('.tswap').addEventListener('pointerdown', (e) => { e.stopPropagation(); e.preventDefault(); this.setSide(!this.left); });
     onTap(this.backBtn, () => { this.cb.back(); return true; });
     this.turn.querySelector('.full').addEventListener('click', () => fullscreen(true));
+    this.turn.querySelector('.install')?.addEventListener('click', async () => {
+      if (!install) return;
+      const e = install; install = null; document.body.classList.remove('can-install');
+      try { await e.prompt(); } catch {}
+    });
     if (inApp) {
       this.turn.querySelector('.leave').addEventListener('click', () => { location.href = leaveURL(); });
       const copy = this.turn.querySelector('.copy');

@@ -4,7 +4,6 @@
 
 import * as THREE from 'three';
 import { BUILD, recolor } from './models.js';
-import { InkLines } from './inkline.js';
 
 const cache = {};
 

@@ -4,7 +4,7 @@
 // 模型朝 +z（臉朝前）、aN 是靠鏡頭那隻手（-x）；面向左邊時整隻鏡像（root.scale.x = -1），靠鏡頭的永遠是同一隻。
 
 import * as THREE from 'three';
-import { kit, joint, INK, fuse, toon, merge, repaint } from './kit.js';
+import { kit, joint, INK, fuse, merge, repaint } from './kit.js';
 import { tagInk } from './inkline.js';
 import { FOREST } from './models-forest.js';
 import { MOON } from './models-moon.js';       // 第四關月球工廠的三隻（另一支檔）   // 第三關黑森林的六隻（另一支檔）

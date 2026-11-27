@@ -6,12 +6,13 @@
 // 闖關（root 加 quest）：回合章和勝場收起來，玩家牌多命和分數；下面頭目的大血條、敵人頭上的小血條、往右的箭頭、接關倒數。
 
 import { HP, MP, CONT_TIME } from '../sim/const.js';
-import { entryAt, entryLen } from '../sim/match.js';
+import { entryAt, entryLen, step, newMatch } from '../sim/match.js';
 import { QUESTS } from '../sim/quests/index.js';
 import { btnName, keyName, KEYMAP, device } from './keys.js';
 import { pickKind } from '../sim/item.js';
-import { pasMeter } from '../sim/fighter.js';
-import { CHARS, MOVES } from '../sim/chars/index.js';
+import { pasMeter, newFighter } from '../sim/fighter.js';
+import { newQuest } from '../sim/quest.js';
+import { CHARS, MOVES, ROSTER } from '../sim/chars/index.js';
 import { cmdHtml, withKeys } from './menu.js';
 import { gt, gtSet } from './gt.js';
 import { setPal, seal, ROMAN, studs } from './arcane.js';
@@ -23,6 +24,8 @@ const FREE_CUE = new Set(['stand', 'walk', 'crouch']);   // 這幾個動作按�
 
 const $ = (s, el = document) => el.querySelector(s);
 const N = ['一', '二', '三', '四', '五'];
+// 等幾個畫面更新（讀取時演字卡用）
+const frames = async (n) => { for (let i = 0; i < n; i++) await new Promise((r) => requestAnimationFrame(r)); };
 
 export class Hud {
   constructor(root) {
@@ -84,16 +87,104 @@ export class Hud {
   // 照 1600×800 的版面等比縮放；視窗比較寬的時候兩邊的牌子還是貼著邊
   fit() { this.s = Math.min(innerWidth / 1600, innerHeight / 800); this.root.style.setProperty('--s', this.s); }
   show(on) { this.root.hidden = !on; }
-  // 開場先要一次會用到的字和頭像：思源宋體是分包下載的，招式名第一次出現才抓的話會頓一下、字還會跳
+  // 讀取時先要一次會用到的字和頭像：思源宋體是分包下載的，招式名第一次出現才抓的話會頓一下、字還會跳。回傳字載好的 promise
   warm() {
     const names = Object.values(CHARS).flatMap((c) => [c.name, c.full, ...(c.say ? [c.say.in[0], c.say.win[0], c.say.lose[0]] : []), c.blurb || '', c.card?.type || '', c.card?.attr || '', ...c.specials.map((s) => s.name), ...c.supers.map((s) => s.name)]).join('');
     const text = names + Object.values(QUESTS).map((q) => q.name + (q.bossName || '') + (q.bossSay || '') + (q.rageName || '')).join('') + '連擊傷害第一二三四五回合開打勝平手破防超必殺練習木樁選角色好了等對方力距速定發動關海底沉船前進接關按繼續分數歸零頭目出局過結束電腦';
+    let fonts = Promise.resolve();
     try {
-      document.fonts.load('900 40px "Noto Serif TC"', text);
-      document.fonts.load('700 40px "Noto Serif TC"', text);
-      document.fonts.load('900 40px "Cinzel"', 'IVXKOROUNDVSPCHOEYMAI0123456789');
+      fonts = Promise.all([
+        document.fonts.load('900 40px "Noto Serif TC"', text),
+        document.fonts.load('700 40px "Noto Serif TC"', text),
+        document.fonts.load('900 40px "Cinzel"', 'IVXKOROUNDVSPCHOEYMAI0123456789'),
+      ]).catch(() => {});
     } catch {}
     for (const c of Object.values(CHARS)) portraitURL(c.id);
+    return fonts;
+  }
+
+  // 讀取時（讀取卡蓋著）把一場的開頭在 HUD 上演一遍：出場字卡、黑邊、回合、開打，再加超必殺緞帶、閃白、KO、勝利。
+  // 大字的金色填色、顆粒、動畫圖層第一次畫的時候瀏覽器要現編（量過開打時頓 200–400ms，只有第一次），先演過就不頓。
+  // 動畫要真的播、字要真的看得到（直接跳到最後一格、或快轉到字還沒浮出來就換下一張，照樣頓）：
+  // 比賽一個畫面更新跑 6 幀，每張字卡出來停 10 幀；開始時 setNames 會把這裡留下的數字清掉
+  async prime(S) {
+    this.show(true);
+    this.setNames(S);
+    while (S.ph === 'intro') {
+      let card = false;
+      for (let k = 0; k < 6 && !card; k++) {
+        step(S, 0, 0);
+        for (const e of S.ev) { this.event(e, S); if (e.k === 'entry' || e.k === 'round' || e.k === 'fight') card = true; }
+        if (S.ph !== 'intro') break;
+      }
+      this.update(S, card ? 1 / 60 : 0.1);
+      await frames(card ? 10 : 1);
+    }
+    // 打起來才有的：連擊數和傷害、血少（紅的、會閃）、血條的殘影、魔力滿了蓋「超」、魔力半格
+    const [A, B] = S.p;
+    A.hp = HP / 5 | 0; A.mp = MP; B.hp = HP * 0.6 | 0; B.mp = MP * 0.35 | 0;
+    this.cdmg = [123, 45];
+    for (const n of [3, 12, 27]) { A.combo = n; B.combo = n + 1; this.update(S, 1 / 60); await frames(4); }
+    this.callout(0, CHARS[S.p[0].ch].supers[0]?.name || '超必殺', '超必殺・發動');
+    this.callout(1, '破防');
+    this.flash(0.2);
+    for (const [t, k] of [['KO', 'ko'], [`${CHARS[S.p[0].ch].name} 勝`, 'win']]) { this.announce(t, 1, k, 'VICTORY'); await frames(15); }
+    // 每一隻的玩家牌（頭像、寶石色、名字）都上場一次：頭像是各自一張圖，第一次畫也會頓
+    for (let i = 0; i < ROSTER.length; i += 2) {
+      const T = newMatch(ROSTER[i].id, ROSTER[(i + 1) % ROSTER.length].id);
+      T.ph = 'fight';
+      this.setNames(T); this.update(T, 1 / 60);
+      await frames(6);
+    }
+    // 收回去
+    this.enKey = null;
+    for (const el of this.root.querySelectorAll('.on')) el.classList.remove('on');
+    $('.announce', this.root).className = 'announce';
+    this.annT = 0;
+    this.show(false);
+  }
+
+  // 第一次進一關的讀取時：闖關才有的（關名字卡、命、分數、頭目血條、敵人頭上的血條、精英的金邊、前進箭頭、洋流、甲板炮提示、
+  // 打法分的浮字、接關倒數、過關）也在讀取卡底下演一次，理由同 prime。cast：這關會出現的角色（prewarm.js castOf）
+  async primeQuest(id, cast) {
+    const S = newQuest([cast[0]], id, { seed: 1 }), me = S.p[0], Q = QUESTS[id];
+    const foes = cast.filter((c) => CHARS[c].npc).slice(0, 5);
+    foes.forEach((ch, k) => {
+      const f = newFighter(ch, k + 1, 1, me.x + 900 * (k + 1), -1);
+      f.mini = k < foes.length - 1 ? 1 : 0; f.elite = k === 1 ? 1 : 0; f.hp = f.mhp >> 1;
+      S.p.push(f);
+    });
+    S.boss = S.p.length - 1;
+    S.ph = 'fight'; S.go = 1;
+    me.combo = 0; S.p[1].combo = 8;
+    S.tr = [{ k: 'current', on: 2, dir: 1 }, { k: 'gun', x: me.x, z: me.z, cd: 0, fire: 0 }];
+    // 頭上的血條、浮字照鏡頭擺，人在畫面外的話不會畫：讀取時一律擺到畫面中間
+    const upd = () => {
+      this.update(S, 1 / 60);
+      [...this.ebars, ...this.pops.map((o) => o.el)].forEach((el, k) => { el.style.transform = `translate(${(innerWidth * (0.3 + 0.08 * (k % 6))) | 0}px, ${(innerHeight * (0.35 + 0.1 * (k / 6 | 0))) | 0}px)`; });
+    };
+    this.show(true);
+    this.setNames(S);
+    this.event({ k: 'stage', n: Q.no, name: Q.name }, S);
+    upd();
+    await frames(12);
+    this.event({ k: 'boss', s: S.boss, say: Q.bossSay || '' }, S);
+    this.event({ k: 'bonus', v: 150, tag: '炮擊', x: me.x, y: 900, z: 0 }, S);
+    upd();
+    await frames(6);
+    for (const sc of [1234567890, 9876543210]) { S.score[0] = sc; S.lives[0] = 2; me.hp = me.mhp / 5 | 0; upd(); await frames(4); }   // 分數每個數字、命少了
+    await frames(6);
+    S.ph = 'cont'; S.pt = 0;
+    upd();
+    await frames(8);
+    S.ph = 'fight';
+    this.event({ k: 'clear' }, S);
+    upd();
+    await frames(12);
+    for (const el of this.root.querySelectorAll('.on')) el.classList.remove('on');
+    $('.announce', this.root).className = 'announce';
+    this.annT = 0;
+    this.show(false);
   }
 
   // 左下角招式表：第 i 隻（自己操作的那隻）的必殺、超必殺和幾個同按；魔力不夠的那行變暗。

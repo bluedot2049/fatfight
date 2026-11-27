@@ -94,6 +94,20 @@ body.touch.tall #turn { display: flex; }
   background: linear-gradient(rgba(36, 26, 28, .94), rgba(13, 10, 12, .94)) padding-box, var(--goldframe) border-box; box-shadow: 0 0 0 1px #0a0604; }
 /* App 裡的瀏覽器轉不過來：一句說明＋用瀏覽器開、複製網址（複製不了就把網址寫在鈕上） */
 #turn p { margin: 0; font-size: 16px; line-height: 1.7; letter-spacing: .1em; color: var(--parch2); }
+/* 外部瀏覽器：教加到主畫面（一步一個圖示），從主畫面開的就不出現 */
+#turn .home { display: flex; flex-direction: column; align-items: center; gap: 12px; margin-top: 6px; padding-top: 18px; border-top: 1px solid rgba(210, 181, 122, .22); }
+#turn .home p { font-size: 14px; }
+#turn .steps { display: flex; align-items: center; gap: 12px; }
+#turn .step { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+#turn .step svg { width: 44px; height: 44px; padding: 8px; box-sizing: border-box; border-radius: 10px; background: rgba(13, 10, 12, .8); box-shadow: 0 0 0 1px rgba(210, 181, 122, .35);
+  fill: none; stroke: var(--goldc); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+#turn .step circle { fill: var(--goldc); stroke: none; }
+#turn .step em { font-style: normal; font-size: 13px; letter-spacing: .08em; color: var(--ivoryc); }
+/* Android Chrome 給了安裝的機會：一顆鈕取代圖示；裝好了整段收掉 */
+#turn .install { display: none; }
+body.can-install #turn .install { display: block; }
+body.can-install #turn .steps, body.installed #turn .home { display: none; }
+#turn .to { font-style: normal; font-size: 22px; color: var(--goldc); opacity: .7; margin-bottom: 20px; }
 #turn button.copy { height: auto; min-height: 40px; max-width: 82vw; padding: 8px 20px; font-size: 14px; font-weight: 500; word-break: break-all; opacity: .85; }
 
 /* ---------- 用觸控時其他介面的調整 ---------- */
@@ -110,6 +124,10 @@ body.touch #hud .pp.mine .mvb { display: grid; place-items: center; position: ab
   background: radial-gradient(circle at 50% 30%, rgba(62, 46, 40, .95), rgba(13, 10, 12, .95) 72%) padding-box, var(--goldframe) border-box; box-shadow: 0 0 0 1px #0a0604, 0 3px 6px rgba(0, 0, 0, .6); }
 body.touch #hud.mvon .pp.mine .mvb { background: radial-gradient(circle at 50% 30%, color-mix(in srgb, var(--gem) 65%, #fff) 0, var(--gem) 26%, var(--deep) 78%) padding-box, var(--goldframe) border-box; }
 body.touch .menu .foot, body.touch .fit9 .keys { display: none; }       /* 鍵盤的按鍵提示；返回用左上角那顆 */
+/* 選角：色票就是確定鈕（點格子移過去、點色票或再點同一格確定），整頁縮小過，要放大才點得到 */
+body.touch .side .sfoot { top: 572px; }
+body.touch .side .sw { height: 64px; padding: 0 22px 0 10px; gap: 10px; font-size: 26px; }
+body.touch .side .sw::before { width: 38px; height: 44px; }
 body.touch #hud .net { bottom: 2px; font-size: 10px; }
 /* 招式表、操作說明：讓出左上角的返回，整張從返回底下開始；關閉用返回 */
 body.touch #overlay { align-items: flex-end; padding-bottom: 6px; }

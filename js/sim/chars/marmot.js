@@ -25,8 +25,8 @@ const N = {
 
 const SP = [
   // 往上衝（使用者 2026-11-27 改成三下都把人帶上去，到頂點看按什麼收尾）：爪子劃一道黃色月牙上去，頂點停住、爪上冒電，
-  // 按攻＝平打打飛（撞人）、按下＋攻＝斜下 45 度砸地（彈一下就躺，收尾）、沒按＝照原本往上打飛。沒打到人也接得出來，不另外扣魔力
-  { id: 'tooth', name: '牙衝', yomi: 'monga sho-ten', tai: 'ge5-tshiong1', d: 'u', btn: 'A', note: '對空無敵。頂點按攻平打、下＋攻砸地',
+  // 按攻＝平打打飛（撞人）、按前＋攻＝斜下 45 度砸地（原本下＋攻，手機按不出來改前）（彈一下就躺，收尾）、沒按＝照原本往上打飛。沒打到人也接得出來，不另外扣魔力
+  { id: 'tooth', name: '牙衝', yomi: 'monga sho-ten', tai: 'ge5-tshiong1', d: 'u', btn: 'A', note: '對空無敵。頂點按攻平打、前＋攻砸地',
     m: mv('tooth', '牙衝', 30, { kind: 'sp', mp: 150, inv: [1, 8], jump: [2, 16, 136], land: 4, landW: 11, hang: 7,
       fork: { f: 'toothF', d: 'toothD', def: 'toothU' },
       hits: [hit([2, 4], [0, 250, 500, 1600], 'S', { dmg: 28, fall: 0, carry: 1, stop: 5, hs: 24 }),

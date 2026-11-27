@@ -15,7 +15,7 @@ import { MoonStage } from './moon.js';
 import { kit, repaint, merge } from './kit.js';
 import { CHARS, MOVES } from '../sim/chars/index.js';
 import { hitBoxes, paceLen } from '../sim/moves.js';
-import { STAGE_HALF, Z_NEAR, Z_REACH } from '../sim/const.js';
+import { STAGE_HALF, Z_REACH } from '../sim/const.js';
 import { QUESTS } from '../sim/quests/index.js';
 import { hurtBoxes } from '../sim/combat.js';
 import { entryAt } from '../sim/match.js';
@@ -103,6 +103,7 @@ export class View {
     this.inkKeep = new Set();
     this.inkSize = new THREE.Vector2();
     this.show = new SuperShow(this);   // 超必殺的演出：全場暗下去、追光、剪影、超必殺 KO
+    this.ready = new Set();            // 讀取時先畫過一次的關卡 id（main.js needLoad、prewarm.js；競技場開遊戲就畫過）
     this.resize();
     addEventListener('resize', () => this.resize());
   }
@@ -278,12 +279,10 @@ export class View {
           this.fx.bolts(x, y, zc, e.big ? 5 : 2, e.big ? 1.5 : 0.6, z, e.big ? 0.22 : 0.12);
           if (e.big && power) this.fx.strike(x, y, z, zc, su ? 4.2 : 3.2);
         }
-        if (e.fx && TEAR_DIR[e.fx]) {                    // 牙衝收尾：水滴形的衝擊波，飛出去的人身後也拖一道
+        if (e.fx && TEAR_DIR[e.fx]) {                    // 牙衝收尾：打中那點一個水滴形的衝擊波（被打的人身上不跟著拖）
           const Ad = S.p[e.s], Dv = S.p[e.d], dir = Math.sign((Dv?.x ?? 0) - (Ad?.x ?? 0)) || Ad?.face || 1, [tx, ty] = TEAR_DIR[e.fx], tc = zc || c;
           this.fx.tear(x, y, z, Math.atan2(-ty, -tx * dir), 3.0, tc, 0.34, 0.75);
           this.fx.shock(x, y, HOT, 1.6, z, 0.2);
-          const vt = this.fighters[e.d];
-          if (vt) { vt.tearT = 0.6; vt.tearC = tc; vt.tearBig = 1; }   // 頓格完飛出去那一刻再爆一個大的，接著一路拖光
           this.shake = Math.max(this.shake, 0.07);
         }
         if (e.fx === 'splash') {                         // 海牛肥尾抽掃中：水花炸開、一圈水環、水珠往下掉
@@ -949,14 +948,8 @@ export class View {
     (v.tip || (v.tip = new THREE.Vector3())).copy(w);
   }
   // 閃電拳手（角色表寫 zap 的，胖鼠）：出拳的有效幀爪上劈啪、必殺身上冒電；牙衝爪子劃一道月牙上去、頂點爪上電一直閃；
-  // 收尾的揮擊也留一道刀光；鑽地在土裡竄電、竄出來劈一道雷。被牙衝收尾打飛的人（任何角色）身後拖水滴形的光
+  // 收尾的揮擊也留一道刀光；鑽地在土裡竄電、竄出來劈一道雷。被打的人身上不加東西（2026-11-27 使用者：多餘）
   zapFx(S, p, v, m, C) {
-    if (v.tearT > 0 && !(p.stop > 0)) {               // 頓格中先停著，飛出去才開始算
-      v.tearT -= this.dt;
-      const sp = Math.hypot(p.vx, p.vy), x = p.x * U, y = (p.y + CHARS[p.ch].h * 0.4) * U, a = Math.atan2(-p.vy, -p.vx);
-      if (v.tearBig && sp > 8) { v.tearBig = 0; this.fx.tear(x, y, p.z * U, a, 3.4, v.tearC, 0.4, 0.95); this.fx.bolts(x, y, v.tearC, 3, 1.0, p.z * U, 0.16); }
-      if (sp > 8) this.fx.tear(x, y, p.z * U, a, 1.0 + Math.min(1.6, sp * U * 14), v.tearC, 0.12, 0.55);
-    }
     const zc = C.zap;
     if (!zc) return;
     const id = m && m.id, x = p.x * U, z = p.z * U;
@@ -1158,7 +1151,7 @@ export class View {
     this.camera.lookAt(ox + sx, 0.55 + 0.12 * lo2 + sy + cy, this.cam.z - 0.15);
   }
 
-  // 開場先把每種特效、泡泡、浪、星星都畫一次到一張小圖上：著色器和貼圖先準備好，第一次出招才不會頓一下
+  // 讀取時（prewarm.js）把每種特效、泡泡、浪、星星都畫一次到一張小圖上：著色器和貼圖先準備好，第一次出招才不會頓一下
   warm() {
     const fx = this.fx, x = this.cam.x, W = '#ffffff';
     const keep = fx.list;
@@ -1231,7 +1224,7 @@ function shade(root) {
 }
 
 // 苦無（朝 +x，長約 0.33）：刀身、握柄、尾巴的環
-function kunaiMesh() {
+export function kunaiMesh() {
   const g = new THREE.Group();
   const k = kit(g);
   k.cone(0.042, 0.2, '#5a5664', 0.1, 0, 0, { rz: -Math.PI / 2, sz: 0.35 });
@@ -1240,7 +1233,7 @@ function kunaiMesh() {
   return merge({ root: g }).root;
 }
 // 一群烏鴉（朝 +x）：五隻，每隻身體、頭、嘴、兩片翅膀（view 拍）
-function crowMesh() {
+export function crowMesh() {
   const g = new THREE.Group(), C = '#1e1a24';
   for (const [bx, by, bz, s] of [[0, 0, 0, 1], [-0.35, 0.16, 0.22, 0.85], [-0.3, -0.12, -0.26, 0.9], [-0.68, 0.05, 0.06, 0.8], [-0.58, 0.24, -0.12, 0.75]]) {
     const b = new THREE.Group(), k = kit(b);
@@ -1256,7 +1249,7 @@ function crowMesh() {
 }
 // 飛行道具的球（半徑 1，view 照判定框縮放）：角色表的 shot [主色, 中間那條帶子的顏色或 null]
 // 箭（朝 +x，長約 1；view 照飛的方向左右翻）：箭桿、箭頭、兩片箭羽
-function arrowMesh([c, wood]) {
+export function arrowMesh([c, wood]) {
   const g = new THREE.Group();
   const k = kit(g);
   k.box(1.0, 0.045, 0.045, wood || '#6a4a2a', 0, 0, 0);
@@ -1264,7 +1257,7 @@ function arrowMesh([c, wood]) {
   for (const rx of [0.6, -0.6]) k.box(0.2, 0.11, 0.015, c, -0.42, 0, 0, { rx, line: false });
   return merge({ root: g }).root;
 }
-function ballMesh([c, band]) {
+export function ballMesh([c, band]) {
   const g = new THREE.Group();
   const k = kit(g);
   k.ball(1, c, 0, 0, 0);

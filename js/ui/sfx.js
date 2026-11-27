@@ -105,6 +105,8 @@ function crush(k) {   // 破音：爆炸、雷要髒一點
   if (!curves[k]) { const c = new Float32Array(1024); for (let i = 0; i < 1024; i++) { const x = i / 511.5 - 1; c[i] = Math.tanh(k * x) / Math.tanh(k); } curves[k] = c; }
   const w = ctx.createWaveShaper(); w.curve = curves[k]; w.oversample = '2x'; return w;
 }
+// 髒的鋸齒掃頻先破音再壓暗（胖鼠的電）：只留胸口那段，不刺耳
+function low(fn) { via(lp(1300), () => via(crush(5), fn)); }
 function lp(f, q = 0.7) { const b = ctx.createBiquadFilter(); b.type = 'lowpass'; b.frequency.value = f; b.Q.value = q; return b; }
 function env(g, t, a, peak, dec) {
   g.gain.setValueAtTime(0.0001, t);
@@ -149,12 +151,34 @@ function rumble(t, dur, peak, f = 120, grow = 0) {
   s.connect(b); b.connect(g); g.connect(dest);
   s.start(t, Math.random() * 0.5); s.stop(t + dur + 0.1);
 }
-// 雷：最前面一聲劈、一把電弧、往下掉的轟、拖很長的低吼
+// 滾雷（peal）：悶住的低雜訊一波一波湧上來又退（一波 0.2–0.45 秒，越後面越小、越悶），像雷在雲裡滾過去
+function peal(t, dur, peak, f = 240) {
+  const s = ctx.createBufferSource(); s.buffer = noiseBuf; s.loop = true;
+  const b = lp(f, 1.2), g = ctx.createGain();
+  b.frequency.setValueAtTime(f, t); b.frequency.exponentialRampToValueAtTime(f * 0.45, t + dur);
+  g.gain.setValueAtTime(0.0001, t);
+  let x = 0;
+  while (x < dur) {
+    const k = Math.pow(1 - x / dur, 1.2), up = 0.05 + Math.random() * 0.1, down = 0.15 + Math.random() * 0.25;
+    g.gain.linearRampToValueAtTime(Math.max(0.0001, peak * k * (0.5 + Math.random() * 0.5)), t + x + up);
+    g.gain.linearRampToValueAtTime(Math.max(0.0001, peak * k * 0.2), t + x + up + down);
+    x += up + down;
+  }
+  g.gain.linearRampToValueAtTime(0.0001, t + x + 0.1);
+  s.connect(b); b.connect(g); g.connect(dest);
+  s.start(t, Math.random() * 0.5); s.stop(t + x + 0.2);
+}
+// 雷：撕開的一刷（中頻、不刺）、壓低的劈啪、很重的轟（破音讓筆電喇叭也聽得到低音）、拖很長的滾雷
 function thunder(t, p = 1) {
-  noise(t, 0.05, 2400, 0.6, 0.8 * p, 'highpass');
-  crackle(t, 0.16, 26, 3600, 0.35 * p);
-  via(crush(3), () => { noise(t + 0.01, 0.45, 1400, 0.6, 0.55 * p, 'lowpass', 160); tone(t, 0.7, 95, 26, 0.7 * p); });
-  rumble(t + 0.06, 1.7, 0.55 * p, 150);
+  noise(t, 0.09, 1500, 0.7, 0.5 * p, 'bandpass', 420);
+  crackle(t, 0.2, 16, 1300, 0.26 * p, 0.7);
+  via(crush(3), () => {
+    noise(t + 0.01, 0.7, 800, 0.6, 0.7 * p, 'lowpass', 80);
+    tone(t, 1.2, 72, 22, 0.72 * p);
+    tone(t, 0.6, 140, 42, 0.35 * p, 'triangle');
+  });
+  rumble(t + 0.04, 0.6, 0.4 * p, 160);
+  peal(t + 0.1, 2.4, 0.65 * p, 260);
 }
 // 電流：鋸齒波的嗡被方波切成一段一段（滋滋滋），上面一層嘶、一把劈啪。f 嗡的音高，結束時往上飄一點
 function buzz(t, dur, p = 1, f = 110) {
@@ -165,16 +189,16 @@ function buzz(t, dur, p = 1, f = 110) {
   const g = ctx.createGain(); g.gain.value = 0.5;
   const e = ctx.createGain(); env(e, t, 0.006, 0.15 * p, dur);
   am.connect(ag); ag.connect(g.gain);
-  via(lp(3200), () => via(crush(7), () => { o.connect(g); g.connect(e); e.connect(dest); }));
+  via(lp(1500), () => via(crush(7), () => { o.connect(g); g.connect(e); e.connect(dest); }));
   o.start(t); am.start(t); o.stop(t + dur + 0.1); am.stop(t + dur + 0.1);
-  noise(t, dur, 5600, 0.8, 0.1 * p, 'highpass');
-  crackle(t, dur, Math.max(4, (dur * 36) | 0), 4400, 0.2 * p, 0.8);
+  noise(t, dur, 2200, 0.9, 0.05 * p, 'bandpass');
+  crackle(t, dur, Math.max(4, (dur * 30) | 0), 1800, 0.18 * p, 0.8);
 }
-// 劈：雷打下來最前面那一聲（很亮的一刷＋往下摔的尖音＋一小把劈啪）
+// 劈：雷打下來最前面那一聲（中頻一刷＋往下摔到很低的一聲悶＋一小把劈啪），不要尖
 function snap(t, p = 1) {
-  noise(t, 0.035, 4200, 0.6, 0.5 * p, 'highpass');
-  via(crush(4), () => tone(t, 0.11, 2800, 170, 0.16 * p, 'square'));
-  crackle(t, 0.08, 10, 5200, 0.32 * p);
+  noise(t, 0.06, 1700, 0.8, 0.42 * p, 'bandpass', 500);
+  via(lp(1400), () => via(crush(4), () => tone(t, 0.16, 800, 50, 0.24 * p, 'square')));
+  crackle(t, 0.09, 8, 1900, 0.26 * p);
 }
 // 爆炸：髒的低頻一團＋碎屑
 function boom(t, p = 1) {
@@ -265,30 +289,30 @@ const KIT = {
   // 胖鼠：中二的閃電拳手（使用者 2026-11-27）。每一招都帶電：滋滋的電流、劈的一聲、轟天雷；地底的爆炸、碎石留著。髒、快、炸
   marmot: {
     sp: {
-      tooth(t) { via(crush(5), () => tone(t, 0.2, 140, 1700, 0.22, 'sawtooth')); buzz(t, 0.32, 0.9, 150); snap(t + 0.03, 0.6); },   // 往上衝：電流往上飄
+      tooth(t) { low(() => tone(t, 0.22, 90, 620, 0.24, 'sawtooth')); buzz(t, 0.32, 0.9, 110); snap(t + 0.03, 0.6); thunder(t + 0.05, 0.3); },   // 往上衝：電流往上飄、背後一聲悶雷
       burrow(t) { boom(t, 0.55); drill(t + 0.08, 0.55); buzz(t + 0.1, 0.5, 0.5, 70); },
-      ball(t) { snap(t, 0.6); buzz(t, 0.6, 1, 120); rumble(t, 0.6, 0.45, 220); noise(t, 0.4, 400, 1.2, 0.22, 'bandpass', 1600); },   // 雷閃：一劈就整團電滾出去
-      crack(t) { noise(t, 0.2, 500, 1.2, 0.22, 'bandpass', 2600); via(crush(4), () => tone(t, 0.18, 120, 520, 0.16, 'sawtooth')); buzz(t, 0.25, 0.6, 160); },   // 地裂雷：舉手（拍地和炸開另外響）
-      gnaw(t) { via(crush(5), () => tone(t, 0.12, 300, 1200, 0.2, 'sawtooth')); crackle(t, 0.5, 26, 2600, 0.24, 0.5); rumble(t, 0.45, 0.4, 260); },   // 衝出去：電弧劈啪往前拉
+      ball(t) { snap(t, 0.6); buzz(t, 0.6, 1, 90); rumble(t, 0.6, 0.5, 200); peal(t + 0.05, 1.2, 0.45, 220); noise(t, 0.4, 300, 1.2, 0.2, 'bandpass', 900); },   // 雷閃：一劈就整團雷滾出去
+      crack(t) { noise(t, 0.2, 400, 1.2, 0.2, 'bandpass', 1400); low(() => tone(t, 0.2, 80, 320, 0.18, 'sawtooth')); buzz(t, 0.25, 0.6, 110); },   // 地裂雷：舉手（拍地和炸開另外響）
+      gnaw(t) { low(() => tone(t, 0.14, 160, 560, 0.22, 'sawtooth')); crackle(t, 0.5, 20, 1500, 0.22, 0.5); rumble(t, 0.45, 0.45, 220); peal(t + 0.1, 1, 0.35, 220); },   // 衝出去：電弧劈啪往前拉、雷聲跟著滾
     },
     cue: {   // 鑽地飛出來：地面炸開、天上劈一道
-      burrow: { up(t) { boom(t, 0.9); snap(t, 1); via(crush(5), () => tone(t, 0.25, 200, 1400, 0.18, 'sawtooth')); thunder(t + 0.02, 0.45); } },
+      burrow: { up(t) { boom(t, 0.9); snap(t, 1); low(() => tone(t, 0.25, 120, 560, 0.2, 'sawtooth')); thunder(t + 0.02, 0.6); } },
     },
     // 牙衝停在頂點換招：爪上一團電炸開＋揮下去的風。往上（沒按）輕一點
     fork: {
-      toothU(t) { snap(t, 0.7); buzz(t, 0.18, 0.7, 200); },
-      toothF(t) { snap(t, 1); buzz(t, 0.24, 1, 150); noise(t + 0.03, 0.18, 500, 1.2, 0.3, 'bandpass', 3800); },
-      toothD(t) { snap(t, 1); buzz(t, 0.24, 1, 220); noise(t + 0.03, 0.2, 3600, 1.2, 0.3, 'bandpass', 450); },
-      zap(t) { snap(t, 0.9); buzz(t, 0.2, 0.8, 180); thunder(t + 0.01, 0.35); },   // 被動狂雷附體：普攻追加的那道雷
+      toothU(t) { snap(t, 0.7); buzz(t, 0.18, 0.7, 140); thunder(t, 0.25); },
+      toothF(t) { snap(t, 1); buzz(t, 0.24, 1, 110); noise(t + 0.03, 0.18, 400, 1.2, 0.3, 'bandpass', 1800); thunder(t + 0.02, 0.35); },
+      toothD(t) { snap(t, 1); buzz(t, 0.24, 1, 140); noise(t + 0.03, 0.2, 1700, 1.2, 0.3, 'bandpass', 300); thunder(t + 0.02, 0.35); },
+      zap(t) { snap(t, 0.9); buzz(t, 0.2, 0.8, 120); thunder(t + 0.01, 0.45); },   // 被動狂雷附體：普攻追加的那道雷
     },
-    slam(t) { thunder(t, 0.9); boom(t, 0.8); snap(t, 0.8); },                    // 砸下去的人撞到地
+    slam(t) { thunder(t, 1); boom(t, 0.8); snap(t, 0.8); },                      // 砸下去的人撞到地
     super(t) {
-      via(crush(6), () => { tone(t, 0.05, 80, 900, 0.22, 'sawtooth', 0.45); tone(t, 0.05, 121, 1360, 0.12, 'square', 0.45); });
-      crackle(t, 0.5, 46, 3400, 0.32, 0.5);                                     // 電弧越來越密
-      buzz(t, 0.5, 0.8, 55);
-      rumble(t, 0.5, 0.5, 90, 1);
+      low(() => { tone(t, 0.05, 50, 380, 0.24, 'sawtooth', 0.45); tone(t, 0.05, 75, 570, 0.13, 'square', 0.45); });
+      crackle(t, 0.5, 36, 1600, 0.3, 0.5);                                      // 電弧越來越密
+      buzz(t, 0.5, 0.8, 50);
+      rumble(t, 0.5, 0.6, 110, 1);                                              // 雷在雲裡聚起來
       const r = t + 0.5;                                                         // 定格結束：轟天雷
-      snap(r, 0.7); thunder(r, 1.1); boom(r + 0.02, 0.8);
+      snap(r, 0.7); thunder(r, 1.25); boom(r + 0.02, 0.9); peal(r + 0.6, 2.2, 0.4, 200);
     },
     hit(t, big, su) {
       via(crush(5), () => { noise(t, big ? 0.3 : 0.14, 1700, 0.6, 0.5, 'lowpass', 200); tone(t, 0.18, 170, 40, 0.5); });
@@ -297,7 +321,7 @@ const KIT = {
       if (big) thunder(t, su ? 0.75 : 0.5);
     },
     hitN(t, big) { snap(t, big ? 0.45 : 0.25); if (big) buzz(t, 0.12, 0.5, 180); },   // 普通拳打中也帶一點電
-    swing(t, heavy) { crackle(t, heavy ? 0.14 : 0.09, heavy ? 6 : 4, 4000, 0.12); },   // 揮拳：爪上劈啪
+    swing(t, heavy) { crackle(t, heavy ? 0.14 : 0.09, heavy ? 6 : 4, 1700, 0.12); },   // 揮拳：爪上劈啪
   },
 };
 // 企鵝：火。呼的一大口、劈啪、彈指；冷著臉，聲音不吼
@@ -749,7 +773,7 @@ const SND = {
   },
   // 地裂：拍地一下悶響，裂縫竄的那半秒鑽頭＋電弧劈啪；炸開是土裡的爆炸＋往上的電；被打斷只剩碎石
   crack() { const t = ctx.currentTime; tone(t, 0.16, 150, 45, 0.55); noise(t, 0.12, 700, 0.8, 0.35, 'lowpass'); drill(t + 0.03, 0.5, 0.6); crackle(t + 0.03, 0.5, 22, 2400, 0.2, 0.6); },
-  erupt() { const t = ctx.currentTime; boom(t, 0.8); snap(t, 0.9); thunder(t + 0.02, 0.5); via(crush(5), () => tone(t, 0.22, 180, 1300, 0.16, 'sawtooth')); noise(t + 0.02, 0.25, 900, 0.7, 0.3, 'bandpass', 300); },   // 地裂雷炸開：土裡爆炸＋天上劈一道
+  erupt() { const t = ctx.currentTime; boom(t, 0.8); snap(t, 0.9); thunder(t + 0.02, 0.65); low(() => tone(t, 0.22, 110, 520, 0.18, 'sawtooth')); noise(t + 0.02, 0.25, 900, 0.7, 0.3, 'bandpass', 300); },   // 地裂雷炸開：土裡爆炸＋天上劈一道
   // 胖鼠牙衝頂點換招、往下砸的人撞到地
   fork({ ch, id }) { KIT[ch]?.fork?.[id]?.(ctx.currentTime); },
   slam({ ch }) { const t = ctx.currentTime; if (KIT[ch]?.slam) return KIT[ch].slam(t); boom(t, 0.9); },

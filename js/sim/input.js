@@ -8,7 +8,7 @@ const KEEP = 16;
 const ORDER = [UP, DOWN, LEFT, RIGHT, BS, BD, BA, BJ];   // 同一幀一起按下的話，方向先、蹲防第二、攻跳最後
 const CMD = 8;                                           // used 的第 8 格：最後一次拿去出必殺的那下防
 
-export function newHistory() { return { prev: 0, n: 0, k: [], t: [], used: [0, 0, 0, 0, 0, 0, 0, 0, 0], gd: 0 }; }
+export function newHistory() { return { prev: 0, n: 0, k: [], t: [], used: [0, 0, 0, 0, 0, 0, 0, 0, 0], gd: 0, ad: 0 }; }
 const slot = (bit) => 31 - Math.clz32(bit);           // 位元 → 0–7
 
 export function record(H, bits) {
@@ -16,6 +16,7 @@ export function record(H, bits) {
   const press = bits & ~H.prev;
   H.prev = bits;
   if (press & BD) H.gd = bits & (UP | DOWN | LEFT | RIGHT | BS);   // 按下防那一刻按著哪些方向（和蹲），給「按著方向出必殺」用
+  if (press & BA) H.ad = bits & (UP | DOWN | LEFT | RIGHT | BS);   // 按下攻那一刻按著哪些方向（胖鼠牙衝頂點：早按、方向先放開也算）
   for (const b of ORDER) {
     if (!(press & b)) continue;
     H.k.push(b); H.t.push(H.n);

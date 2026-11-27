@@ -291,7 +291,7 @@ function decide(S, f, A) {
     // 牙衝停在頂點：會接拳的難度按攻收尾。旁邊還有別的敵人就平打（打飛去撞人），不然一半砸地
     if (m.fork && f.hang > 0 && f.con === 1 && L.combo >= 1 && !(A.last & BA)) {
       const crowd = S.p.some((e) => e.team !== f.team && e.i !== o.i && e.hp > 0 && !e.gone && Math.abs(e.x - f.x) < 3000 && Math.abs(e.z - f.z) < 800);
-      return BA | (!crowd && rnd(A) < 0.5 ? DOWN : 0);
+      return BA | (!crowd && rnd(A) < 0.5 ? (f.face > 0 ? RIGHT : LEFT) : 0);
     }
     // 必殺打中、最後一下打完：照難度再接一招必殺
     if (m.kind === 'sp' && m.cancel && f.con === 1 && !f.air && L.combo >= 3 && f.t === m.hits[m.hits.length - 1].on[1] + 1) {

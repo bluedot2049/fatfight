@@ -18,11 +18,13 @@ import { magicCircle } from './ui/arcane.js';
 import { decorate } from './ui/ornate.js';
 import { CardStage } from './view/cardstage.js';
 import { Poster } from './view/poster.js';
+import { prewarm, compile, castOf } from './view/prewarm.js';
+import { loading } from './ui/loading.js';
 import { newMatch, step, setCpu } from './sim/match.js';
 import { newQuest } from './sim/quest.js';
 import { ORDER, QUESTS } from './sim/quests/index.js';
 import { LV_MAX } from './sim/ai.js';
-import { CHARS, MOVES } from './sim/chars/index.js';
+import { CHARS } from './sim/chars/index.js';
 import { LEFT, RIGHT, BD, BJ, BS } from './sim/const.js';
 import { Rollback } from './net/rollback.js';
 import { connect, newCode, cleanCode } from './net/peer.js';
@@ -37,7 +39,7 @@ hud.locals = () => (G.kind === 'online' ? [[mine(), 0]] : G.S.p.filter((f) => f.
 const keys = new Keyboard();
 const menu = new Menu(document.getElementById('menu'), keys);
 const overlay = document.getElementById('overlay');
-let cards3d = null;          // 選角閃卡上的 3D 角色（第一次進選角才建）
+let cards3d = null;          // 選角閃卡上的 3D 角色（讀取時建好，見 boot）
 // 選角照 1600×900 畫再整塊縮放
 const fit9 = () => document.documentElement.style.setProperty('--s9', Math.min(innerWidth / 1600, innerHeight / 900));
 fit9();
@@ -48,6 +50,7 @@ const G = {
   kind: 'local',          // local train online cpu quest
   S: newMatch('manatee', 'marmot'),
   chars: ['manatee', 'marmot'],
+  cols: [0, 0],           // 選角選的那套色（攻＝本色、防＝換色）
   paused: false,
   dummy: 0,               // 練習對手：0 站著 1 蹲著 2 防禦 3 一直跳 4 P2 操作 5 電腦
   cpuLv: 1,               // 對電腦的難度：贏了往上一級（0–LV_MAX），回標題重來
@@ -151,8 +154,7 @@ function loop(now) {
   }
   if (G.mode === 'select') cards3d?.render(dt);       // 選角整頁都是介面蓋住，場地不用畫
   else if ((G.mode === 'title' || G.mode === 'room') && poster) poster.render(dt);   // 標題、房間：海報
-  else view.render(G.S, G.events, dt);
-  if (!G.warm) { G.warm = true; view.warm(); hud.warm(); }     // 第一個畫面畫完就預先準備特效和字，之後第一次出招不會頓
+  else if (G.mode !== 'load') view.render(G.S, G.events, dt);   // load：讀取卡蓋著，prewarm 自己畫
   if (G.mode === 'fight') { hud.update(G.S, dt); if (!G.paused) sfxState(G.S, panOf); }
   view.setLift(touch.on && G.mode === 'fight' ? 0.06 : 0);
   touch.sync({
@@ -256,8 +258,9 @@ function toSelect(kind, onlineSide = 0) {
   const scr = selectScreen({
     mode: kind, side: onlineSide, coop: kind === 'online' && G.room?.mode === 'quest',
     back: kind === 'online' ? () => toRoom(true) : () => (G.wait ? backToWait() : toTitle()),
-    onPick: kind === 'online' ? (ch, ok) => G.net?.ctl({ t: 'pick', ch, ok }) : null,
-    done: (c0, c1) => {
+    onPick: kind === 'online' ? (ch, ok, col) => G.net?.ctl({ t: 'pick', ch, ok, col }) : null,
+    done: (c0, c1, cols) => {
+      G.cols = cols;
       if (kind === 'online') { if (G.side === 0) startOnline(c0, c1); }
       else if (kind === 'quest') startQuest(c0);
       else startFight(c0, c1);
@@ -271,11 +274,14 @@ function toSelect(kind, onlineSide = 0) {
   cards3d.start();
 }
 
+// 選角選的那套色（0 本色、1 換色），一個玩家一格；放進每隻的狀態（p.col），畫面照它換色（view/mark.js isAlt）
+function dressCols(S, cols = G.cols) { cols.forEach((c, k) => { if (S.p[k]) S.p[k].col = c | 0; }); return S; }
+
 function startFight(c0, c1) {
   menu.hide(); closeOverlay(); cards3d?.stop();
   view.camOffset = 0; view.marks = true;
   G.chars = [c0, c1];
-  G.S = newMatch(c0, c1, { train: G.kind === 'train', cpu: G.kind === 'cpu' ? G.cpuLv : undefined, items: itemsOn });
+  G.S = dressCols(newMatch(c0, c1, { train: G.kind === 'train', cpu: G.kind === 'cpu' ? G.cpuLv : undefined, items: itemsOn }));
   if (G.kind === 'train' && G.dummy === 5) setCpu(G.S, 1, TRAIN_CPU);
   G.mode = 'fight'; G.paused = false; acc = 0; G.overShown = false; view.fresh();
   hud.show(true); hud.setNames(G.S); hud.setMoves(G.S, 0); hud.showMoves(movesOn);
@@ -284,12 +290,27 @@ function startFight(c0, c1) {
   music.muffle(false); music.level(1); music.battle();
 }
 
+// 第一次進這一關：蓋讀取卡，把這關的場景、雜兵、頭目先畫一次（view/prewarm.js），好了再開。回傳 true＝要等
+function needLoad(id, then) {
+  if (view.ready.has(id)) return false;
+  menu.hide(); closeOverlay(); cards3d?.stop();
+  G.mode = 'load'; G.rb = null;
+  const L = loading(QUESTS[id].name);
+  L.step(0, '準備場景');
+  prewarm(view, id, (k) => L.step(k * 0.8))
+    .then(() => { L.step(0.85, '字卡'); return hud.primeQuest(id, castOf(id)); })
+    .catch((e) => console.error(e))
+    .finally(() => { view.ready.add(id); L.done(); then(); });
+  return true;
+}
+
 // 闖關：一個人（之後兩人合作），從第一關開始；carry：過關後打下一關，帶著上一關的分數（命每關補滿）
 function startQuest(c0, id = ORDER[0], carry = null) {
+  if (needLoad(id, () => startQuest(c0, id, carry))) return;
   menu.hide(); closeOverlay(); cards3d?.stop();
   view.camOffset = 0; view.marks = true;
   G.kind = 'quest'; G.chars = [c0]; G.quest = id; G.side = 0;
-  G.S = newQuest([c0], id, { seed: (Math.random() * 0x7fffffff) | 0, ...(carry || {}) });
+  G.S = dressCols(newQuest([c0], id, { seed: (Math.random() * 0x7fffffff) | 0, ...(carry || {}) }));
   G.mode = 'fight'; G.paused = false; acc = 0; G.overShown = false; view.fresh();
   hud.show(true); hud.setNames(G.S); hud.setMoves(G.S, 0); hud.showMoves(movesOn);
   document.body.classList.remove('at-title');
@@ -700,7 +721,7 @@ function toRoom(send) {
 }
 
 function onCtl(m) {
-  if (m.t === 'pick') G.select?.setOther(m.ch, m.ok);
+  if (m.t === 'pick') G.select?.setOther(m.ch, m.ok, m.col);
   else if (m.t === 'start') beginOnline(m);
   else if (m.t === 'room') { G.room.mode = m.mode; G.room.stage = m.stage; toSelect('online', G.side); }
   else if (m.t === 'stage') { G.room.stage = m.stage; if (menu.cur === G.roomScr) menu.render(); }
@@ -770,18 +791,21 @@ function startOnline(c0, c1, carry = null) {
   const oneWay = G.net.rtt / 2 / (1000 / 60);
   const delay = Math.max(1, Math.min(5, Math.ceil(oneWay * 0.6)));
   const quest = G.room.mode === 'quest' ? G.room.stage : null;
-  const m = { t: 'start', ch: [c0, c1], delay, quest, seed: quest ? (Math.random() * 0x7fffffff) | 0 : 0, carry, gid: 1 + ((Math.random() * 0x7ffffffe) | 0) };
+  const m = { t: 'start', ch: [c0, c1], col: G.cols, delay, quest, seed: quest ? (Math.random() * 0x7fffffff) | 0 : 0, carry, gid: 1 + ((Math.random() * 0x7ffffffe) | 0) };
   G.net.ctl(m);
   beginOnline(m);
 }
-function beginOnline({ ch, delay, quest, seed, carry, gid }) {
+function beginOnline(m) {
+  const { ch, delay, quest, seed, carry, gid } = m;
+  if (m.col) G.cols = m.col;
+  if (quest && needLoad(quest, () => beginOnline(m))) return;
   G.vote = G.otherVote = null;
   menu.hide(); closeOverlay(); cards3d?.stop();
   document.body.classList.remove('at-title');
   G.kind = 'online'; G.chars = ch;
   if (quest) { G.room.mode = 'quest'; G.room.stage = quest; }
   view.camOffset = 0; view.marks = true;
-  const init = quest ? newQuest(ch, quest, { seed, ...(carry || {}) }) : newMatch(ch[0], ch[1]);
+  const init = dressCols(quest ? newQuest(ch, quest, { seed, ...(carry || {}) }) : newMatch(ch[0], ch[1]));
   G.rb = new Rollback({ local: G.side, init, send: (m) => G.net?.fast(m), delay, gid });
   G.S = G.rb.S;
   G.mode = 'fight'; G.paused = false; acc = 0; G.overShown = false; view.fresh();
@@ -798,7 +822,38 @@ function netStatus() {
 }
 
 // ---------- 開始 ----------
-if (qs.has('debug')) window.__g = { G, view, hud, keys, menu, touch, step, newMatch, CHARS, music, play, toRoom, toSelect };
+// 讀取：字、頭像、競技場（每隻角色、特效、道具畫一次）、首頁海報、選角閃卡。著色器都在這裡編好，開打、進選角才不會頓（view/prewarm.js）
+async function boot() {
+  const L = loading('讀取中', true);
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  L.step(0.02, '字和頭像');
+  await Promise.race([hud.warm(), wait(4000)]);       // 字是分包下載的，網路慢就不等了
+  L.step(0.15, '角色和特效');
+  await prewarm(view, null, (k) => L.step(0.15 + 0.55 * k));
+  L.step(0.7, '首頁');
+  poster = new Poster(view.renderer, view.ink);
+  await compile(view.renderer, poster.scene, poster.cam);
+  poster.render(0);
+  L.step(0.8, '選角');
+  cards3d = new CardStage();
+  await cards3d.warm();
+  // 選角那頁也先發一次牌（卡、六角格、魔法陣、卡上的 3D 角色第一次畫也會頓）
+  const scr = selectScreen({ mode: 'local', back() {}, done() {} });
+  scr.refresh = () => menu.render();
+  menu.show(scr);
+  cards3d.start();
+  for (let i = 0; i < 50; i++) { cards3d.render(1 / 60); await frames(1); }
+  cards3d.stop(); menu.hide();
+  L.step(0.9, '字卡');
+  await hud.prime(newMatch('manatee', 'marmot'));
+  L.step(1);
+  return L;
+}
+const frames = async (n) => { for (let i = 0; i < n; i++) await new Promise((r) => requestAnimationFrame(r)); };
+let booted = null;
+try { booted = await boot(); } catch (e) { console.error(e); document.getElementById('load').hidden = true; }
+
+if (qs.has('debug')) window.__g = { G, view, hud, keys, menu, touch, step, newMatch, CHARS, music, play, toRoom, toSelect, startFight, startQuest };
 // ?fight=manatee,marmot 直接進本機對戰（截圖、測試用）；&train 練習；&cpu=3 對電腦（幾級）；?quest=marmot 直接闖關、&stage=tunnel 從哪一關開始
 if (qs.has('quest')) startQuest(CHARS[qs.get('quest')] && !CHARS[qs.get('quest')].npc ? qs.get('quest') : 'marmot', QUESTS[qs.get('stage')] ? qs.get('stage') : ORDER[0]);
 else if (qs.has('fight')) {
@@ -815,3 +870,5 @@ else if (qs.has('fight')) {
   goOnline(code, false, { card: true });
 } else toTitle();
 requestAnimationFrame(loop);
+// 首頁（或直接開打）先畫幾個畫面才拿掉讀取卡：第一次畫的那一下頓藏在讀取卡底下
+if (booted) { await frames(10); booted.done(); }

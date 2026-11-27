@@ -17,10 +17,11 @@ export function markOf(S, p) {
   return { c: CPU, label: '' };
 }
 
-// 同一隻角色場上已經有一隻了（前面的格子）：換色。雜兵、闖關專用的角色不算
+// 穿第二套色嗎：選角選的（p.col，防確定＝換色）；同一隻角色前面的格子已經穿這套了，就換另一套。雜兵、闖關專用的角色不算
 export function isAlt(S, p) {
   if (p.mini || CHARS[p.ch]?.npc) return false;
-  return S.p.some((o, j) => j < p.i && o.ch === p.ch && !o.mini);
+  const want = !!p.col;
+  return S.p.some((o, j) => j < p.i && o.ch === p.ch && !o.mini && isAlt(S, o) === want) ? !want : want;
 }
 
 const TEX = {};
