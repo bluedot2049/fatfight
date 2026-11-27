@@ -50,7 +50,7 @@ function resetRound(S) {
   S.ph = 'intro'; S.pt = 0; S.pr = []; S.freeze = 0; S.rw = -2; S.it = []; S.itT = 0;
   for (const f of S.p) {
     const H = f.H, x = f.team ? START_X : -START_X;
-    const ai = f.ai ? newAI(f.ai.lv, f.ai.r) : null;           // 電腦：難度和亂數接著用，其他重來
+    const ai = f.ai ? Object.assign(newAI(f.ai.lv, f.ai.r, f.ai.mob), { pm: f.ai.pm ? f.ai.pm.slice() : [0, 0, 0, 0, 0, 0] }) : null;   // 電腦：難度、亂數、被罰過什麼接著用，其他重來
     Object.assign(f, keepCards(f, newFighter(f.ch, f.i, f.team, x, f.team ? -1 : 1)), { H, pad: f.pad, main: f.main, ai });   // 強化卡跟著人走（之後的對戰卡片模式）
   }
 }
