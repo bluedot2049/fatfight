@@ -261,6 +261,21 @@ export class View {
           this.fx.spark(x, y, 0, '#dfe8f0', z); this.fx.bolts(x, y, '#ffffff', 2, 0.35, z, 0.12); this.fx.shock(x, y, '#c8d4dc', 0.6, z, 0.12);
           break;
         }
+        const zc = CHARS[S.p[e.s]?.ch]?.zap;
+        if (zc && su && this.show.lastHit(S, e)) {      // 閃電拳手的超必殺最後一下：不炸一大團，天上一道雷單點劈在對方身上
+          const D = S.p[e.d], gx = D ? D.x * U : x, gz = D ? (D.z || 0) * U : z, by = D ? (D.y + CHARS[D.ch].h * 0.55) * U : y;
+          // 前 5 幀被超必殺最後一下的剪影蓋住（super.js），所以留久一點，剪影收掉之後還劈著
+          this.fx.strike(gx, by, gz, zc, 10, 0.46, 0.55); this.fx.strike(gx, by, gz, HOT, 10, 0.36, 0.35);
+          this.fx.beam(gx, by, gz, zc, 10, 0.42, 0.32);  // 雷後面一條細光柱，從天上直直到對方身上
+          this.fx.spark(gx, by, 0, zc, gz);
+          this.fx.glow(gx, by, HOT, 1.3, gz, 0.16); this.fx.glow(gx, by, zc, 1.8, gz, 0.24);
+          this.fx.bolts(gx, by, zc, 4, 0.9, gz, 0.22);
+          this.shake = Math.max(this.shake, 0.08); this.punch = Math.max(this.punch, 0.6);
+          this.kickY.v -= 2.2;                           // 鏡頭往下頂（從上面劈下來），不往左右頂
+          const vd = this.fighters[e.d];
+          if (vd) { vd.white = 1; vd.jig.x = -0.13; vd.jig.v = 0; }
+          break;
+        }
         this.fx.spark(x, y, e.big, c, z);
         this.fx.slash(x, y, HOT, e.big, z);
         this.fx.glow(x, y, c, e.big ? 2.4 : 1.1, z);
@@ -274,7 +289,6 @@ export class View {
           this.fx.motes(x, y, c, su ? 10 : 5, z);
           this.punch = Math.max(this.punch, su ? 0.9 : 0.55);
         } else if ((e.combo || 0) >= 3) { this.fx.bolts(x, y, c, 2, 0.8, z); this.fx.motes(x, y, c, 2, z); }
-        const zc = CHARS[S.p[e.s]?.ch]?.zap;
         if (zc) {                                        // 閃電拳手（胖鼠）：每一拳都帶電，必殺重擊從頭上劈一道雷
           const power = e.kind === 'sp' || e.kind === 'su';
           this.fx.bolts(x, y, zc, e.big ? 5 : 2, e.big ? 1.5 : 0.6, z, e.big ? 0.22 : 0.12);

@@ -331,6 +331,7 @@ const KIT = {
       toothF(t) { snap(t, 1); buzz(t, 0.24, 1, 110); noise(t + 0.03, 0.18, 400, 1.2, 0.3, 'bandpass', 1800); thunder(t + 0.02, 0.35); },
       toothD(t) { snap(t, 1); buzz(t, 0.24, 1, 140); noise(t + 0.03, 0.2, 1700, 1.2, 0.3, 'bandpass', 300); thunder(t + 0.02, 0.35); },
       zap(t) { snap(t, 0.9); buzz(t, 0.2, 0.8, 120); thunder(t + 0.01, 0.45); },   // 被動狂雷附體：普攻追加的那道雷
+      suEnd(t) { snap(t, 1); thunder(t + 0.01, 0.85); boom(t + 0.02, 0.6); peal(t + 0.35, 1.8, 0.4, 200); },   // 狂妄煞最後一下：落雷劈下來
     },
     slam(t) { thunder(t, 1); boom(t, 0.8); snap(t, 0.8); },                      // 砸下去的人撞到地
     super(t) {
@@ -978,7 +979,9 @@ export function play(name, arg = {}, pan = 0) {
 export function sfxEvent(e, pan = 0, S = null) {
   const ch = S?.p[e.s]?.ch;
   switch (e.k) {
-    case 'hit': play('hit', { ...e, ch, mv: e.src ? '' : e.mv || S?.p[e.s]?.mv, h: evHash(e) }, pan); if (e.d !== undefined && !e.armor) tryGrunt(S, e.d, 'hurt', e.big, pan, ctx && cutVoice(e.d)); break;
+    case 'hit': play('hit', { ...e, ch, mv: e.src ? '' : e.mv || S?.p[e.s]?.mv, h: evHash(e) }, pan); if (e.d !== undefined && !e.armor) tryGrunt(S, e.d, 'hurt', e.big, pan, ctx && cutVoice(e.d));
+      if (e.kind === 'su' && e.stop >= 14 && KIT[ch]?.fork?.suEnd) play('fork', { ch, id: 'suEnd' }, pan);   // 超必殺最後一下另外一聲（胖鼠的落雷）
+      break;
     case 'block': play('block', e, pan); break;
     case 'break': play('shatter', e, pan); break;
     case 'dizzy': play('dizzy', e, pan); break;

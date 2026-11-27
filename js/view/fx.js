@@ -277,13 +277,19 @@ export class FX {
     }
   }
   // 落雷（胖鼠）：從頭上劈下來一道到那一點，一閃一閃；底下白光亮一下
-  strike(x, y, z, color, h = 3, life = 0.2) {
+  strike(x, y, z, color, h = 3, life = 0.2, w = 1) {   // w：粗細倍數（很長的一道要細一點才看得出鋸齒）
     for (let i = 0; i < 2; i++) {
-      const tex = T.bolt + ((Math.random() * 6) | 0), ph = Math.random() * 6, th = h * (i ? 0.13 : 0.22);
-      const o = this.sp(tex, i ? WHITE : color, x + (Math.random() - 0.5) * 0.12, y + h, z + 0.43, life * (i ? 0.8 : 1), (o, k) => { o.sx = h * Math.min(1, k * 7); o.sy = th; o.a = (1 - k) * (0.6 + 0.4 * Math.sin(ph + k * 55)); });
-      o.rot = -Math.PI / 2; o.anc = 1;
+      const tex = T.bolt + ((Math.random() * 6) | 0), ph = Math.random() * 6, th = h * (i ? 0.13 : 0.22) * w;
+      // 從落點那頭往天上長（鏡頭斜看，從天上那頭對齊的話底下會戳過地板）；兩幀就長滿，看起來還是劈下來
+      const o = this.sp(tex, i ? WHITE : color, x + (Math.random() - 0.5) * 0.12, y, z + 0.43, life * (i ? 0.8 : 1), (o, k) => { o.sx = h * Math.min(1, k * 7); o.sy = th; o.a = (1 - k) * (0.6 + 0.4 * Math.sin(ph + k * 55)); });
+      o.rot = Math.PI / 2; o.anc = 1;
     }
     this.glow(x, y, WHITE, 1.1, z, 0.12);
+  }
+  // 細光柱：從 (x, y) 直直往上一條光（落雷後面墊的），一下子亮、慢慢變細淡掉
+  beam(x, y, z, color, h = 8, life = 0.3, w = 0.3) {
+    const o = this.sp(T.streak, color, x, y, z + 0.4, life, (o, k) => { o.sx = h; o.sy = w * (1 - k * 0.7); o.a = 0.7 * (1 - k); });
+    o.rot = Math.PI / 2; o.anc = 1;
   }
   // 月牙刀光的一段：爪子這一幀走過的路。view 每幀接一段，連起來是一道弧；新的粗、舊的變細淡掉，所以頭粗尾尖
   swipe(x0, y0, z0, x1, y1, z1, color, w = 0.3, life = 0.2) {
